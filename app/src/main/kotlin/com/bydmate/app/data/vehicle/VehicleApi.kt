@@ -20,6 +20,13 @@ interface VehicleApi {
     suspend fun readBatterySnapshot(): BatteryReading?
     suspend fun readSnapshot(): DiParsData?
 
+    /** APK-derived reflection read. 1/2 are raw firmware codes, not assumed folded/open meanings. */
+    suspend fun readRearMirrorState(): com.bydmate.app.data.vehicle.reflection.ReflectionRead<Int> =
+        com.bydmate.app.data.vehicle.reflection.ReflectionRead.Unavailable(
+            com.bydmate.app.data.vehicle.reflection.ReflectionFailure.CLASS_MISSING,
+            "Rear mirror reflection reader is not configured",
+        )
+
     // Individual read accessors (grow organically as consumers migrate).
     suspend fun readSoc(): Float?
     suspend fun readSpeed(): Float?
