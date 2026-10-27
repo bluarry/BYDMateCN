@@ -168,6 +168,14 @@ class AvmCameraProbe(
             return false
         }
         if (camera != null) close("reopen")
+        // All in-process users (blind-spot and manual preview) share exclusive ownership.
+        synchronized(ownershipLock) {
+            if (owner != null && owner !== this) {
+                append("open refused: another BYDMate camera session owns AVM")
+                return false
+            }
+            owner = this
+        }
         // A late event after the last close must not count as a repeat in this session.
         events.end()
         return try {
@@ -256,7 +264,10 @@ class AvmCameraProbe(
      */
     @Synchronized
     fun close(reason: String) {
-        val cam = camera ?: return
+        val cam = camera ?: run {
+            releaseOwnership()
+            return
+        }
         val avm = cam.javaClass
         var firstError: Throwable? = null
         var failed = false
@@ -281,6 +292,7 @@ class AvmCameraProbe(
         }
         camera = null
         bound.clear()
+        releaseOwnership()
         val err = firstError
         val (line, result) = when {
             err == null -> "closed cleanly" to "clean"
@@ -311,7 +323,14 @@ class AvmCameraProbe(
         return "${cur.javaClass.simpleName}: ${cur.message}"
     }
 
+    private fun releaseOwnership() {
+        synchronized(ownershipLock) { if (owner === this) owner = null }
+    }
+
     companion object {
+        private val ownershipLock = Any()
+        private var owner: AvmCameraProbe? = null
+
         private val CAMERA_TAGS = listOf("pano_h", "pano_l", "apa", "byd_apa")
         private const val TAG = "CameraProbe"
     }

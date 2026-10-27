@@ -2174,4 +2174,5 @@
     <string name="tech_card_fuel">Топливо</string>
     <string name="settings_fuel_price_label">Цена литра</string>
     <string name="settings_fuel_price_hint">за литр, на поездки с этой даты</string>
+    <string name="nav_tab_local">工具</string>
 </resources>

@@ -21,7 +21,7 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "com.bydmate.app"
-    compileSdk = 34
+    compileSdk = 29
 
     defaultConfig {
         applicationId = "com.bydmate.app"

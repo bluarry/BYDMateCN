@@ -90,6 +90,7 @@ enum class Screen(val route: String, val labelRes: Int, val icon: ImageVector) {
     Trips("trips", R.string.nav_tab_trips, Icons.Outlined.DirectionsCar),
     Charges("charges", R.string.nav_tab_charges, Icons.Outlined.BatteryChargingFull),
     Automation("automation", R.string.nav_tab_automation, Icons.Outlined.Bolt),
+    Local("local_capabilities", R.string.nav_tab_local, Icons.Outlined.DirectionsCar),
     Settings("settings", R.string.nav_tab_settings, Icons.Outlined.Settings)
 }
 
@@ -304,6 +305,12 @@ fun AppNavigation(
             }
             composable(Screen.Charges.route) {
                 ChargesScreen(onNavigateSettings = { navController.navigate(Screen.Settings.route) })
+            }
+            composable(Screen.Local.route) {
+                com.bydmate.app.local.LocalCapabilitiesScreen(onNavigate = { navController.navigate(it) })
+            }
+            composable("tool_settings/{section}") { entry ->
+                SettingsScreen(initialSection = entry.arguments?.getString("section"))
             }
             composable(Screen.Automation.route) { AutomationScreen() }
             composable(Screen.Settings.route) {

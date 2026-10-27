@@ -82,6 +82,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.BYDMate">
 
+        <activity android:name=".local.LocalToolsActivity" android:exported="false" />
+        <activity android:name=".local.LocalCameraActivity" android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

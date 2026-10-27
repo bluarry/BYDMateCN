@@ -200,6 +200,7 @@ fun SettingsScreen(
     onNavigateToVoiceJournal: () -> Unit = {},
     onNavigateToVoiceUserPhrases: () -> Unit = {},
     onNavigateToTariffPeriods: () -> Unit = {},
+    initialSection: String? = null,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -261,7 +262,9 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        var selected by rememberSaveable { mutableStateOf(SettingsSection.VOICE) }
+        var selected by rememberSaveable(initialSection) {
+            mutableStateOf(SettingsSection.entries.firstOrNull { it.name == initialSection } ?: SettingsSection.VOICE)
+        }
         val hiddenSelected = selected == SettingsSection.SMART_HOME
         val safeSelected = if (hiddenSelected && !state.devModeUnlocked) {
             SettingsSection.VOICE
