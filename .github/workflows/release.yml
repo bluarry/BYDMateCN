@@ -66,8 +66,11 @@ jobs:
           python3 - <<'PY'
           import base64, os
           from pathlib import Path
-          names = ['KEYSTORE_BASE64', 'STORE_PASSWORD', 'KEY_ALIAS', 'KEY_PASSWORD']
-          missing = [name for name in names if not os.environ.get(name)]
+          secret_names = {'KEYSTORE_BASE64': 'ANDROID_KEYSTORE_BASE64',
+                          'STORE_PASSWORD': 'ANDROID_KEYSTORE_PASSWORD',
+                          'KEY_ALIAS': 'ANDROID_KEY_ALIAS',
+                          'KEY_PASSWORD': 'ANDROID_KEY_PASSWORD'}
+          missing = [secret for variable, secret in secret_names.items() if not os.environ.get(variable)]
           if missing:
               raise SystemExit('缺少发布签名 Secrets，请在仓库 Settings → Secrets and variables → Actions 中配置：' + ', '.join(missing))
           key = Path(os.environ['RUNNER_TEMP']) / 'bydmatecn-release.jks'

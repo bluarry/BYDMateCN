@@ -13,7 +13,7 @@ plugins {
 }
 
 // Release signing is loaded from keystore.properties (gitignored, never in VCS).
-// When the file is absent (CI, fresh clone), the release build is left unsigned.
+// Android Studio can also supply signing through android.injected.signing.* properties.
 val keystorePropsFile = rootProject.file("keystore.properties")
 val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) load(FileInputStream(keystorePropsFile))
@@ -152,10 +152,26 @@ android {
 // unaffected; explicit escape hatch for exotic cases.
 gradle.taskGraph.whenReady {
     val wantsRelease = allTasks.any { it.name == "assembleRelease" || it.name == "bundleRelease" }
-    if (wantsRelease && !keystorePropsFile.exists() && !project.hasProperty("allowUnsignedRelease")) {
+    // Generate Signed APK in Android Studio injects these properties instead of creating
+    // keystore.properties. AGP consumes them; do not copy passwords into files or logs.
+    val injectedSigningProperties = listOf(
+        "android.injected.signing.store.file",
+        "android.injected.signing.store.password",
+        "android.injected.signing.key.alias",
+        "android.injected.signing.key.password",
+    )
+    val hasInjectedSigning = injectedSigningProperties.all {
+        !project.findProperty(it)?.toString().isNullOrBlank()
+    } && project.findProperty("android.injected.signing.store.file")?.toString()?.let {
+        rootProject.file(it).isFile
+    } == true
+    if (wantsRelease && !keystorePropsFile.exists() && !hasInjectedSigning &&
+        !project.hasProperty("allowUnsignedRelease")
+    ) {
         throw GradleException(
             "keystore.properties not found - release build would be UNSIGNED. " +
-            "Add keystore.properties or pass -PallowUnsignedRelease."
+            "Use Android Studio Generate Signed App Bundle or APK, add keystore.properties, " +
+                "or explicitly pass -PallowUnsignedRelease for an unsigned artifact."
         )
     }
 }
