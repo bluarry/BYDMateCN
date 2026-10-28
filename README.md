@@ -1,5 +1,7 @@
 # BYDMateCN
 
+> **WIP（开发与适配中）**：尚未完成实车验证，不保证所有车型及固件可用。欢迎自愿测试后通过 [Issues](https://github.com/bluarry/BYDMateCN/issues) 反馈问题与日志。仅在安全驻车时测试，勿在驾驶中调试；分享日志前请检查并遮盖隐私信息。
+
 面向比亚迪 DiLink 车机的中文优先版本：行程与能耗分析、车辆状态、自动化、多屏/盲区显示，以及本地音频、驻车录像和问题日志。
 
 ## 项目来源与定位
@@ -84,7 +86,7 @@
 
 ## 安装与实车验收
 
-1. 安装 `app/build/outputs/apk/debug/BYDMateCN-v4.0.1.apk`，仅用于已获授权的车机测试。
+1. 安装 `app/build/outputs/apk/debug/BYDMateCN.apk`，仅用于已获授权的车机测试。
 2. 独立包名与原 BYDMate 可并存，但**不继承旧包数据或权限**。重新授权相机/麦克风、悬浮窗、通知访问、辅助功能等实际需要项。厂商包名白名单可能需合法固件配置。
 3. 停用旧应用的相机、自动化与常驻服务，避免竞争车辆硬件。先 P 挡驻车、低音量、单路相机标定，再逐项测试。
 4. 按 [宋 L DM-i 实车验证文档](docs/song-l-dmi-real-car-validation.md) 记录结果。出现问题：导出 TXT，附发生时间、权限、车机版本、操作顺序和实际现象；必要时另附已授权采集的系统日志/视频。
@@ -99,7 +101,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 & "$env:JAVA_HOME\bin\java.exe" -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain :app:assembleDebug
 ```
 
-输出：`app/build/outputs/apk/debug/BYDMateCN-v4.0.1.apk`。测试可按 `com.bydmatecn.app.*` 包选择运行。没有发布签名配置时不能把 debug 包当正式签名发布版本。
+输出：`app/build/outputs/apk/debug/BYDMateCN.apk`。测试可按 `com.bydmatecn.app.*` 包选择运行。没有发布签名配置时不能把 debug 包当正式签名发布版本。
 
 ### 车机 SDK 与权限
 
@@ -120,3 +122,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 ## 开源来源与许可证
 
 感谢 BYDMate 原作者、贡献者与所基于分支的维护者；本分支保留原项目版权与许可证约束。请阅读 [LICENSE](LICENSE)，尤其非商业使用及再分发条件；fork 和功能扩展不改变原许可证，不意味着获得商业发布授权。
+
+## GitHub 自动预发布
+
+推送与应用版本一致的 `v1.0.0` 等标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN.apk`，创建 **WIP 预发布版**并附 SHA-256 校验文件。须先配置发布签名 Secrets；见 [发布配置与操作说明](docs/github-release.md)。普通推送和 PR 不会发布。

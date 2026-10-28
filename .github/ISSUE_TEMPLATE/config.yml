@@ -1,5 +1,10 @@
+# 允许直接创建问题；捐赠入口默认隐藏。
 blank_issues_enabled: true
 contact_links:
-  - name: Поддержать проект
-    url: https://github.com/AndyShaman/BYDMate/blob/main/SUPPORT.md
-    about: Реквизиты для донатов в USDT (сети EVM: Arbitrum, Optimism, Polygon, BNB, Avalanche, Ethereum)
+  - name: 使用说明与测试须知
+    url: https://github.com/bluarry/BYDMateCN#readme
+    about: 本项目处于 WIP 阶段，请先阅读功能边界与实车验证说明，自愿测试后反馈。
+# 如需恢复捐赠入口，请先核实原作者收款信息。
+#  - name: 支持原项目
+#    url: https://github.com/AndyShaman/BYDMate/blob/main/SUPPORT.md
+#    about: 查看原项目的支持说明；不是 BYDMateCN 分支的收款入口。

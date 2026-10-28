@@ -32,7 +32,7 @@ android {
         // targetSdk 30+ would break listFiles() on /storage/emulated/0/energydata/
         targetSdk = 29
         versionCode = 508
-        versionName = "4.0.1"
+        versionName = "1.0.0"
         // Independent fork: no donor APKs may be offered as this application's updates.
         buildConfigField("String", "APP_UPDATE_URL", "\"\"")
         // Retain donor donation UI/resources, but hide every entry in this fork.
@@ -67,10 +67,9 @@ android {
     }
 
     applicationVariants.all {
-        val variant = this
-        variant.outputs.all {
+        outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "BYDMateCN-v${variant.versionName}.apk"
+            output.outputFileName = "BYDMateCN.apk"
         }
     }
 

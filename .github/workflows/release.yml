@@ -1,0 +1,141 @@
+name: 发布 WIP 预发布版
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+# 同一标签只允许一个发布任务运行，不中断正在进行的发布。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: 构建签名 APK 并发布
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - name: 检出版本标签
+        uses: actions/checkout@v4
+
+      - name: 校验标签与应用版本一致
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          tag = os.environ['RELEASE_TAG']
+          if not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?', tag):
+              raise SystemExit('标签格式应为 v1.0.0 或 v1.0.0-beta.1')
+          source = Path('app/build.gradle.kts').read_text(encoding='utf-8')
+          version = re.search(r'versionName\s*=\s*"([^"\n]+)"', source)
+          if not version or tag != 'v' + version.group(1):
+              raise SystemExit('标签版本与 app/build.gradle.kts 中 versionName 不一致')
+          PY
+
+      - name: 配置 Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 配置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装编译所需 Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - name: 配置 Gradle 与缓存
+        uses: gradle/actions/setup-gradle@v4
+
+      # 使用固定签名；禁止降级为未签名包或临时 debug 签名。
+      - name: 从仓库 Secrets 准备发布签名
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          names = ['KEYSTORE_BASE64', 'STORE_PASSWORD', 'KEY_ALIAS', 'KEY_PASSWORD']
+          missing = [name for name in names if not os.environ.get(name)]
+          if missing:
+              raise SystemExit('缺少发布签名 Secrets，请阅读 docs/github-release.md：' + ', '.join(missing))
+          key = Path(os.environ['RUNNER_TEMP']) / 'bydmatecn-release.jks'
+          key.write_bytes(base64.b64decode(os.environ['KEYSTORE_BASE64'], validate=True))
+          key.chmod(0o600)
+          def escape(value):
+              # java.util.Properties：转义特殊字符，并将 Unicode 编码为 UTF-16 转义。
+              out = ''
+              for char in value:
+                  if char in '\\ :=#!': out += '\\' + char
+                  elif char == '\n': out += r'\n'
+                  elif char == '\r': out += r'\r'
+                  elif char == '\t': out += r'\t'
+                  elif ord(char) > 127:
+                      units = char.encode('utf-16-be')
+                      out += ''.join('\\u' + units[i:i+2].hex() for i in range(0, len(units), 2))
+                  else: out += char
+              return out
+          props = {'storeFile': str(key), 'storePassword': os.environ['STORE_PASSWORD'],
+                   'keyAlias': os.environ['KEY_ALIAS'], 'keyPassword': os.environ['KEY_PASSWORD']}
+          target = Path('keystore.properties')
+          target.write_text(''.join(k + '=' + escape(v) + '\n' for k, v in props.items()), encoding='ascii')
+          target.chmod(0o600)
+          PY
+
+      - name: 构建发布 APK
+        run: bash ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: 验证签名并生成 SHA-256
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp app/build/outputs/apk/release/BYDMateCN.apk release-assets/BYDMateCN.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose release-assets/BYDMateCN.apk
+          (cd release-assets && sha256sum BYDMateCN.apk > BYDMateCN.apk.sha256)
+
+      - name: 上传构建产物留档
+        uses: actions/upload-artifact@v4
+        with:
+          name: BYDMateCN-release
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 创建 GitHub WIP 预发布版
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          ## BYDMateCN · WIP（开发与适配中）
+          本项目 fork 自 BYDMate。本次发布是测试用预发布版，不代表已完成实车验证，也不保证所有车型或固件可用。
+
+          欢迎自愿在安全驻车状态下测试，通过本仓库 Issues 反馈车型、固件版本、问题复现步骤和导出日志。请勿在驾驶中调试；上传日志前请检查并遮盖隐私信息。
+
+          - 安装包：`BYDMateCN.apk`（固定发布密钥签名）
+          - 校验文件：`BYDMateCN.apk.sha256`
+          - 安装权限、功能边界和实车验证步骤请阅读仓库 README 与 docs。
+          - 若已安装版本使用不同签名，无法直接覆盖升级；请先导出备份，确认卸载会清除数据后再处理。后续版本须持续使用同一发布密钥并提高 versionCode。
+          NOTES
+          # 已有同名 Release 时失败，不覆盖已发布安装包。
+          gh release create "$RELEASE_TAG" release-assets/BYDMateCN.apk release-assets/BYDMateCN.apk.sha256 \
+            --verify-tag --prerelease --title "BYDMateCN $RELEASE_TAG · WIP" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+
+      - name: 清理临时签名文件
+        if: always()
+        run: |
+          rm -f -- keystore.properties "$RUNNER_TEMP/bydmatecn-release.jks"
