@@ -94,7 +94,7 @@
 
 ## 构建
 
-当前工具链：JDK 24.0.2+12、Gradle 8.14.5、AGP 8.7.3、Kotlin 2.1.0。依赖源使用国内镜像，Android Studio SDK 路径通过本机 `local.properties` 配置。
+当前工具链：JDK 24.0.2+12、Gradle 8.14.5、AGP 8.7.3、Kotlin 2.1.0。本地依赖源优先使用国内镜像（官方源兜底），GitHub Actions 使用官方源，Android Studio SDK 路径通过本机 `local.properties` 配置。
 
 ```powershell
 $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
