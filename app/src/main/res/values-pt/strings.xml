@@ -2004,4 +2004,5 @@
     <string name="settings_fuel_price_label">Preço por litro</string>
     <string name="settings_fuel_price_hint">por litro, para viagens a partir desta data</string>
     <string name="automation_learned_key_label">Tecla %1$d</string>
+    <string name="nav_tab_local">Ferramentas</string>
 </resources>

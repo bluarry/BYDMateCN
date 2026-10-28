@@ -2160,4 +2160,5 @@
     <string name="settings_fuel_price_label">Цана літра</string>
     <string name="settings_fuel_price_hint">за літр, на паездкі з гэтай даты</string>
     <string name="automation_learned_key_label">Клавіша %1$d</string>
+    <string name="nav_tab_local">Інструменты</string>
 </resources>
