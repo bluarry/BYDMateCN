@@ -67,3 +67,6 @@ CONTEXT.md
 
 # 本地非公开文档，不提交至远程仓库。
 /.docs/
+
+# Android Studio 签名向导生成的发布产物。
+/app/release/
