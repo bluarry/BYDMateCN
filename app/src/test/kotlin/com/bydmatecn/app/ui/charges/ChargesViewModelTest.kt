@@ -1,0 +1,770 @@
+package com.bydmatecn.app.ui.charges
+
+import com.bydmatecn.app.data.autoservice.BatteryReading
+import com.bydmatecn.app.data.vehicle.VehicleApi
+import com.bydmatecn.app.data.local.LocalePreferences
+import com.bydmatecn.app.data.local.dao.BatterySnapshotDao
+import com.bydmatecn.app.data.local.dao.ChargeDao
+import com.bydmatecn.app.data.local.dao.ChargePointDao
+import com.bydmatecn.app.data.local.dao.ChargeSummary
+import com.bydmatecn.app.data.local.dao.SettingsDao
+import com.bydmatecn.app.data.local.entity.BatterySnapshotEntity
+import com.bydmatecn.app.data.local.entity.ChargeEntity
+import com.bydmatecn.app.data.local.entity.ChargePointEntity
+import com.bydmatecn.app.data.local.entity.SettingEntity
+import com.bydmatecn.app.data.repository.BatteryHealthRepository
+import com.bydmatecn.app.data.repository.ChargeRepository
+import com.bydmatecn.app.data.repository.SettingsRepository
+import com.bydmatecn.app.domain.battery.BatteryStateRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import android.content.Context
+import android.content.res.Configuration
+import android.content.res.Resources
+import android.os.LocaleList
+import io.mockk.coVerify
+import io.mockk.every
+import java.util.Locale
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import io.mockk.mockk
+import java.util.Calendar
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class ChargesViewModelTest {
+
+    private val testDispatcher = StandardTestDispatcher()
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(testDispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    // ─── Fake DAOs ────────────────────────────────────────────────────────────
+
+    private class FakeSettingsDao(
+        batteryCapacity: String = "72.9"
+    ) : SettingsDao {
+        val map = mutableMapOf(
+            SettingsRepository.KEY_BATTERY_CAPACITY to batteryCapacity,
+            SettingsRepository.KEY_CURRENCY to "BYN"
+        )
+        override suspend fun get(key: String): String? = map[key]
+        override suspend fun getMany(keys: List<String>): List<SettingEntity> =
+            keys.mapNotNull { k -> map[k]?.let { SettingEntity(k, it) } }
+        override fun observe(key: String): Flow<String?> = flowOf(map[key])
+        override suspend fun set(entity: SettingEntity) { map[entity.key] = entity.value ?: "" }
+        override suspend fun setAll(settings: List<SettingEntity>) { settings.forEach { set(it) } }
+        override fun getAll(): Flow<List<SettingEntity>> = flowOf(emptyList())
+    }
+
+    private class FakeChargeDao(
+        val chargesFlow: MutableStateFlow<List<ChargeEntity>> = MutableStateFlow(emptyList()),
+        private val autoserviceCharges: List<ChargeEntity> = emptyList(),
+        private val legacyExists: Boolean = false
+    ) : ChargeDao {
+        var lastInserted: ChargeEntity? = null
+        var lastUpdated: ChargeEntity? = null
+        override suspend fun insert(charge: ChargeEntity): Long {
+            val newId = (chargesFlow.value.maxOfOrNull { it.id } ?: 0L) + 1L
+            val withId = charge.copy(id = newId)
+            chargesFlow.value = chargesFlow.value + withId
+            lastInserted = withId
+            return newId
+        }
+        override suspend fun update(charge: ChargeEntity) {
+            chargesFlow.value = chargesFlow.value.map { if (it.id == charge.id) charge else it }
+            lastUpdated = charge
+        }
+        override fun getAll(): Flow<List<ChargeEntity>> = chargesFlow
+        override suspend fun getById(id: Long): ChargeEntity? =
+            chargesFlow.value.find { it.id == id }
+        override fun getByDateRange(from: Long, to: Long): Flow<List<ChargeEntity>> =
+            flowOf(chargesFlow.value.filter { it.startTs in from..to })
+        override suspend fun getPeriodSummary(from: Long, to: Long): ChargeSummary =
+            ChargeSummary(0, 0.0, 0.0)
+        override fun getLastCharge(): Flow<ChargeEntity?> = flowOf(null)
+        override suspend fun getLastSuspendedCharge(): ChargeEntity? = null
+        override suspend fun getStaleSessions(cutoffTs: Long): List<ChargeEntity> = emptyList()
+        override suspend fun getLastChargeSync(): ChargeEntity? = null
+        override suspend fun getRecentChargesWithBatteryData(): List<ChargeEntity> = emptyList()
+        override suspend fun getMaxLifetimeKwhAtFinish(): Double? = null
+        override suspend fun getAllAutoserviceCharges(): List<ChargeEntity> = autoserviceCharges
+        override suspend fun hasLegacyCharges(): Boolean = legacyExists
+        override suspend fun deleteEmpty(): Int {
+            val before = chargesFlow.value
+            val after = before.filter { it.kwhCharged != null && it.kwhCharged >= 0.05 }
+            chargesFlow.value = after
+            return before.size - after.size
+        }
+        override suspend fun getInRangeAsc(from: Long, to: Long): List<ChargeEntity> = emptyList()
+        override suspend fun getCompletedForPricing(until: Long): List<ChargeEntity> = emptyList()
+        override suspend fun getWithMeterReading(): List<ChargeEntity> = emptyList()
+        override suspend fun deletePhantomAutoserviceRows(): Int = 0
+        override suspend fun delete(charge: ChargeEntity) {
+            chargesFlow.value = chargesFlow.value.filter { it.id != charge.id }
+        }
+        override suspend fun getCompletedSince(since: Long): List<ChargeEntity> =
+            chargesFlow.value.filter {
+                it.startTs >= since && it.status == "COMPLETED" &&
+                    (it.kwhCharged ?: 0.0) >= 0.05
+            }
+    }
+
+    private class StubChargePointDao : ChargePointDao {
+        override suspend fun insertAll(points: List<ChargePointEntity>) {}
+        override suspend fun getByChargeId(chargeId: Long): List<ChargePointEntity> = emptyList()
+        override suspend fun getCount(): Int = 0
+        override suspend fun thinOldPoints(cutoff: Long, intervalMs: Long): Int = 0
+    }
+
+    private class FakeBatterySnapshotDao(
+        private val snapshots: List<BatterySnapshotEntity> = emptyList()
+    ) : BatterySnapshotDao {
+        override fun getAll(): Flow<List<BatterySnapshotEntity>> = flowOf(snapshots)
+        override fun getRecent(limit: Int): Flow<List<BatterySnapshotEntity>> = flowOf(snapshots.take(limit))
+        override suspend fun insert(snapshot: BatterySnapshotEntity): Long = 0L
+        override suspend fun getLast(): BatterySnapshotEntity? = snapshots.firstOrNull()
+        override suspend fun getCount(): Int = snapshots.size
+    }
+
+    private class FakeAutoserviceClient(
+        private val battery: BatteryReading?,
+        private val available: Boolean = true
+    ) : VehicleApi {
+        override suspend fun isAvailable(): Boolean = available
+        override suspend fun readBatterySnapshot(): BatteryReading? = battery
+        override suspend fun readSnapshot(): com.bydmatecn.app.data.remote.DiParsData? = null
+        override suspend fun readSoc(): Float? = null
+        override suspend fun readSpeed(): Float? = null
+        override suspend fun readMileageKm(): Float? = null
+        override suspend fun readPowerKw(): Int? = null
+        override suspend fun readAcStatus(): Int? = null
+        override suspend fun readAcTemp(): Int? = null
+        override suspend fun readInsideTemp(): Int? = null
+        override suspend fun readExteriorTemp(): Int? = null
+        override suspend fun readFanLevel(): Int? = null
+        override suspend fun readWindowDriver(): Int? = null
+        override suspend fun readWindowPassenger(): Int? = null
+        override suspend fun readWindowRearLeft(): Int? = null
+        override suspend fun readWindowRearRight(): Int? = null
+        override suspend fun dispatch(commandString: String): Result<Unit> = Result.success(Unit)
+        override suspend fun writeAcOn(): Result<Unit> = Result.success(Unit)
+        override suspend fun writeAcOff(): Result<Unit> = Result.success(Unit)
+        override suspend fun writeSetDriverTemp(celsius: Int): Result<Unit> = Result.success(Unit)
+        override suspend fun writeWindowDriver(percent: Int): Result<Unit> = Result.success(Unit)
+        override suspend fun writeWindowPassenger(percent: Int): Result<Unit> = Result.success(Unit)
+        override suspend fun writeWindowRearLeft(percent: Int): Result<Unit> = Result.success(Unit)
+        override suspend fun writeWindowRearRight(percent: Int): Result<Unit> = Result.success(Unit)
+        override suspend fun writeLockDoors(): Result<Unit> = Result.success(Unit)
+        override suspend fun writeUnlockDoors(): Result<Unit> = Result.success(Unit)
+        override suspend fun writeSunroof(mode: com.bydmatecn.app.data.vehicle.SunroofMode): Result<Unit> = Result.success(Unit)
+        override suspend fun writeSunshade(open: Boolean): Result<Unit> = Result.success(Unit)
+    }
+
+    // ─── Factory ──────────────────────────────────────────────────────────────
+
+    /** Held as a field so a test can verify the re-pricing range without a new factory arg. */
+    private val costCalculator: com.bydmatecn.app.domain.cost.CostCalculator = mockk(relaxed = true)
+
+    private fun buildViewModel(
+        chargesFlow: MutableStateFlow<List<ChargeEntity>> = MutableStateFlow(emptyList()),
+        autoserviceCharges: List<ChargeEntity> = emptyList(),
+        legacyExists: Boolean = false,
+        batteryReading: BatteryReading? = null,
+        autoserviceAvailable: Boolean = true,
+        snapshots: List<BatterySnapshotEntity> = emptyList(),
+        batteryCapacityKwh: String = "72.9"
+    ): ChargesViewModel = buildViewModelAndDao(
+        chargesFlow, autoserviceCharges, legacyExists,
+        batteryReading, autoserviceAvailable, snapshots, batteryCapacityKwh
+    ).first
+
+    private fun buildViewModelAndDao(
+        chargesFlow: MutableStateFlow<List<ChargeEntity>> = MutableStateFlow(emptyList()),
+        autoserviceCharges: List<ChargeEntity> = emptyList(),
+        legacyExists: Boolean = false,
+        batteryReading: BatteryReading? = null,
+        autoserviceAvailable: Boolean = true,
+        snapshots: List<BatterySnapshotEntity> = emptyList(),
+        batteryCapacityKwh: String = "72.9"
+    ): Pair<ChargesViewModel, FakeChargeDao> {
+        val settingsDao = FakeSettingsDao(batteryCapacityKwh)
+        val settingsRepo = SettingsRepository(settingsDao, mockk<LocalePreferences>(relaxed = true))
+
+        val chargeDao = FakeChargeDao(chargesFlow, autoserviceCharges, legacyExists)
+        val chargeRepo = ChargeRepository(chargeDao, StubChargePointDao())
+
+        val snapshotDao = FakeBatterySnapshotDao(snapshots)
+        val autoservice = FakeAutoserviceClient(batteryReading, autoserviceAvailable)
+        val batteryHealthRepo = BatteryHealthRepository(snapshotDao)
+        val batteryStateRepo = BatteryStateRepository(autoservice, batteryHealthRepo)
+
+        // Minimal Context mock — only locale lookup used in ChargesViewModel.groupChargesByMonthDay.
+        val mockLocaleList = mockk<LocaleList> { every { get(0) } returns Locale("ru") }
+        val config = mockk<Configuration> { every { locales } returns mockLocaleList }
+        val res = mockk<Resources>(relaxed = true) { every { configuration } returns config }
+        val ctx = mockk<Context>(relaxed = true) {
+            every { resources } returns res
+            every { getString(any()) } returns ""
+            every { getString(any(), any()) } returns ""
+        }
+        // appLocalizedContext() rebuilds a localized context via createConfigurationContext;
+        // route it back to the same mock so locale ("ru") and getString stubs still apply.
+        every { ctx.createConfigurationContext(any()) } returns ctx
+        return ChargesViewModel(
+            ctx, chargeRepo, snapshotDao, settingsRepo, batteryStateRepo, costCalculator
+        ) to chargeDao
+    }
+
+    // ─── Helper ───────────────────────────────────────────────────────────────
+
+    private fun makeCharge(
+        id: Long,
+        startTs: Long,
+        kwhCharged: Double? = 10.0,
+        gunState: Int? = 2,
+        type: String? = when (gunState) { 2 -> "AC"; 3, 4 -> "DC"; else -> null },
+        cost: Double? = 2.0,
+        detectionSource: String? = "autoservice_detector"
+    ) = ChargeEntity(
+        id = id,
+        startTs = startTs,
+        endTs = startTs + 3_600_000L,
+        kwhCharged = kwhCharged,
+        gunState = gunState,
+        type = type,
+        cost = cost,
+        detectionSource = detectionSource
+    )
+
+    private fun startOfToday(): Long {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
+    }
+
+    // ─── Tests ────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `effective capacity for manual kWh edit is nominal scaled by BMS SOH`() = runTest {
+        val vm = buildViewModel(
+            batteryReading = BatteryReading(
+                sohPercent = 90f, socPercent = 80f, lifetimeKwh = null,
+                lifetimeMileageKm = 1000f, voltage12v = 14f, readAtMs = 0L
+            )
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(72.9 * 0.9, vm.uiState.value.effectiveCapacityKwh, 0.001)
+    }
+
+    @Test
+    fun `effective capacity falls back to nominal when SOH unavailable`() = runTest {
+        val vm = buildViewModel(batteryReading = null, autoserviceAvailable = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(72.9, vm.uiState.value.effectiveCapacityKwh, 0.001)
+    }
+
+    @Test
+    fun `setPeriod_today_filtersChargesToToday`() = runTest {
+        // Clamped to real now: the VM's TODAY upper bound is System.currentTimeMillis(), so a
+        // fixed startOfToday()+1h charge lands in the future when the suite runs before 01:00
+        // local time and gets filtered out (flaked on a 00:04 run).
+        val today = minOf(startOfToday() + 3_600_000L, System.currentTimeMillis())
+        val yesterdayTs = startOfToday() - 3_600_000L // 1 hour before midnight today
+
+        val flow = MutableStateFlow(listOf(
+            makeCharge(1, today),
+            makeCharge(2, yesterdayTs)
+        ))
+        val vm = buildViewModel(chargesFlow = flow)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.setPeriod(ChargesPeriod.TODAY)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ChargesPeriod.TODAY, vm.uiState.value.period)
+        val allCharges = vm.uiState.value.months.flatMap { m -> m.days.flatMap { it.charges } }
+        assertEquals(1, allCharges.size)
+        assertEquals(1L, allCharges[0].id)
+    }
+
+    @Test
+    fun `setPeriod_year_excludesChargesOlderThanCalendarYear`() = runTest {
+        // Calendar-year boundaries: Jan 1 of current year. Charge dated 14 months ago
+        // is BEFORE that boundary regardless of when in the year we run.
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.MONTH, -14)
+        val fourteenMonthsAgo = cal.timeInMillis
+        val recentTs = System.currentTimeMillis() - 1_000L
+
+        val flow = MutableStateFlow(listOf(
+            makeCharge(1, recentTs),
+            makeCharge(2, fourteenMonthsAgo)
+        ))
+        val vm = buildViewModel(chargesFlow = flow)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.setPeriod(ChargesPeriod.YEAR)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val yearCharges = vm.uiState.value.months.flatMap { m -> m.days.flatMap { it.charges } }
+        assertEquals(1, yearCharges.size)
+        assertEquals(1L, yearCharges[0].id)
+
+        vm.setPeriod(ChargesPeriod.ALL)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val allCharges = vm.uiState.value.months.flatMap { m -> m.days.flatMap { it.charges } }
+        assertEquals(2, allCharges.size)
+    }
+
+    @Test
+    fun `setTypeFilter_AC_filtersOnlyAcCharges`() = runTest {
+        val now = System.currentTimeMillis()
+        val flow = MutableStateFlow(listOf(
+            makeCharge(1, now - 1000, gunState = 2),                      // AC (gun=2)
+            makeCharge(2, now - 2000, gunState = 3),                      // DC
+            makeCharge(3, now - 3000, gunState = 4),                      // GB_DC
+            makeCharge(4, now - 4000, gunState = -10011, type = "AC")     // AC via observed power (Leopard 3 sentinel)
+        ))
+        val vm = buildViewModel(chargesFlow = flow)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.setTypeFilter(ChargeTypeFilter.AC)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ChargeTypeFilter.AC, vm.uiState.value.typeFilter)
+        val months = vm.uiState.value.months
+        val allCharges = months.flatMap { m -> m.days.flatMap { it.charges } }
+        // Filter must match `type` (resolved by classifier), NOT raw gunState which is
+        // closed/sentinel on Leopard 3. Both gun=2 and sentinel-with-type=AC should pass.
+        assertEquals(2, allCharges.size)
+        assertTrue(allCharges.all { it.type == "AC" })
+    }
+
+    @Test
+    fun `setTypeFilter_DC_filtersOnlyDcCharges_includingSentinelGunState`() = runTest {
+        val now = System.currentTimeMillis()
+        val flow = MutableStateFlow(listOf(
+            makeCharge(1, now - 1000, gunState = 2),                      // AC (gun=2)
+            makeCharge(2, now - 2000, gunState = 3),                      // DC (gun=3)
+            makeCharge(3, now - 3000, gunState = 4),                      // GB_DC (gun=4)
+            makeCharge(4, now - 4000, gunState = -10011, type = "DC")     // DC via observed power (Leopard 3 sentinel)
+        ))
+        val vm = buildViewModel(chargesFlow = flow)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.setTypeFilter(ChargeTypeFilter.DC)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ChargeTypeFilter.DC, vm.uiState.value.typeFilter)
+        val months = vm.uiState.value.months
+        val allCharges = months.flatMap { m -> m.days.flatMap { it.charges } }
+        // Three DC rows expected: gun=3, gun=4, and sentinel-with-type=DC.
+        assertEquals(3, allCharges.size)
+        assertTrue(allCharges.all { it.type == "DC" })
+    }
+
+    @Test
+    fun `groupChargesByMonthDay_groupsCorrectly`() = runTest {
+        val vm = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val cal = Calendar.getInstance()
+        cal.set(2026, Calendar.APRIL, 25, 10, 0, 0)
+        val ts1 = cal.timeInMillis
+        cal.set(2026, Calendar.APRIL, 25, 22, 0, 0)
+        val ts2 = cal.timeInMillis
+        cal.set(2026, Calendar.MARCH, 15, 8, 0, 0)
+        val ts3 = cal.timeInMillis
+
+        val charges = listOf(
+            makeCharge(1, ts1, kwhCharged = 30.0),
+            makeCharge(2, ts2, kwhCharged = 20.0),
+            makeCharge(3, ts3, kwhCharged = 15.0)
+        )
+
+        val groups = vm.groupChargesByMonthDay(charges)
+
+        assertEquals(2, groups.size)
+        // Most recent month first
+        val aprilGroup = groups[0]
+        assertEquals(2, aprilGroup.sessionCount)
+        assertEquals(50.0, aprilGroup.totalKwh, 0.001)
+        assertEquals(1, aprilGroup.days.size)
+        assertEquals(2, aprilGroup.days[0].sessionCount)
+
+        val marchGroup = groups[1]
+        assertEquals(1, marchGroup.sessionCount)
+        assertEquals(15.0, marchGroup.totalKwh, 0.001)
+    }
+
+    @Test
+    fun `groupChargesByMonthDay_emptyList_returnsEmpty`() = runTest {
+        val vm = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val result = vm.groupChargesByMonthDay(emptyList())
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `toggleMonth_addsToExpanded`() = runTest {
+        val vm = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.toggleMonth("2026-04")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue("2026-04" in vm.uiState.value.expandedMonths)
+    }
+
+    @Test
+    fun `toggleMonth_removesFromExpanded`() = runTest {
+        val vm = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.toggleMonth("2026-04")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue("2026-04" in vm.uiState.value.expandedMonths)
+
+        vm.toggleMonth("2026-04")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse("2026-04" in vm.uiState.value.expandedMonths)
+    }
+
+    @Test
+    fun `toggleDay_addsToExpanded`() = runTest {
+        val vm = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.toggleDay("2026-04-25")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue("2026-04-25" in vm.uiState.value.expandedDays)
+    }
+
+    @Test
+    fun `loadAutoserviceState_connected_returnsConnectedTrue`() = runTest {
+        val vm = buildViewModel(
+            batteryReading = BatteryReading(100f, 91f, 602f, 2091f, 14f, 0L),
+            autoserviceAvailable = true
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.autoserviceConnected)
+        assertFalse(vm.uiState.value.autoserviceAllSentinel)
+    }
+
+    @Test
+    fun `loadAutoserviceState_allNull_returnsAllSentinelTrue`() = runTest {
+        val vm = buildViewModel(
+            batteryReading = BatteryReading(
+                sohPercent = null,
+                socPercent = null,
+                lifetimeKwh = null,
+                lifetimeMileageKm = null,
+                voltage12v = 14f,
+                readAtMs = 0L
+            ),
+            autoserviceAvailable = true
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.autoserviceConnected)
+        assertTrue(vm.uiState.value.autoserviceAllSentinel)
+    }
+
+    @Test
+    fun `loadLifetimeStats_zeroKwh_equivCyclesIsZero`() = runTest {
+        val vm = buildViewModel(autoserviceCharges = emptyList())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(0.0, vm.uiState.value.equivCycles, 0.001)
+    }
+
+    @Test
+    fun `loadLifetimeStats_kwhEqualsNominal_equivCyclesIsOne`() = runTest {
+        val now = System.currentTimeMillis()
+        val charges = listOf(
+            makeCharge(1, now, kwhCharged = 72.9, gunState = 2)
+        )
+        val vm = buildViewModel(
+            autoserviceCharges = charges,
+            batteryCapacityKwh = "72.9"
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1.0, vm.uiState.value.equivCycles, 0.01)
+    }
+
+    /**
+     * The BMS counter covers the whole life of the car, the app's own sum only what it saw since
+     * install, so the cycles must come off the BMS wherever the car reports one (field 2026-09-18:
+     * 10 963 kWh counted against 1 557 kWh logged).
+     */
+    @Test
+    fun `loadLifetimeStats_bmsCounter_winsOverLoggedCharges`() = runTest {
+        val now = System.currentTimeMillis()
+        val vm = buildViewModel(
+            autoserviceCharges = listOf(makeCharge(1, now, kwhCharged = 1557.0, gunState = 2)),
+            batteryReading = BatteryReading(
+                sohPercent = null,
+                socPercent = null,
+                lifetimeKwh = 10963f,
+                lifetimeMileageKm = 55000f,
+                voltage12v = 14f,
+                readAtMs = 0L
+            ),
+            batteryCapacityKwh = "87"
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(126.0, vm.uiState.value.equivCycles, 0.1)
+    }
+
+    /** #224: the BMS lifetime counter is divided by the average capacity nominal × (100 + SoH) / 200. */
+    @Test
+    fun `loadLifetimeStats_bmsCounter_divisorCorrectedForSoh`() = runTest {
+        val vm = buildViewModel(
+            autoserviceCharges = emptyList(),
+            batteryReading = BatteryReading(
+                sohPercent = 90f,
+                socPercent = null,
+                lifetimeKwh = 10963f,
+                lifetimeMileageKm = 55000f,
+                voltage12v = 14f,
+                readAtMs = 0L
+            ),
+            batteryCapacityKwh = "87"
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(10963.0 / 82.65, vm.uiState.value.equivCycles, 0.1)
+    }
+
+    /**
+     * #224: the raw SoH reaches the divisor, as on «Техника». sohFactor drops SoH below 50 % to
+     * 1.0, which would have divided by the full nominal instead of nominal × (100 + 40) / 200.
+     */
+    @Test
+    fun `loadLifetimeStats_bmsCounter_lowSohStillCorrectsDivisor`() = runTest {
+        val vm = buildViewModel(
+            autoserviceCharges = emptyList(),
+            batteryReading = BatteryReading(
+                sohPercent = 40f,
+                socPercent = null,
+                lifetimeKwh = 10963f,
+                lifetimeMileageKm = 55000f,
+                voltage12v = 14f,
+                readAtMs = 0L
+            ),
+            batteryCapacityKwh = "87"
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(10963.0 / (87.0 * 140.0 / 200.0), vm.uiState.value.equivCycles, 0.1)
+    }
+
+    @Test
+    fun `loadLifetimeStats_acDcSplit_correct`() = runTest {
+        val now = System.currentTimeMillis()
+        val charges = listOf(
+            makeCharge(1, now, kwhCharged = 30.0, gunState = 2),   // AC
+            makeCharge(2, now - 1000, kwhCharged = 10.0, gunState = 3),  // DC
+            makeCharge(3, now - 2000, kwhCharged = 5.0, gunState = 4)    // GB_DC
+        )
+        val vm = buildViewModel(autoserviceCharges = charges)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(30.0, vm.uiState.value.lifetimeAcKwh, 0.001)
+        assertEquals(15.0, vm.uiState.value.lifetimeDcKwh, 0.001)
+        assertEquals(45.0, vm.uiState.value.lifetimeTotalKwh, 0.001)
+    }
+
+    @Test
+    fun `loadLifetimeStats_catchUpSessionsWithNullGunState_includedByType`() = runTest {
+        val now = System.currentTimeMillis()
+        val charges = listOf(
+            makeCharge(1, now - 3000, kwhCharged = 25.0, gunState = null, type = "AC"),
+            makeCharge(2, now - 2000, kwhCharged = 50.0, gunState = null, type = "DC"),
+            makeCharge(3, now - 1000, kwhCharged = 10.0, gunState = 2, type = "AC")
+        )
+        val vm = buildViewModel(autoserviceCharges = charges)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(35.0, vm.uiState.value.lifetimeAcKwh, 0.01)
+        assertEquals(50.0, vm.uiState.value.lifetimeDcKwh, 0.01)
+        assertEquals(85.0, vm.uiState.value.lifetimeTotalKwh, 0.01)
+    }
+
+    @Test
+    fun `hasLegacyCharges_onlyAutoservice_returnsFalse`() = runTest {
+        val vm = buildViewModel(legacyExists = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.hasLegacyCharges)
+    }
+
+    @Test
+    fun `hasLegacyCharges_someLegacy_returnsTrue`() = runTest {
+        val vm = buildViewModel(legacyExists = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.hasLegacyCharges)
+    }
+
+    @Test
+    fun `sohSeries_populatedFromSnapshots`() = runTest {
+        val snapshots = listOf(
+            BatterySnapshotEntity(id = 1, timestamp = 1000L, socStart = 10, socEnd = 80,
+                kwhCharged = 50.0, sohPercent = 100.0, calculatedCapacityKwh = 72.9),
+            BatterySnapshotEntity(id = 2, timestamp = 2000L, socStart = 20, socEnd = 90,
+                kwhCharged = 55.0, sohPercent = 99.5, calculatedCapacityKwh = 72.6)
+        )
+        val vm = buildViewModel(snapshots = snapshots)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(2, vm.uiState.value.sohSeries.size)
+        assertEquals(2, vm.uiState.value.capacitySeries.size)
+    }
+
+    @Test
+    fun `defaultPeriod_isMonth`() = runTest {
+        val vm = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ChargesPeriod.MONTH, vm.uiState.value.period)
+    }
+
+    @Test
+    fun `defaultTypeFilter_isAll`() = runTest {
+        val vm = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ChargeTypeFilter.ALL, vm.uiState.value.typeFilter)
+    }
+
+    @Test
+    fun `onCreateNewCharge_setsDraftWithIdZeroAndManualSource`() = runTest {
+        val vm = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onCreateNewCharge()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val draft = vm.uiState.value.editingCharge
+        assertTrue("editingCharge должен быть установлен", draft != null)
+        assertEquals(0L, draft!!.id)
+        assertEquals("manual", draft.detectionSource)
+        assertEquals("AC", draft.type)
+        assertEquals(2, draft.gunState)
+        assertEquals(3_600_000L, draft.endTs!! - draft.startTs)
+    }
+
+    @Test
+    fun `onSaveEdit_idZero_callsInsertAndClearsEditing`() = runTest {
+        val (vm, dao) = buildViewModelAndDao()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val draft = ChargeEntity(
+            id = 0L,
+            startTs = 1_000L,
+            endTs = 4_600_000L,
+            type = "AC",
+            kwhCharged = 12.5,
+            cost = 2.5,
+            detectionSource = "manual"
+        )
+        vm.onSaveEdit(draft)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue("insert должен быть вызван", dao.lastInserted != null)
+        assertEquals(12.5, dao.lastInserted!!.kwhCharged!!, 0.0001)
+        assertEquals("manual", dao.lastInserted!!.detectionSource)
+        assertEquals(null, dao.lastUpdated)
+        assertEquals(null, vm.uiState.value.editingCharge)
+    }
+
+    @Test
+    fun `onSaveEdit_idNonZero_callsUpdateAndClearsEditing`() = runTest {
+        val existing = makeCharge(id = 7, startTs = startOfToday(), kwhCharged = 5.0)
+        val (vm, dao) = buildViewModelAndDao(
+            chargesFlow = MutableStateFlow(listOf(existing))
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val edited = existing.copy(kwhCharged = 9.9, type = "DC")
+        vm.onSaveEdit(edited)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue("update должен быть вызван", dao.lastUpdated != null)
+        assertEquals(7L, dao.lastUpdated!!.id)
+        assertEquals(9.9, dao.lastUpdated!!.kwhCharged!!, 0.0001)
+        assertEquals("DC", dao.lastUpdated!!.type)
+        assertEquals(null, dao.lastInserted)
+        assertEquals(null, vm.uiState.value.editingCharge)
+    }
+
+    // Moving a session backwards changes the pack price between the two dates, so the trips
+    // in that gap must be re-priced as well: recalculation starts at the earlier date.
+    @Test
+    fun `onSaveEdit_movedDate_recalculatesFromTheEarlierDate`() = runTest {
+        val sep1 = 1_756_684_800_000L
+        val sep10 = sep1 + 9 * 24 * 60 * 60 * 1000L
+        val existing = makeCharge(id = 4, startTs = sep1, kwhCharged = 10.0)
+        val (vm, _) = buildViewModelAndDao(chargesFlow = MutableStateFlow(listOf(existing)))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.onSaveEdit(existing.copy(startTs = sep10))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { costCalculator.recalculate(sep1, Long.MAX_VALUE) }
+    }
+
+    @Test
+    fun `initialAutoserviceCheckDone_startsAsFalse`() = runTest {
+        val vm = buildViewModel()
+
+        // Before any coroutines run, the flag must still be false (default value).
+        assertFalse(vm.uiState.value.initialAutoserviceCheckDone)
+    }
+
+    @Test
+    fun `initialAutoserviceCheckDone_becomesTrueAfterPhase1_noLegacy`() = runTest {
+        val vm = buildViewModel(legacyExists = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.initialAutoserviceCheckDone)
+        assertFalse(vm.uiState.value.hasLegacyCharges)
+    }
+
+    @Test
+    fun `initialAutoserviceCheckDone_withLegacy_flagTrueHasLegacyTrue`() = runTest {
+        val vm = buildViewModel(legacyExists = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.initialAutoserviceCheckDone)
+        assertTrue(vm.uiState.value.hasLegacyCharges)
+    }
+}

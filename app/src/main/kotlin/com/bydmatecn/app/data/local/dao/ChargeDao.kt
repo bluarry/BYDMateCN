@@ -1,0 +1,139 @@
+package com.bydmatecn.app.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
+import com.bydmatecn.app.data.local.entity.ChargeEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ChargeDao {
+    @Insert
+    suspend fun insert(charge: ChargeEntity): Long
+
+    @Update
+    suspend fun update(charge: ChargeEntity)
+
+    @Query("SELECT * FROM charges ORDER BY start_ts DESC")
+    fun getAll(): Flow<List<ChargeEntity>>
+
+    @Query("SELECT * FROM charges WHERE id = :id")
+    suspend fun getById(id: Long): ChargeEntity?
+
+    @Query("SELECT * FROM charges WHERE start_ts >= :from AND start_ts <= :to ORDER BY start_ts DESC")
+    fun getByDateRange(from: Long, to: Long): Flow<List<ChargeEntity>>
+
+    @Query("""
+        SELECT COUNT(*) as sessionCount,
+               COALESCE(SUM(kwh_charged), 0.0) as totalKwh,
+               COALESCE(SUM(cost), 0.0) as totalCost
+        FROM charges
+        WHERE start_ts >= :from AND start_ts <= :to
+    """)
+    suspend fun getPeriodSummary(from: Long, to: Long): ChargeSummary
+
+    @Query("SELECT * FROM charges ORDER BY start_ts DESC LIMIT 1")
+    fun getLastCharge(): Flow<ChargeEntity?>
+
+    @Query("SELECT * FROM charges WHERE status = 'SUSPENDED' ORDER BY start_ts DESC LIMIT 1")
+    suspend fun getLastSuspendedCharge(): ChargeEntity?
+
+    @Query("SELECT * FROM charges WHERE status != 'COMPLETED' AND start_ts < :cutoffTs")
+    suspend fun getStaleSessions(cutoffTs: Long): List<ChargeEntity>
+
+    @Query("SELECT * FROM charges ORDER BY start_ts DESC LIMIT 1")
+    suspend fun getLastChargeSync(): ChargeEntity?
+
+    @Query("""
+        SELECT * FROM charges
+        WHERE status = 'COMPLETED' AND (cell_voltage_min IS NOT NULL OR voltage_12v IS NOT NULL)
+        ORDER BY start_ts DESC LIMIT 30
+    """)
+    suspend fun getRecentChargesWithBatteryData(): List<ChargeEntity>
+
+    /**
+     * Returns the highest lifetime_kwh_at_finish recorded by an autoservice
+     * detector, or null if no autoservice-sourced sessions exist yet.
+     * Used as the catch-up baseline.
+     */
+    @Query("""
+        SELECT MAX(lifetime_kwh_at_finish) FROM charges
+        WHERE detection_source LIKE 'autoservice%'
+          AND lifetime_kwh_at_finish IS NOT NULL
+    """)
+    suspend fun getMaxLifetimeKwhAtFinish(): Double?
+
+    /** All charges detected by the autoservice path, ascending by start time. */
+    @Query("SELECT * FROM charges WHERE detection_source LIKE 'autoservice_%' ORDER BY start_ts ASC")
+    suspend fun getAllAutoserviceCharges(): List<ChargeEntity>
+
+    /**
+     * Returns true if there is at least one charge that was NOT sourced from autoservice
+     * (i.e. legacy DiPlus / manual charges).
+     */
+    @Query("SELECT EXISTS(SELECT 1 FROM charges WHERE detection_source IS NULL OR detection_source NOT LIKE 'autoservice_%')")
+    suspend fun hasLegacyCharges(): Boolean
+
+    /**
+     * Removes empty/junk charge rows that runCatchUp left behind in v2.4.15
+     * (3-row morning batch). Triggered once per TrackingService.onCreate after
+     * historyImporter.runSync. Filter mirrors the safety floor in
+     * AutoserviceChargingDetector (delta < 0.05 kWh ≈ measurement noise).
+     */
+    @Query("DELETE FROM charges WHERE kwh_charged IS NULL OR kwh_charged < 0.05")
+    suspend fun deleteEmpty(): Int
+
+    @Query("""
+        SELECT * FROM charges
+        WHERE start_ts >= :since
+          AND status = 'COMPLETED'
+          AND kwh_charged IS NOT NULL
+          AND kwh_charged >= 0.05
+        ORDER BY start_ts DESC
+    """)
+    suspend fun getCompletedSince(since: Long): List<ChargeEntity>
+
+    /**
+     * One-shot migration for v2.4.17: removes phantom autoservice rows where SOC
+     * didn't change (the lifetime_kwh delta bug from v2.4.15/v2.4.16). Filter:
+     * autoservice source + (socStart == socEnd OR either null) + kwhCharged > 1.0.
+     */
+    @Query("""
+        DELETE FROM charges
+        WHERE detection_source LIKE 'autoservice_%'
+          AND ABS(IFNULL(soc_start, 0) - IFNULL(soc_end, 0)) < 1
+          AND kwh_charged > 1.0
+    """)
+    suspend fun deletePhantomAutoserviceRows(): Int
+
+    /** Recalculation input: every charge whose start falls inside the period being re-priced. */
+    @Query("SELECT * FROM charges WHERE start_ts >= :from AND start_ts <= :to ORDER BY start_ts ASC")
+    suspend fun getInRangeAsc(from: Long, to: Long): List<ChargeEntity>
+
+    /**
+     * Full priced history up to [until], ascending — the input of the weighted-average
+     * battery price. Ranges never truncate it: a trip in September is priced off charges
+     * that happened before the recalculated range started.
+     */
+    @Query("""
+        SELECT * FROM charges
+        WHERE status = 'COMPLETED' AND start_ts <= :until
+          AND kwh_charged IS NOT NULL AND kwh_charged > 0 AND cost IS NOT NULL
+        ORDER BY start_ts ASC
+    """)
+    suspend fun getCompletedForPricing(until: Long): List<ChargeEntity>
+
+    /** Sessions where the driver typed in a meter reading — the measured-losses hint. */
+    @Query("SELECT * FROM charges WHERE meter_kwh IS NOT NULL AND kwh_charged IS NOT NULL AND kwh_charged > 0")
+    suspend fun getWithMeterReading(): List<ChargeEntity>
+
+    @androidx.room.Delete
+    suspend fun delete(charge: ChargeEntity)
+}
+
+data class ChargeSummary(
+    val sessionCount: Int,
+    val totalKwh: Double,
+    val totalCost: Double
+)

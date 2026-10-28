@@ -69,7 +69,7 @@
     <ID>CyclomaticComplexMethod:ClusterProjectionManager.kt$ClusterProjectionManager$private suspend fun pullBackToMain(context: Context, helper: HelperClient, focus: Boolean)</ID>
     <ID>CyclomaticComplexMethod:ClusterProjectionManager.kt$ClusterProjectionManager$private suspend fun swapToNewSize( context: Context, helper: HelperClient, bootstrap: HelperBootstrap, ): Boolean</ID>
     <ID>CyclomaticComplexMethod:ClusterProjectionManager.kt$ClusterProjectionManager$private suspend fun tryDirectProjection( context: Context, helper: HelperClient, target: ClusterTarget, geo: ClusterGeometry, plan: RenderPlan, ): Boolean</ID>
-    <ID>CyclomaticComplexMethod:DashboardViewModel.kt$DashboardViewModel$private fun calculateBatteryStatus( data: com.bydmate.app.data.remote.DiParsData?, current: DashboardUiState ): String</ID>
+    <ID>CyclomaticComplexMethod:DashboardViewModel.kt$DashboardViewModel$private fun calculateBatteryStatus( data: com.bydmatecn.app.data.remote.DiParsData?, current: DashboardUiState ): String</ID>
     <ID>CyclomaticComplexMethod:DashboardViewModel.kt$DashboardViewModel$private fun observeLiveData()</ID>
     <ID>CyclomaticComplexMethod:EnergyDataDeadDetector.kt$EnergyDataDeadDetector$fun onTick(ignition: Boolean, mileage: Double?)</ID>
     <ID>CyclomaticComplexMethod:EnergyDataReader.kt$EnergyDataReader$suspend fun diagnose(): String</ID>
@@ -256,7 +256,7 @@
     <ID>LongMethod:SettingsViewModel.kt$SettingsViewModel$private fun loadSettings()</ID>
     <ID>LongMethod:SettingsViewModel.kt$SettingsViewModel$private suspend fun writeDiagnosticHeader(file: File)</ID>
     <ID>LongMethod:SettingsViewModelConnectionsTest.kt$SettingsViewModelConnectionsTest$private fun buildViewModel(): SettingsViewModel</ID>
-    <ID>LongMethod:SettingsViewModelTest.kt$SettingsViewModelTest$private fun buildViewModel( updateChecker: UpdateChecker? = null, ttsModelManager: com.bydmate.app.voice.TtsModelManager? = null, ttsEngine: com.bydmate.app.voice.TtsEngine? = null, gigaAmModelManager: com.bydmate.app.voice.GigaAmModelManager? = null, llmConnectionResolver: LlmConnectionResolver? = null, voiceJournal: com.bydmate.app.voice.VoiceJournal = com.bydmate.app.voice.VoiceJournal(), ): SettingsViewModel</ID>
+    <ID>LongMethod:SettingsViewModelTest.kt$SettingsViewModelTest$private fun buildViewModel( updateChecker: UpdateChecker? = null, ttsModelManager: com.bydmatecn.app.voice.TtsModelManager? = null, ttsEngine: com.bydmatecn.app.voice.TtsEngine? = null, gigaAmModelManager: com.bydmatecn.app.voice.GigaAmModelManager? = null, llmConnectionResolver: LlmConnectionResolver? = null, voiceJournal: com.bydmatecn.app.voice.VoiceJournal = com.bydmatecn.app.voice.VoiceJournal(), ): SettingsViewModel</ID>
     <ID>LongMethod:SherpaTtsEngine.kt$SherpaTtsEngine$override fun playPcm(samples: FloatArray, sampleRate: Int): Boolean</ID>
     <ID>LongMethod:SherpaTtsEngine.kt$SherpaTtsEngine$override fun speak(text: String): Boolean</ID>
     <ID>LongMethod:SplitSessionManager.kt$SplitSessionManager$private suspend fun handlePaneLocked( taskState: SplitTaskState, taskId: Int, pane: Pane, pkg: String, expectedBounds: SplitBounds, otherTaskId: Int, ): Boolean</ID>
@@ -278,8 +278,8 @@
     <ID>LongParameterList:AgentOrchestrator.kt$AgentOrchestrator$( private val backend: AgentBackend, private val tools: AgentTools, private val settingsRepository: SettingsRepository, private val isMoving: () -&gt; Boolean = { false }, private val identity: () -&gt; AgentIdentity = { AgentIdentity("", AgentPersona.NAVIGATOR) }, private val memoryBlock: () -&gt; String = { "" }, private val dayMemory: DayMemory = DayMemory(prefs = null), )</ID>
     <ID>LongParameterList:AgentTools.kt$AgentTools$( private val gate: VoiceGate, private val batteryStateRepository: BatteryStateRepository, private val rangeCalculator: RangeCalculator, private val tripDao: TripDao, private val chargeDao: ChargeDao, private val actionDispatcher: ActionDispatcher, private val ruleDao: RuleDao, private val automationEngine: AutomationEngine, private val placeRepository: PlaceRepository, private val weatherClient: WeatherClient, private val exaSearchClient: ExaSearchClient, private val openRouterClient: OpenRouterClient, private val settingsRepository: SettingsRepository, private val contactLookup: ContactLookup, @ApplicationContext private val context: Context, private val clusterVoiceControl: ClusterVoiceControl, private val chargerSearchClient: ChargerSearchClient, private val insightsManager: InsightsManager, private val zaiSearchClient: ZaiSearchClient, private val llmConnections: LlmConnectionResolver, )</ID>
     <ID>LongParameterList:AgentToolsReadTest.kt$AgentToolsReadTest.Companion$( soc: Int? = null, speed: Int? = null, gear: Int? = null, seatHeatDriver: Int? = null, totalElec: Double? = null, doorFL: Int? = null, doorFR: Int? = null, tirePressFL: Int? = null, tirePressFR: Int? = null, tirePressRL: Int? = null, tirePressRR: Int? = null, chargeGunState: Int? = null, minCellVoltage: Double? = null, maxCellVoltage: Double? = null, powerState: Int? = null, drl: Int? = null, maxBatTemp: Int? = null, minBatTemp: Int? = null, workMode: Int? = null, )</ID>
-    <ID>LongParameterList:AppModule.kt$AppModule$( helper: com.bydmate.app.data.vehicle.HelperClient, prefs: com.bydmate.app.split.SplitPreferences, backdrop: com.bydmate.app.split.SplitBackdrop, @javax.inject.Named("io") dispatcher: kotlinx.coroutines.CoroutineDispatcher, @ApplicationContext ctx: Context, bootstrap: com.bydmate.app.data.vehicle.HelperBootstrap, journal: com.bydmate.app.split.SplitJournal, )</ID>
-    <ID>LongParameterList:AppModule.kt$AppModule$( parsReader: com.bydmate.app.data.nativestack.ParsReader, autoservice: com.bydmate.app.data.autoservice.AutoserviceClient, helper: com.bydmate.app.data.vehicle.HelperClient, allowlist: com.bydmate.app.data.vehicle.WriteAllowlist, writeLogDao: VehicleWriteLogDao, seatChannelStore: com.bydmate.app.data.vehicle.SeatChannelStore, windowChannelStore: com.bydmate.app.data.vehicle.WindowChannelStore, seatCommandJournal: com.bydmate.app.data.vehicle.SeatCommandJournal, )</ID>
+    <ID>LongParameterList:AppModule.kt$AppModule$( helper: com.bydmatecn.app.data.vehicle.HelperClient, prefs: com.bydmatecn.app.split.SplitPreferences, backdrop: com.bydmatecn.app.split.SplitBackdrop, @javax.inject.Named("io") dispatcher: kotlinx.coroutines.CoroutineDispatcher, @ApplicationContext ctx: Context, bootstrap: com.bydmatecn.app.data.vehicle.HelperBootstrap, journal: com.bydmatecn.app.split.SplitJournal, )</ID>
+    <ID>LongParameterList:AppModule.kt$AppModule$( parsReader: com.bydmatecn.app.data.nativestack.ParsReader, autoservice: com.bydmatecn.app.data.autoservice.AutoserviceClient, helper: com.bydmatecn.app.data.vehicle.HelperClient, allowlist: com.bydmatecn.app.data.vehicle.WriteAllowlist, writeLogDao: VehicleWriteLogDao, seatChannelStore: com.bydmatecn.app.data.vehicle.SeatChannelStore, windowChannelStore: com.bydmatecn.app.data.vehicle.WindowChannelStore, seatCommandJournal: com.bydmatecn.app.data.vehicle.SeatCommandJournal, )</ID>
     <ID>LongParameterList:AutomationEngine.kt$AutomationEngine$( triggers: List&lt;TriggerDef&gt;, data: DiParsData, location: Location?, places: Map&lt;Long, PlaceEntity&gt;, serviceStartActive: Boolean, networkAvailableEdge: Boolean )</ID>
     <ID>LongParameterList:AutomationEngineButtonPressTest.kt$AutomationEngineButtonPressTest$( id: Long, buttonId: Int, cooldown: Int = 0, requirePark: Boolean = false, fireOncePerTrip: Boolean = false, lastTriggeredAt: Long? = null, enabled: Boolean = true, )</ID>
     <ID>LongParameterList:AutomationEngineEdgeTest.kt$AutomationEngineEdgeTest$( id: Long, triggers: List&lt;TriggerDef&gt;, logic: String = "AND", cooldown: Int = 0, requirePark: Boolean = false, lastTriggeredAt: Long? = null, )</ID>
@@ -295,7 +295,7 @@
     <ID>LongParameterList:ConfirmOverlayManager.kt$ConfirmOverlayManager$( context: Context, ruleName: String, actionsSummary: String, onConfirm: () -&gt; Unit, onCancel: () -&gt; Unit, timeoutMs: Long = DEFAULT_TIMEOUT_MS, )</ID>
     <ID>LongParameterList:ConfirmOverlayManager.kt$ConfirmOverlayManager$( context: Context, ruleName: String, actionsSummary: String, onConfirm: () -&gt; Unit, onCancel: () -&gt; Unit, timeoutMs: Long, )</ID>
     <ID>LongParameterList:DashboardViewModel.kt$DashboardViewModel$( @ApplicationContext private val appContext: Context, private val tripRepository: TripRepository, private val settingsRepository: SettingsRepository, private val idleDrainDao: IdleDrainDao, private val insightsManager: InsightsManager, private val batteryStateRepository: BatteryStateRepository, private val adbVerdictMonitor: AdbVerdictMonitor, )</ID>
-    <ID>LongParameterList:DashboardViewModelTest.kt$DashboardViewModelTest$( fakeAutoservice: VehicleApi, insightsManager: InsightsManager? = null, trips: List&lt;TripEntity&gt; = emptyList(), charges: List&lt;com.bydmate.app.data.local.entity.ChargeEntity&gt; = emptyList(), settingsRepositoryOverride: SettingsRepository? = null, tripDaoOverride: TripDao? = null, )</ID>
+    <ID>LongParameterList:DashboardViewModelTest.kt$DashboardViewModelTest$( fakeAutoservice: VehicleApi, insightsManager: InsightsManager? = null, trips: List&lt;TripEntity&gt; = emptyList(), charges: List&lt;com.bydmatecn.app.data.local.entity.ChargeEntity&gt; = emptyList(), settingsRepositoryOverride: SettingsRepository? = null, tripDaoOverride: TripDao? = null, )</ID>
     <ID>LongParameterList:DiParsDataFixtures.kt$( soc: Int? = null, speed: Int? = null, mileage: Double? = null, power: Double? = null, chargeGunState: Int? = null, maxBatTemp: Int? = null, avgBatTemp: Int? = null, minBatTemp: Int? = null, chargingStatus: Int? = null, batteryCapacityKwh: Double? = null, totalElecConsumption: Double? = null, voltage12v: Double? = null, maxCellVoltage: Double? = null, minCellVoltage: Double? = null, exteriorTemp: Int? = null, gear: Int? = null, powerState: Int? = null, insideTemp: Int? = null, acStatus: Int? = null, acTemp: Int? = null, fanLevel: Int? = null, acCirc: Int? = null, doorFL: Int? = null, doorFR: Int? = null, doorRL: Int? = null, doorRR: Int? = null, windowFL: Int? = null, windowFR: Int? = null, windowRL: Int? = null, windowRR: Int? = null, sunroof: Int? = null, trunk: Int? = null, hood: Int? = null, seatbeltFL: Int? = null, lockFL: Int? = null, tirePressFL: Int? = null, tirePressFR: Int? = null, tirePressRL: Int? = null, tirePressRR: Int? = null, driveMode: Int? = null, workMode: Int? = null, autoPark: Int? = null, rain: Int? = null, lightLow: Int? = null, drl: Int? = null, turnSignal: Int? = null, )</ID>
     <ID>LongParameterList:DragGestureLogic.kt$DragGestureLogic$( x: Int, y: Int, widgetWidth: Int, widgetHeight: Int, screenWidth: Int, screenHeight: Int, )</ID>
     <ID>LongParameterList:EnsureTypedFreeformTest.kt$EnsureTypedFreeformTest$( taskId: Int, activityType: Int, desiredActivityType: Int = ACTIVITY_TYPE_RECENTS, displayId: Int = 0, shell: (String, List&lt;String&gt;) -&gt; String = { script, args -&gt; ops += effectiveCmd(script, args); "" }, stateOf: (Int) -&gt; TaskModeState? = { _ -&gt; null }, )</ID>
@@ -332,7 +332,7 @@
     <ID>LongParameterList:RaiseFreeformTaskCoreTest.kt$RaiseFreeformTaskCoreTest$( packageName: String = "com.example.navi", displayId: Int = 0, desiredActivityType: Int = ACTIVITY_TYPE_RECENTS, resolveComponent: (String) -&gt; String? = { "com.example.navi/com.example.navi.MainActivity" }, shell: (String, List&lt;String&gt;) -&gt; String = { script, args -&gt; shellCmds += effectiveCmd(script, args); "" }, taskIdForPackage: (String) -&gt; Int = { _ -&gt; -1 }, getActivityType: (Int) -&gt; Int = { _ -&gt; -1 }, sleep: (Long) -&gt; Unit = { shellCmds += "sleep:$it" }, stateOf: (Int) -&gt; TaskModeState? = { _ -&gt; null }, )</ID>
     <ID>LongParameterList:SeatCommandJournal.kt$SeatCommandJournal$(action: String, dev: Int, fid: Int, value: Int, status: Int?, outcome: WriteOutcome)</ID>
     <ID>LongParameterList:SetWindowingModeCompatTest.kt$SetWindowingModeCompatTest$( mode: Int = WINDOWING_MODE_FREEFORM, desiredActivityType: Int = ACTIVITY_TYPE_RECENTS, reflectSet: (Int, Int) -&gt; Unit = { t, m -&gt; ops += "reflect:$t:$m" }, resolveComponent: () -&gt; String? = { ops += "resolve"; "ru.yandex.yandexnavi/.core.NavigatorActivity" }, shell: (String, List&lt;String&gt;) -&gt; String = { script, args -&gt; ops += "shell:${effectiveCmd(script, args)}" "" }, getActivityType: (Int) -&gt; Int = { _ -&gt; -1 }, stateOf: (Int) -&gt; TaskModeState? = { _ -&gt; null }, )</ID>
-    <ID>LongParameterList:SettingsViewModelTest.kt$SettingsViewModelTest$( updateChecker: UpdateChecker? = null, ttsModelManager: com.bydmate.app.voice.TtsModelManager? = null, ttsEngine: com.bydmate.app.voice.TtsEngine? = null, gigaAmModelManager: com.bydmate.app.voice.GigaAmModelManager? = null, llmConnectionResolver: LlmConnectionResolver? = null, voiceJournal: com.bydmate.app.voice.VoiceJournal = com.bydmate.app.voice.VoiceJournal(), )</ID>
+    <ID>LongParameterList:SettingsViewModelTest.kt$SettingsViewModelTest$( updateChecker: UpdateChecker? = null, ttsModelManager: com.bydmatecn.app.voice.TtsModelManager? = null, ttsEngine: com.bydmatecn.app.voice.TtsEngine? = null, gigaAmModelManager: com.bydmatecn.app.voice.GigaAmModelManager? = null, llmConnectionResolver: LlmConnectionResolver? = null, voiceJournal: com.bydmatecn.app.voice.VoiceJournal = com.bydmatecn.app.voice.VoiceJournal(), )</ID>
     <ID>LongParameterList:SherpaTtsEngine.kt$SherpaTtsEngine.Companion$( targetFrames: Long, timeoutMs: Long, pollMs: Long, currentFrames: () -&gt; Long, stillCurrent: () -&gt; Boolean, sleep: (Long) -&gt; Unit = Thread::sleep, now: () -&gt; Long = System::currentTimeMillis, )</ID>
     <ID>LongParameterList:SherpaTtsEngine.kt$SherpaTtsEngine.Companion$( voiceId: String, speakerId: Int, speed: Float, liveliness: Int, sampleRate: Int, synthesisText: String, )</ID>
     <ID>LongParameterList:Split37Engine.kt$Split37Engine$( pane: String, pkg: String, taskId: Int, targetArea: Int, root: Split37Root, fullRootId: Int?, )</ID>
@@ -343,7 +343,7 @@
     <ID>LongParameterList:VehicleApiImpl.kt$VehicleApiImpl$( private val parsReader: ParsReader, private val autoservice: AutoserviceClient, private val helper: HelperClient, private val allowlist: WriteAllowlist, private val writeLogDao: VehicleWriteLogDao, private val seatStore: SeatChannelStore, private val windowStore: WindowChannelStore, // Null in unit tests (no SharedPreferences); production gets the singleton from AppModule. private val seatJournal: SeatCommandJournal? = null, )</ID>
     <ID>LongParameterList:VoiceAutomationActionsAgentQueryTest.kt$VoiceAutomationActionsAgentQueryTest$( ttsEnabled: Boolean = true, voiceEnabled: Boolean = true, listening: Boolean = false, speakOk: Boolean = true, ttsEngine: TtsEngine = mockk(relaxed = true) { every { speaking } returns MutableStateFlow(false) every { speak(any()) } returns speakOk }, audioCapture: AudioCapture = mockk(relaxed = true), orchestrator: AgentOrchestrator = mockk(relaxed = true), )</ID>
     <ID>LongParameterList:VoiceAutomationActionsSpeakTest.kt$VoiceAutomationActionsSpeakTest$( ttsEnabled: Boolean = true, voiceEnabled: Boolean = true, listening: Boolean = false, speakOk: Boolean = true, ttsEngine: TtsEngine = mockk(relaxed = true) { every { speaking } returns MutableStateFlow(false) every { speak(any()) } returns speakOk }, audioCapture: AudioCapture = mockk(relaxed = true), orchestrator: AgentOrchestrator = mockk(relaxed = true), )</ID>
-    <ID>LongParameterList:VoiceController.kt$VoiceController$( route: VoiceJournalEntry.Route, transcript: String, detail: String, outcome: VoiceJournalEntry.Outcome, reason: String? = null, logMsg: String, tools: List&lt;com.bydmate.app.agent.AgentToolOutcome&gt; = emptyList(), answer: String? = null, )</ID>
+    <ID>LongParameterList:VoiceController.kt$VoiceController$( route: VoiceJournalEntry.Route, transcript: String, detail: String, outcome: VoiceJournalEntry.Outcome, reason: String? = null, logMsg: String, tools: List&lt;com.bydmatecn.app.agent.AgentToolOutcome&gt; = emptyList(), answer: String? = null, )</ID>
     <ID>LongParameterList:VoiceControllerAgentFallbackTest.kt$VoiceControllerAgentFallbackTest$( agentOrchestrator: AgentOrchestrator, dispatcher: ActionDispatcher = mockk(relaxed = true), ttsEnabled: Boolean = false, ttsEngine: TtsEngine = quietTtsEngine(), journal: VoiceJournal = VoiceJournal(), agentIdentity: () -&gt; AgentIdentity = { AgentIdentity("", AgentPersona.NAVIGATOR) }, continuousAsr: ContinuousAsr = FakeContinuousAsr(), )</ID>
     <ID>LongParameterList:VoiceControllerEchoFilterTest.kt$VoiceControllerEchoFilterTest$( continuousAsr: ContinuousAsr, dispatcher: ActionDispatcher, echoFilter: SelfEchoFilter = SelfEchoFilter(), journal: VoiceJournal = VoiceJournal(), ttsEngine: TtsEngine = quietTtsEngine(), earcon: VoiceEarcon = mockk(relaxed = true), ttsEnabled: Boolean = false, agentIdentity: () -&gt; AgentIdentity = { AgentIdentity("Джез", AgentPersona.NAVIGATOR) }, )</ID>
     <ID>LongParameterList:VoiceControllerSafetyTest.kt$VoiceControllerSafetyTest$( gateEnabled: Boolean, snapshot: DiParsData?, dispatcher: ActionDispatcher, journal: VoiceJournal = VoiceJournal(), ttsEnabled: Boolean = false, ttsEngine: TtsEngine = quietTtsEngine(), agentIdentity: () -&gt; AgentIdentity = { AgentIdentity("", AgentPersona.NAVIGATOR) }, continuousAsr: ContinuousAsr = FakeContinuousAsr(ready = true), )</ID>
@@ -551,32 +551,32 @@
     <ID>TooManyFunctions:AppDatabase.kt$AppDatabase : RoomDatabase</ID>
     <ID>TooManyFunctions:AppModule.kt$AppModule</ID>
     <ID>TooManyFunctions:AutomationEngine.kt$AutomationEngine</ID>
-    <ID>TooManyFunctions:AutomationScreen.kt$com.bydmate.app.ui.automation.AutomationScreen.kt</ID>
+    <ID>TooManyFunctions:AutomationScreen.kt$com.bydmatecn.app.ui.automation.AutomationScreen.kt</ID>
     <ID>TooManyFunctions:AutomationViewModel.kt$AutomationViewModel : ViewModel</ID>
-    <ID>TooManyFunctions:AutomationViewModel.kt$com.bydmate.app.ui.automation.AutomationViewModel.kt</ID>
+    <ID>TooManyFunctions:AutomationViewModel.kt$com.bydmatecn.app.ui.automation.AutomationViewModel.kt</ID>
     <ID>TooManyFunctions:BlindSpotController.kt$BlindSpotController</ID>
     <ID>TooManyFunctions:BlindSpotPositionOverlay.kt$BlindSpotPositionOverlay</ID>
     <ID>TooManyFunctions:ChargeDao.kt$ChargeDao</ID>
     <ID>TooManyFunctions:ChargeRepository.kt$ChargeRepository</ID>
-    <ID>TooManyFunctions:ChargesScreen.kt$com.bydmate.app.ui.charges.ChargesScreen.kt</ID>
+    <ID>TooManyFunctions:ChargesScreen.kt$com.bydmatecn.app.ui.charges.ChargesScreen.kt</ID>
     <ID>TooManyFunctions:ChargesViewModel.kt$ChargesViewModel : ViewModel</ID>
     <ID>TooManyFunctions:ClusterDisplayDiag.kt$ClusterDisplayDiag</ID>
     <ID>TooManyFunctions:ClusterFrameUi7.kt$ClusterFrameUi7</ID>
     <ID>TooManyFunctions:ClusterProbeRunner.kt$ClusterProbeRunner</ID>
     <ID>TooManyFunctions:ClusterProjectionManager.kt$ClusterProjectionManager</ID>
-    <ID>TooManyFunctions:ClusterProjectionState.kt$com.bydmate.app.cluster.ClusterProjectionState.kt</ID>
-    <ID>TooManyFunctions:Components.kt$com.bydmate.app.ui.components.Components.kt</ID>
-    <ID>TooManyFunctions:DashboardScreen.kt$com.bydmate.app.ui.dashboard.DashboardScreen.kt</ID>
+    <ID>TooManyFunctions:ClusterProjectionState.kt$com.bydmatecn.app.cluster.ClusterProjectionState.kt</ID>
+    <ID>TooManyFunctions:Components.kt$com.bydmatecn.app.ui.components.Components.kt</ID>
+    <ID>TooManyFunctions:DashboardScreen.kt$com.bydmatecn.app.ui.dashboard.DashboardScreen.kt</ID>
     <ID>TooManyFunctions:DashboardViewModel.kt$DashboardViewModel : ViewModel</ID>
     <ID>TooManyFunctions:EnergyDataLivenessStore.kt$EnergyDataLivenessStore</ID>
     <ID>TooManyFunctions:EnergyDataLivenessStore.kt$EnergyDataLivenessStorePrefs : EnergyDataLivenessStore</ID>
     <ID>TooManyFunctions:EnergyDataReader.kt$EnergyDataReader</ID>
-    <ID>TooManyFunctions:FloatingWidgetView.kt$com.bydmate.app.ui.widget.FloatingWidgetView.kt</ID>
+    <ID>TooManyFunctions:FloatingWidgetView.kt$com.bydmatecn.app.ui.widget.FloatingWidgetView.kt</ID>
     <ID>TooManyFunctions:GigaAmModelManager.kt$GigaAmModelManager</ID>
     <ID>TooManyFunctions:HelperBootstrap.kt$HelperBootstrap</ID>
     <ID>TooManyFunctions:HelperClient.kt$HelperClient</ID>
     <ID>TooManyFunctions:HelperClient.kt$HelperClientImpl : HelperClient</ID>
-    <ID>TooManyFunctions:HelperDaemon.kt$com.bydmate.app.helper.HelperDaemon.kt</ID>
+    <ID>TooManyFunctions:HelperDaemon.kt$com.bydmatecn.app.helper.HelperDaemon.kt</ID>
     <ID>TooManyFunctions:HistoryImporter.kt$HistoryImporter</ID>
     <ID>TooManyFunctions:HudController.kt$HudController</ID>
     <ID>TooManyFunctions:HudProtobufBuilder.kt$HudProtobufBuilder</ID>
@@ -589,9 +589,9 @@
     <ID>TooManyFunctions:NaviRichNotificationParser.kt$NaviRichNotificationParser</ID>
     <ID>TooManyFunctions:NluParser.kt$NluParser</ID>
     <ID>TooManyFunctions:RuleDao.kt$RuleDao</ID>
-    <ID>TooManyFunctions:SettingRows.kt$com.bydmate.app.ui.settings.SettingRows.kt</ID>
+    <ID>TooManyFunctions:SettingRows.kt$com.bydmatecn.app.ui.settings.SettingRows.kt</ID>
     <ID>TooManyFunctions:SettingsRepository.kt$SettingsRepository</ID>
-    <ID>TooManyFunctions:SettingsScreen.kt$com.bydmate.app.ui.settings.SettingsScreen.kt</ID>
+    <ID>TooManyFunctions:SettingsScreen.kt$com.bydmatecn.app.ui.settings.SettingsScreen.kt</ID>
     <ID>TooManyFunctions:SettingsViewModel.kt$SettingsViewModel : ViewModel</ID>
     <ID>TooManyFunctions:SherpaTtsEngine.kt$SherpaTtsEngine : TtsEngine</ID>
     <ID>TooManyFunctions:SherpaTtsEngine.kt$SherpaTtsEngine$Companion</ID>
@@ -599,11 +599,11 @@
     <ID>TooManyFunctions:SplitOverlayController.kt$SplitOverlayController : SplitBackdrop</ID>
     <ID>TooManyFunctions:SplitPillView.kt$SplitPillView</ID>
     <ID>TooManyFunctions:SplitSessionManager.kt$SplitSessionManager</ID>
-    <ID>TooManyFunctions:TechPanelScreen.kt$com.bydmate.app.ui.tech.TechPanelScreen.kt</ID>
+    <ID>TooManyFunctions:TechPanelScreen.kt$com.bydmatecn.app.ui.tech.TechPanelScreen.kt</ID>
     <ID>TooManyFunctions:TrackingService.kt$TrackingService : ServiceLocationListener</ID>
     <ID>TooManyFunctions:TripDao.kt$TripDao</ID>
     <ID>TooManyFunctions:TripRepository.kt$TripRepository</ID>
-    <ID>TooManyFunctions:TripsScreen.kt$com.bydmate.app.ui.trips.TripsScreen.kt</ID>
+    <ID>TooManyFunctions:TripsScreen.kt$com.bydmatecn.app.ui.trips.TripsScreen.kt</ID>
     <ID>TooManyFunctions:TripsViewModel.kt$TripsViewModel : ViewModel</ID>
     <ID>TooManyFunctions:TtsModelManager.kt$TtsModelManager</ID>
     <ID>TooManyFunctions:TtsRouter.kt$TtsRouter : TtsEngine</ID>
@@ -673,20 +673,20 @@
     <ID>WildcardImport:AgentChatScreen.kt$import androidx.compose.foundation.layout.*</ID>
     <ID>WildcardImport:AgentChatScreen.kt$import androidx.compose.material3.*</ID>
     <ID>WildcardImport:AgentChatScreen.kt$import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:AgentChatScreen.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:AppNavigation.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:AutomationScreen.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:ChargesScreen.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:Components.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:DashboardScreen.kt$import com.bydmate.app.ui.theme.*</ID>
+    <ID>WildcardImport:AgentChatScreen.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:AppNavigation.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:AutomationScreen.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:ChargesScreen.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:Components.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:DashboardScreen.kt$import com.bydmatecn.app.ui.theme.*</ID>
     <ID>WildcardImport:OverlayNotificationManager.kt$import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:SettingsScreen.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:TripDetailDialog.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:TripsScreen.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:UpdateDialog.kt$import com.bydmate.app.ui.theme.*</ID>
-    <ID>WildcardImport:VoiceCommandSpec.kt$import com.bydmate.app.voice.ActionSlot.*</ID>
-    <ID>WildcardImport:VoiceCommandSpec.kt$import com.bydmate.app.voice.DeviceSlot.*</ID>
-    <ID>WildcardImport:VoiceModule.kt$import com.bydmate.app.voice.*</ID>
-    <ID>WildcardImport:WelcomeScreen.kt$import com.bydmate.app.ui.theme.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:TripDetailDialog.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:TripsScreen.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:UpdateDialog.kt$import com.bydmatecn.app.ui.theme.*</ID>
+    <ID>WildcardImport:VoiceCommandSpec.kt$import com.bydmatecn.app.voice.ActionSlot.*</ID>
+    <ID>WildcardImport:VoiceCommandSpec.kt$import com.bydmatecn.app.voice.DeviceSlot.*</ID>
+    <ID>WildcardImport:VoiceModule.kt$import com.bydmatecn.app.voice.*</ID>
+    <ID>WildcardImport:WelcomeScreen.kt$import com.bydmatecn.app.ui.theme.*</ID>
   </CurrentIssues>
 </SmellBaseline>

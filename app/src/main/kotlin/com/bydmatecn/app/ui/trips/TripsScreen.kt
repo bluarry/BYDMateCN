@@ -1,0 +1,869 @@
+package com.bydmatecn.app.ui.trips
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.bydmatecn.app.ui.components.AppAlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bydmatecn.app.R
+import com.bydmatecn.app.data.local.entity.TripEntity
+import com.bydmatecn.app.data.nativestack.VehicleKind
+import com.bydmatecn.app.ui.components.consumptionColor
+import com.bydmatecn.app.ui.components.formatTime
+import com.bydmatecn.app.ui.theme.*
+import android.graphics.Paint as AndroidPaint
+import kotlin.math.floor
+import kotlin.math.log10
+import kotlin.math.pow
+import java.text.SimpleDateFormat
+import java.util.Date
+
+@Composable
+fun TripsScreen(
+    onOpenTemperature: () -> Unit = {},
+    viewModel: TripsViewModel = hiltViewModel()
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(NavyDark, NavyDeep)))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        // Period chips
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TripsChip(stringResource(R.string.dashboard_period_day), state.period == TripPeriod.TODAY) { viewModel.setPeriod(TripPeriod.TODAY) }
+            TripsChip(stringResource(R.string.dashboard_period_week), state.period == TripPeriod.WEEK) { viewModel.setPeriod(TripPeriod.WEEK) }
+            TripsChip(stringResource(R.string.dashboard_period_month), state.period == TripPeriod.MONTH) { viewModel.setPeriod(TripPeriod.MONTH) }
+            TripsChip(stringResource(R.string.dashboard_period_year), state.period == TripPeriod.YEAR) { viewModel.setPeriod(TripPeriod.YEAR) }
+            TripsChip(stringResource(R.string.dashboard_period_all), state.period == TripPeriod.ALL) { viewModel.setPeriod(TripPeriod.ALL) }
+            Spacer(modifier = Modifier.width(12.dp))
+            TripsChip(stringResource(R.string.trips_filter_all), state.filter == TripFilter.ALL) { viewModel.setFilter(TripFilter.ALL) }
+            TripsChip(stringResource(R.string.trips_filter_trips_only), state.filter == TripFilter.TRIPS_ONLY) { viewModel.setFilter(TripFilter.TRIPS_ONLY) }
+            TripsChip(stringResource(R.string.trips_filter_stops_only), state.filter == TripFilter.STOPS_ONLY) { viewModel.setFilter(TripFilter.STOPS_ONLY) }
+            Spacer(modifier = Modifier.weight(1f))
+            // Opens the «Расход и температура» screen; it is not a period, so it never latches.
+            TemperatureChip(onOpenTemperature)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Left: trip list (65%)
+            if (state.months.isEmpty()) {
+                Column(
+                    modifier = Modifier.weight(0.65f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        stringResource(emptyTripsStringRes(state.period, state.hasTripsBeforeFilter)),
+                        color = TextSecondary,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                val timeColWidth = rememberTimeColumnWidth()
+                LazyColumn(
+                    modifier = Modifier.weight(0.65f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    for (month in state.months) {
+                        item(key = "month_${month.yearMonth}") {
+                            MonthHeader(
+                                month = month,
+                                expanded = month.yearMonth in state.expandedMonths,
+                                currencySymbol = state.currencySymbol,
+                                hybrid = state.vehicleKind == VehicleKind.HYBRID,
+                                onClick = { viewModel.toggleMonth(month.yearMonth) }
+                            )
+                        }
+                        if (month.yearMonth in state.expandedMonths) {
+                            for (day in month.days) {
+                                item(key = "day_${month.yearMonth}_${day.date}") {
+                                    DayHeader(
+                                        day = day,
+                                        expanded = day.date in state.expandedDays,
+                                        currencySymbol = state.currencySymbol,
+                                        hybrid = state.vehicleKind == VehicleKind.HYBRID,
+                                        onClick = { viewModel.toggleDay(day.date) }
+                                    )
+                                }
+                                if (day.date in state.expandedDays) {
+                                    item(key = "header_${month.yearMonth}_${day.date}") {
+                                        ColumnHeaders(currencySymbol = state.currencySymbol, timeColWidth = timeColWidth,
+                                            kind = state.vehicleKind)
+                                    }
+                                    for (trip in day.trips) {
+                                        item(key = "trip_${trip.id}") {
+                                            TripRow(
+                                                trip = trip,
+                                                currencySymbol = state.currencySymbol,
+                                                timeColWidth = timeColWidth,
+                                                kind = state.vehicleKind,
+                                                onClick = { viewModel.selectTrip(trip) },
+                                                onLongClick = { viewModel.onLongPressTrip(trip) },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Vertical divider
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(CardBorder.copy(alpha = 0.5f))
+            )
+
+            // Right: chart panel (35%)
+            ChartPanel(
+                bars = state.chartBars,
+                metric = state.chartMetric,
+                selectedIndex = state.selectedBarIndex,
+                currencySymbol = state.currencySymbol,
+                stopsOnly = state.filter == TripFilter.STOPS_ONLY,
+                onMetricChange = { viewModel.setChartMetric(it) },
+                onBarSelect = { viewModel.selectBar(it) },
+                modifier = Modifier.weight(0.35f).fillMaxHeight()
+            )
+        }
+    }
+
+    // Trip detail dialog
+    state.selectedTrip?.let { trip ->
+        TripDetailDialog(
+            trip = trip,
+            points = state.selectedTripPoints,
+            currencySymbol = state.currencySymbol,
+            tileSource = state.mapTileSource,
+            hybrid = state.vehicleKind == VehicleKind.HYBRID,
+            onDismiss = { viewModel.clearSelectedTrip() }
+        )
+    }
+
+    // Long-press action sheet
+    state.selectedTripForAction?.let { trip ->
+        TripActionSheet(
+            trip = trip,
+            onDismiss = { viewModel.onDismissActionSheet() },
+            onDeletePrompt = { viewModel.onConfirmDeletePrompt() },
+        )
+    }
+
+    // Delete confirmation dialog
+    state.deleteConfirmTrip?.let { trip ->
+        AppAlertDialog(
+            onDismissRequest = { viewModel.onDismissDeleteConfirm() },
+            title = { Text(stringResource(R.string.trips_delete_dialog_title)) },
+            text = {
+                Text(stringResource(R.string.trips_delete_dialog_text, trip.distanceKm?.let { "%.1f".format(it) } ?: "-"))
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onConfirmDelete() }) {
+                    Text(stringResource(R.string.charges_action_delete), color = SocRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.onDismissDeleteConfirm() }) {
+                    Text(stringResource(R.string.settings_cancel_button))
+                }
+            },
+            containerColor = CardSurface,
+        )
+    }
+}
+
+@Composable
+private fun MonthHeader(month: MonthGroup, expanded: Boolean, currencySymbol: String, hybrid: Boolean, onClick: () -> Unit) {
+    // Reading LocalConfiguration ties this to the app language, so the label
+    // recomposes on an in-place locale switch instead of staying in the old language.
+    val locale = LocalConfiguration.current.locales[0]
+    val monthLabel = remember(month.yearMonth, locale) {
+        SimpleDateFormat("LLLL yyyy", locale)
+            .format(Date(month.days.first().trips.first().startTs))
+            .replaceFirstChar { it.uppercase() }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .background(CardSurface.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row {
+            Text(if (expanded) "▼" else "▶", color = AccentGreen, fontSize = 12.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(monthLabel, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(stringResource(R.string.trips_km_value, month.totalKm), color = TextSecondary, fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace, textAlign = TextAlign.End,
+                maxLines = 1, modifier = Modifier.width(80.dp))
+            Text(stringResource(R.string.trips_kwh_value, month.totalKwh), color = TextSecondary, fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace, textAlign = TextAlign.End,
+                maxLines = 1, modifier = Modifier.width(104.dp))
+            AggregatePer100(month.avgConsumption, month.totalLiters, month.litersKm, hybrid)
+            Text("%.2f %s".format(month.totalCost, currencySymbol), color = TextSecondary, fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace, textAlign = TextAlign.End,
+                maxLines = 1, modifier = Modifier.width(80.dp))
+        }
+    }
+}
+
+@Composable
+private fun DayHeader(day: DayGroup, expanded: Boolean, currencySymbol: String, hybrid: Boolean, onClick: () -> Unit) {
+    // See MonthHeader: format the weekday in the UI so it follows the app language.
+    val locale = LocalConfiguration.current.locales[0]
+    val weekday = remember(day.date, locale) {
+        SimpleDateFormat("EEE", locale).format(Date(day.trips.first().startTs))
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .background(CardSurface.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+            .padding(start = 20.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row {
+            Text(if (expanded) "▼" else "▶", color = AccentBlue, fontSize = 12.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("${day.date} ($weekday)", color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(stringResource(R.string.trips_km_decimal_value, day.totalKm), color = TextSecondary, fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace, textAlign = TextAlign.End,
+                maxLines = 1, modifier = Modifier.width(80.dp))
+            Text(stringResource(R.string.trips_kwh_decimal_value, day.totalKwh), color = TextSecondary, fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace, textAlign = TextAlign.End,
+                maxLines = 1, modifier = Modifier.width(104.dp))
+            AggregatePer100(day.avgConsumption, day.totalLiters, day.litersKm, hybrid)
+            Text("%.2f %s".format(day.totalCost, currencySymbol), color = TextSecondary, fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace, textAlign = TextAlign.End,
+                maxLines = 1, modifier = Modifier.width(80.dp))
+        }
+    }
+}
+
+/**
+ * «/100» of a day or month header. On a hybrid the trip-row rule runs on the sums: with litres
+ * it reads «1.8 л/100» uncoloured over [litersKm], the km of the trips that know their litres,
+ * without them today's coloured kWh/100.
+ */
+@Composable
+private fun AggregatePer100(avgConsumption: Double, totalLiters: Double?, litersKm: Double?, hybrid: Boolean) {
+    val cell = per100Cell(avgConsumption, totalLiters, litersKm, stringResource(R.string.dashboard_unit_liters))
+    if (hybrid && !cell.colored) {
+        Text("${cell.text}/100",
+            color = TextPrimary, fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace, textAlign = TextAlign.End,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(72.dp))
+    } else {
+        Text("%.1f/100".format(avgConsumption),
+            color = consumptionColor(avgConsumption), fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace, textAlign = TextAlign.End,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1, modifier = Modifier.width(72.dp))
+    }
+}
+
+private val TimeColumnStyle = TextStyle(fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+
+// The time cell must hold "HH:mm – HH:mm" on one line at every text size and font: a fixed
+// dp width let the end time wrap onto a second line that maxLines = 1 dropped.
+@Composable
+private fun rememberTimeColumnWidth(): Dp {
+    val measurer = rememberTextMeasurer()
+    val style = LocalTextStyle.current.merge(TimeColumnStyle)
+    val density = LocalDensity.current
+    return remember(measurer, style, density) {
+        val px = measurer.measure("00:00 – 00:00", style, softWrap = false).size.width
+        with(density) { px.toDp() }.coerceAtLeast(96.dp)
+    }
+}
+
+@Composable
+private fun ColumnHeaders(currencySymbol: String, timeColWidth: Dp, kind: VehicleKind) {
+    val w = tripsColumnWidthsDp(kind)
+    val hybrid = kind == VehicleKind.HYBRID
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 36.dp, end = 12.dp, top = 4.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(stringResource(R.string.trips_col_time), color = TextMuted, fontSize = 11.sp, modifier = Modifier.width(timeColWidth))
+        Text(stringResource(R.string.trips_col_duration), color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.width(w[0].dp))
+        Text(stringResource(R.string.trips_col_km), color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.width(w[1].dp))
+        Text(stringResource(R.string.trips_col_soc), color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.width(w[2].dp))
+        Text(stringResource(R.string.trips_col_kwh), color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.width(w[3].dp))
+        if (hybrid) {
+            Text(stringResource(R.string.dashboard_unit_liters), color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.End,
+                maxLines = 1, modifier = Modifier.width(w[4].dp))
+        }
+        Text("/100", color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.width(w[w.size - 2].dp))
+        Text(currencySymbol.lowercase(), color = TextMuted, fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.width(w.last().dp))
+    }
+    HorizontalDivider(color = CardBorder.copy(alpha = 0.5f), thickness = 0.5.dp,
+        modifier = Modifier.padding(start = 36.dp, end = 12.dp))
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TripRow(
+    trip: TripEntity,
+    currencySymbol: String,
+    timeColWidth: Dp,
+    kind: VehicleKind,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val w = tripsColumnWidthsDp(kind)
+    val hybrid = kind == VehicleKind.HYBRID
+    val isStop = (trip.distanceKm ?: 0.0) == 0.0
+    val time = formatTime(trip.startTs)
+    val endTime = trip.endTs?.let { formatTime(it) } ?: ""
+    val dist = trip.distanceKm?.let { "%.1f".format(it) } ?: "—"
+    val dur = if (trip.endTs != null) formatDurationHm(trip.startTs, trip.endTs) else "—"
+    val kwh = trip.kwhConsumed?.let { "%.1f".format(it) } ?: "—"
+    val per100 = trip.kwhPer100km?.let { "%.1f".format(it) } ?: "—"
+    val cost = trip.cost?.let { "%.2f".format(it) } ?: "—"
+    val consColor = trip.kwhPer100km?.let { consumptionColor(it) } ?: TextSecondary
+    val hasSoc = !isStop && trip.socStart != null && trip.socEnd != null
+    val socText = if (hasSoc) "${trip.socStart}→${trip.socEnd}" else "—"
+
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .padding(start = 36.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Time range
+            Text(
+                "$time – $endTime",
+                color = if (isStop) TextMuted else TextSecondary,
+                fontSize = TimeColumnStyle.fontSize, fontFamily = TimeColumnStyle.fontFamily,
+                maxLines = 1,
+                modifier = Modifier.width(timeColWidth)
+            )
+            // Duration (compact H:MM, language-neutral so it never wraps the cell)
+            Text(dur, color = if (isStop) TextMuted else TextSecondary,
+                fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                textAlign = TextAlign.End, modifier = Modifier.width(w[0].dp))
+            // Distance
+            Text(
+                if (isStop) "0.0" else dist,
+                color = if (isStop) TextMuted else TextPrimary,
+                fontSize = 14.sp, fontFamily = FontFamily.Monospace,
+                fontWeight = if (!isStop) FontWeight.Medium else FontWeight.Normal,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(w[1].dp)
+            )
+            // SOC start→end (— when no session bookmark matched, or this is a stop)
+            Text(
+                socText,
+                color = if (hasSoc) TextSecondary else TextMuted,
+                fontSize = 13.sp, fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(w[2].dp)
+            )
+            // kWh
+            Text(kwh, color = if (isStop) TextMuted else TextSecondary,
+                fontSize = 14.sp, fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.End, modifier = Modifier.width(w[3].dp))
+            if (hybrid) {
+                HybridTripCells(trip, isStop, litersWidth = w[4].dp, per100Width = w[5].dp)
+            } else {
+                // /100
+                Text(
+                    if (isStop) "—" else per100,
+                    color = if (isStop) TextMuted else consColor,
+                    fontSize = 14.sp, fontFamily = FontFamily.Monospace,
+                    fontWeight = if (!isStop) FontWeight.Medium else FontWeight.Normal,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(w[4].dp)
+                )
+            }
+            // Cost (без кода валюты — он в заголовке дня/месяца)
+            Text(
+                cost,
+                color = if (isStop) TextMuted else TextSecondary,
+                fontSize = 12.sp, fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(w.last().dp)
+            )
+        }
+        HorizontalDivider(color = CardBorder.copy(alpha = 0.3f), thickness = 0.5.dp,
+            modifier = Modifier.padding(start = 36.dp, end = 12.dp))
+    }
+}
+
+/** DM-i: the «л» cell and the «/100» cell with the litre rule ([per100Cell]). */
+@Composable
+private fun HybridTripCells(trip: TripEntity, isStop: Boolean, litersWidth: Dp, per100Width: Dp) {
+    val liters = trip.fuelLiters
+    val burned = liters != null && liters > 0.0
+    Text(
+        litersCell(liters),
+        color = if (burned) AccentOrange else TextMuted,
+        fontSize = 14.sp, fontFamily = FontFamily.Monospace,
+        maxLines = 1, overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.End, modifier = Modifier.width(litersWidth)
+    )
+    val per100 = trip.kwhPer100km
+    val cell = per100Cell(per100, liters, trip.distanceKm, stringResource(R.string.dashboard_unit_liters))
+    Text(
+        if (isStop) "—" else cell.text,
+        color = when {
+            isStop -> TextMuted
+            cell.colored && per100 != null -> consumptionColor(per100)
+            burned -> TextPrimary
+            else -> TextSecondary
+        },
+        fontSize = 14.sp, fontFamily = FontFamily.Monospace,
+        fontWeight = if (!isStop) FontWeight.Medium else FontWeight.Normal,
+        maxLines = 1, overflow = TextOverflow.Ellipsis,
+        textAlign = TextAlign.End,
+        modifier = Modifier.width(per100Width)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TripActionSheet(
+    trip: TripEntity,
+    onDismiss: () -> Unit,
+    onDeletePrompt: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = CardSurface,
+    ) {
+        ScaledDialogContent {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "${formatTime(trip.startTs)} • ${trip.distanceKm?.let { "%.1f".format(it) } ?: "-"} ${stringResource(R.string.trips_col_km)}",
+                    color = TextSecondary, fontSize = 12.sp
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onDeletePrompt).padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.charges_action_delete), color = SocRed, fontSize = 16.sp)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+// Trip-list duration as compact H:MM (e.g. 1:40, 0:34). Language-neutral and
+// narrow enough to fit the "длит." column without wrapping; the trip detail
+// dialog keeps the full localized "1 ч 40 мин" form via components.formatDuration.
+private fun formatDurationHm(startTs: Long, endTs: Long): String {
+    val totalMin = ((endTs - startTs) / 60_000L).coerceAtLeast(0L)
+    val hours = totalMin / 60
+    val minutes = totalMin % 60
+    return "%d:%02d".format(hours, minutes)
+}
+
+@Composable
+private fun TripsChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontSize = 12.sp) },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = AccentGreen,
+            selectedLabelColor = Color.White,
+            containerColor = CardSurface,
+            labelColor = TextSecondary
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            borderColor = Color.Transparent,
+            selectedBorderColor = Color.Transparent,
+            enabled = true,
+            selected = selected
+        )
+    )
+}
+
+/** Same chip shape as the period row, outlined green to read as a door, not a filter. */
+@Composable
+private fun TemperatureChip(onClick: () -> Unit) {
+    FilterChip(
+        selected = false,
+        onClick = onClick,
+        label = { Text(stringResource(R.string.trips_temp_chip), fontSize = 12.sp) },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = CardSurface,
+            labelColor = AccentGreen,
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            borderColor = AccentGreen,
+            enabled = true,
+            selected = false
+        )
+    )
+}
+
+@Composable
+private fun ChartPanel(
+    bars: List<ChartBar>,
+    metric: ChartMetric,
+    selectedIndex: Int?,
+    currencySymbol: String,
+    stopsOnly: Boolean,
+    onMetricChange: (ChartMetric) -> Unit,
+    onBarSelect: (Int?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 8.dp)
+    ) {
+        // Metric chips
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(modifier = Modifier.weight(1f))
+            MetricChip("/100", ChartMetric.PER_100, metric, enabled = !stopsOnly, onMetricChange)
+            MetricChip(stringResource(R.string.trips_chart_kwh_chip), ChartMetric.KWH, metric, enabled = true, onMetricChange)
+            MetricChip(currencySymbol, ChartMetric.COST, metric, enabled = true, onMetricChange)
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (bars.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(stringResource(R.string.trips_chart_no_data), color = TextMuted, fontSize = 13.sp)
+            }
+        } else {
+            BarChart(
+                bars = bars,
+                metric = metric,
+                selectedIndex = selectedIndex,
+                currencySymbol = currencySymbol,
+                onBarSelect = onBarSelect,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+@Composable
+private fun MetricChip(
+    label: String,
+    metric: ChartMetric,
+    current: ChartMetric,
+    enabled: Boolean,
+    onClick: (ChartMetric) -> Unit
+) {
+    val selected = metric == current
+    FilterChip(
+        selected = selected,
+        onClick = { if (enabled) onClick(metric) },
+        enabled = enabled,
+        label = { Text(label, fontSize = 11.sp) },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = AccentGreen.copy(alpha = 0.15f),
+            selectedLabelColor = AccentGreen,
+            containerColor = CardSurface,
+            labelColor = TextSecondary,
+            disabledContainerColor = CardSurface.copy(alpha = 0.3f),
+            disabledLabelColor = TextMuted.copy(alpha = 0.4f)
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            borderColor = Color.Transparent,
+            selectedBorderColor = AccentGreen.copy(alpha = 0.5f),
+            enabled = enabled,
+            selected = selected
+        )
+    )
+}
+
+@Composable
+private fun BarChart(
+    bars: List<ChartBar>,
+    metric: ChartMetric,
+    selectedIndex: Int?,
+    currencySymbol: String,
+    onBarSelect: (Int?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+
+    // Hoist localized strings for use inside Canvas (non-composable scope)
+    val tooltipCountFormat = stringResource(R.string.trips_chart_tooltip_count)
+    val kwhLabel = stringResource(R.string.trips_chart_kwh_chip)
+
+    val yLabelPaint = remember {
+        AndroidPaint().apply {
+            color = 0xFF64748B.toInt()
+            textSize = 26f
+            textAlign = AndroidPaint.Align.RIGHT
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+    }
+    val tooltipBgPaint = remember {
+        AndroidPaint().apply {
+            color = 0xFF1D2940.toInt()
+            isAntiAlias = true
+        }
+    }
+    val tooltipTextPaint = remember {
+        AndroidPaint().apply {
+            color = 0xFF4ADE80.toInt()
+            textSize = 30f
+            textAlign = AndroidPaint.Align.CENTER
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+        }
+    }
+    val tooltipSubPaint = remember {
+        AndroidPaint().apply {
+            color = 0xFF94A3B8.toInt()
+            textSize = 24f
+            textAlign = AndroidPaint.Align.CENTER
+            isAntiAlias = true
+        }
+    }
+    val tooltipBorderPaint = remember {
+        AndroidPaint().apply {
+            color = 0xFF2A3A52.toInt()
+            style = AndroidPaint.Style.STROKE
+            strokeWidth = 2f
+            isAntiAlias = true
+        }
+    }
+
+    val niceMax = remember(bars) {
+        val maxValue = bars.maxOfOrNull { it.value } ?: 1.0
+        niceAxisMax(maxValue)
+    }
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(bars, selectedIndex) {
+                    detectTapGestures { offset ->
+                        val yAxisW = 48f * density
+                        val chartLeft = yAxisW
+                        val chartWidth = size.width - chartLeft
+                        if (offset.x < chartLeft || bars.isEmpty()) {
+                            onBarSelect(null)
+                            return@detectTapGestures
+                        }
+                        val barTotalWidth = chartWidth / bars.size
+                        val index = ((offset.x - chartLeft) / barTotalWidth).toInt()
+                            .coerceIn(0, bars.size - 1)
+                        onBarSelect(if (index == selectedIndex) null else index)
+                    }
+                }
+        ) {
+            val d = density
+            val yAxisWidth = 48f * d
+            val bottomPadding = 8f * d
+            val topPadding = 52f * d
+            val chartLeft = yAxisWidth
+            val chartWidth = size.width - chartLeft
+            val chartHeight = size.height - bottomPadding - topPadding
+
+            if (chartHeight <= 0 || chartWidth <= 0) return@Canvas
+
+            // Grid lines
+            val gridSteps = 4
+            for (i in 0..gridSteps) {
+                val y = topPadding + chartHeight * (1f - i.toFloat() / gridSteps)
+                drawLine(
+                    color = ChartGrid,
+                    start = Offset(chartLeft, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = 1f
+                )
+                val labelValue = niceMax * i / gridSteps
+                val labelText = if (labelValue >= 10) "%.0f".format(labelValue) else "%.1f".format(labelValue)
+                drawContext.canvas.nativeCanvas.drawText(
+                    labelText,
+                    yAxisWidth - 8f * d,
+                    y + 4f * d,
+                    yLabelPaint
+                )
+            }
+
+            // Bars
+            val barTotalWidth = chartWidth / bars.size
+            val barGap = (2f * d).coerceAtMost(barTotalWidth * 0.15f)
+            val barWidth = (barTotalWidth - barGap).coerceAtMost(40f * d)
+            val barOffset = (barTotalWidth - barWidth) / 2f
+
+            for ((i, bar) in bars.withIndex()) {
+                val barH = if (niceMax > 0) (bar.value / niceMax * chartHeight).toFloat()
+                    .coerceAtLeast(2f * d) else 2f * d
+                val x = chartLeft + i * barTotalWidth + barOffset
+                val y = topPadding + chartHeight - barH
+
+                val alpha = if (selectedIndex == null) 0.75f
+                else if (i == selectedIndex) 1.0f else 0.35f
+
+                drawRoundRect(
+                    color = AccentGreen.copy(alpha = alpha),
+                    topLeft = Offset(x, y),
+                    size = Size(barWidth, barH),
+                    cornerRadius = CornerRadius(3f * d, 3f * d)
+                )
+
+            }
+
+            // Tooltip
+            if (selectedIndex != null && selectedIndex in bars.indices) {
+                val bar = bars[selectedIndex]
+                val barCenterX = chartLeft + selectedIndex * barTotalWidth + barTotalWidth / 2f
+                val barH = if (niceMax > 0) (bar.value / niceMax * chartHeight).toFloat() else 0f
+                val barTopY = topPadding + chartHeight - barH
+
+                val valueText = when (metric) {
+                    ChartMetric.PER_100 -> "%.1f /100".format(bar.value)
+                    ChartMetric.KWH -> "%.1f $kwhLabel".format(bar.value)
+                    ChartMetric.COST -> "%.2f $currencySymbol".format(bar.value)
+                }
+                val countText = tooltipCountFormat.format(bar.label, bar.tripCount)
+
+                val tooltipW = 150f * d
+                val tooltipH = 48f * d
+                val tooltipX = (barCenterX - tooltipW / 2f)
+                    .coerceIn(chartLeft, size.width - tooltipW)
+                val tooltipY = (barTopY - tooltipH - 8f * d)
+                    .coerceAtLeast(4f * d)
+
+                drawContext.canvas.nativeCanvas.drawRoundRect(
+                    tooltipX, tooltipY,
+                    tooltipX + tooltipW, tooltipY + tooltipH,
+                    8f * d, 8f * d,
+                    tooltipBgPaint
+                )
+                drawContext.canvas.nativeCanvas.drawRoundRect(
+                    tooltipX, tooltipY,
+                    tooltipX + tooltipW, tooltipY + tooltipH,
+                    8f * d, 8f * d,
+                    tooltipBorderPaint
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    valueText,
+                    tooltipX + tooltipW / 2f,
+                    tooltipY + 22f * d,
+                    tooltipTextPaint
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    countText,
+                    tooltipX + tooltipW / 2f,
+                    tooltipY + 40f * d,
+                    tooltipSubPaint
+                )
+            }
+        }
+    }
+}
+
+private fun niceAxisMax(value: Double): Double {
+    if (value <= 0) return 1.0
+    val magnitude = 10.0.pow(floor(log10(value)))
+    val normalized = value / magnitude
+    val nice = when {
+        normalized <= 1.0 -> 1.0
+        normalized <= 2.0 -> 2.0
+        normalized <= 5.0 -> 5.0
+        else -> 10.0
+    }
+    return nice * magnitude
+}

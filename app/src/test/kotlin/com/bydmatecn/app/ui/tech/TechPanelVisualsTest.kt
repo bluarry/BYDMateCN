@@ -1,0 +1,156 @@
+package com.bydmatecn.app.ui.tech
+
+import com.bydmatecn.app.data.repository.equivalentFullCycles
+import com.bydmatecn.app.data.repository.fullCycleCapacityKwh
+import com.bydmatecn.app.ui.tech.TechPanelVisuals.TempZone
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+import java.util.Locale
+
+class TechPanelVisualsTest {
+
+    // --- cell range scale ---
+
+    @Test
+    fun `LFP pack keeps the default 3_25 - 3_40 scale`() {
+        val (lo, hi) = TechPanelVisuals.cellScale(3.301, 3.312)
+        assertEquals(3.25, lo, 1e-9)
+        assertEquals(3.40, hi, 1e-9)
+    }
+
+    @Test
+    fun `scale expands below and above the LFP window`() {
+        val (lo, hi) = TechPanelVisuals.cellScale(3.10, 4.05)
+        assertEquals(3.05, lo, 1e-9)
+        assertEquals(4.10, hi, 1e-9)
+    }
+
+    // --- temperature zones ---
+
+    @Test
+    fun `zone boundaries are 90 and 120`() {
+        assertEquals(TempZone.OK, TechPanelVisuals.tempZone(89))
+        assertEquals(TempZone.WARM, TechPanelVisuals.tempZone(90))
+        assertEquals(TempZone.WARM, TechPanelVisuals.tempZone(119))
+        assertEquals(TempZone.HOT, TechPanelVisuals.tempZone(120))
+    }
+
+    // --- tyre deviation ---
+
+    @Test
+    fun `equal pressures never deviate`() {
+        assertEquals(
+            listOf(false, false, false, false),
+            TechPanelVisuals.tyreDeviates(listOf(250, 250, 250, 250)),
+        )
+    }
+
+    @Test
+    fun `a tyre far from the average is flagged`() {
+        // mean of 252 / 255 / 221 / 260 = 247, so 221 is 26 kPa off against a 24.7 threshold.
+        assertEquals(
+            listOf(false, false, true, false),
+            TechPanelVisuals.tyreDeviates(listOf(252, 255, 221, 260)),
+        )
+    }
+
+    @Test
+    fun `a missing reading is never flagged and is left out of the average`() {
+        // mean of 300 / 250 / 250 = 266.67; only 300 is more than 10% off.
+        assertEquals(
+            listOf(true, false, false, false),
+            TechPanelVisuals.tyreDeviates(listOf(300, 250, 250, null)),
+        )
+    }
+
+    @Test
+    fun `fewer than two readings flag nothing`() {
+        assertEquals(
+            listOf(false, false, false, false),
+            TechPanelVisuals.tyreDeviates(listOf(180, null, null, null)),
+        )
+    }
+
+    // --- full cycles ---
+
+    @Test
+    fun `full cycles round the quotient and show the sum they came from`() {
+        val cycles = TechPanelVisuals.fullCycles(null, 6340.0, 72.9, null, Locale("ru"))!!
+        assertEquals("87", cycles.value)
+        assertEquals("6 340", cycles.totalKwh.replace('\u00A0', ' '))
+        assertEquals("72,9", cycles.capacity)
+    }
+
+    @Test
+    fun `full cycles follow the locale separators`() {
+        val cycles = TechPanelVisuals.fullCycles(null, 6340.0, 72.9, null, Locale.US)!!
+        assertEquals("87", cycles.value)
+        assertEquals("6,340", cycles.totalKwh)
+        assertEquals("72.9", cycles.capacity)
+    }
+
+    /**
+     * Field case (Song, 3 years, 2026-09-18): the app has logged 1 557 kWh since it was
+     * installed, the BMS counted 10 963 over the life of the car — 18 cycles against 126.
+     */
+    @Test
+    fun `the BMS counter is divided, not the app's own charging sum`() {
+        val cycles = TechPanelVisuals.fullCycles(10963.0, 1557.0, 87.0, null, Locale.US)!!
+        assertEquals("126", cycles.value)
+        assertEquals("10,963", cycles.totalKwh)
+    }
+
+    @Test
+    fun `a car that reports no BMS counter falls back to the charging sum`() {
+        assertEquals("18", TechPanelVisuals.fullCycles(null, 1557.0, 87.0, null, Locale.US)!!.value)
+        assertEquals("18", TechPanelVisuals.fullCycles(0.0, 1557.0, 87.0, null, Locale.US)!!.value)
+    }
+
+    // --- SoH-corrected divisor (#224) ---
+
+    @Test
+    fun `BMS lifetime source divides by the average capacity over the pack life`() {
+        // 87 × (100 + 90) / 200 = 82.65
+        assertEquals(82.65, fullCycleCapacityKwh(87.0, 90f, lifetimeSource = true), 1e-9)
+        assertEquals(10963.0 / 82.65, equivalentFullCycles(10963.0, 87.0, 90f, lifetimeSource = true), 1e-9)
+        val cycles = TechPanelVisuals.fullCycles(10963.0, 1557.0, 87.0, 90f, Locale.US)!!
+        assertEquals("133", cycles.value)
+        assertEquals("82.7", cycles.capacity)
+    }
+
+    @Test
+    fun `own charging sum divides by the capacity today`() {
+        // 87 × 90 / 100 = 78.3
+        assertEquals(78.3, fullCycleCapacityKwh(87.0, 90f, lifetimeSource = false), 1e-9)
+        assertEquals(1557.0 / 78.3, equivalentFullCycles(1557.0, 87.0, 90f, lifetimeSource = false), 1e-9)
+        val cycles = TechPanelVisuals.fullCycles(null, 1557.0, 87.0, 90f, Locale.US)!!
+        assertEquals("20", cycles.value)
+        assertEquals("78.3", cycles.capacity)
+    }
+
+    @Test
+    fun `no SoH keeps the nominal divisor`() {
+        assertEquals(87.0, fullCycleCapacityKwh(87.0, null, lifetimeSource = true), 0.0)
+        assertEquals(87.0, fullCycleCapacityKwh(87.0, null, lifetimeSource = false), 0.0)
+        assertEquals(10963.0 / 87.0, equivalentFullCycles(10963.0, 87.0, null, lifetimeSource = true), 1e-9)
+        assertEquals("87.0", TechPanelVisuals.fullCycles(10963.0, null, 87.0, null, Locale.US)!!.capacity)
+    }
+
+    @Test
+    fun `SoH out of range keeps the nominal divisor`() {
+        for (soh in listOf(0f, -5f, 100.5f, 250f)) {
+            assertEquals(87.0, fullCycleCapacityKwh(87.0, soh, lifetimeSource = true), 0.0)
+            assertEquals(87.0, fullCycleCapacityKwh(87.0, soh, lifetimeSource = false), 0.0)
+        }
+        assertEquals(1557.0 / 87.0, equivalentFullCycles(1557.0, 87.0, 0f, lifetimeSource = false), 1e-9)
+    }
+
+    @Test
+    fun `no source and no pack size leave the row empty`() {
+        assertNull(TechPanelVisuals.fullCycles(null, null, 72.9, null, Locale.US))
+        assertNull(TechPanelVisuals.fullCycles(null, 0.0, 72.9, null, Locale.US))
+        assertNull(TechPanelVisuals.fullCycles(0.0, 0.0, 72.9, null, Locale.US))
+        assertNull(TechPanelVisuals.fullCycles(10963.0, 6340.0, 0.0, null, Locale.US))
+    }
+}

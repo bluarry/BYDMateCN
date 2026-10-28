@@ -1,0 +1,489 @@
+package com.bydmatecn.app.ui.settings
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.BorderStroke
+import com.bydmatecn.app.R
+import com.bydmatecn.app.diagnostics.Trace
+import com.bydmatecn.app.diagnostics.TraceArea
+import com.bydmatecn.app.ui.components.bydSwitchColors
+import com.bydmatecn.app.ui.theme.AccentGreen
+import com.bydmatecn.app.ui.theme.AccentOrange
+import com.bydmatecn.app.ui.theme.CardBorder
+import com.bydmatecn.app.ui.theme.CardSurfaceElevated
+import com.bydmatecn.app.ui.theme.NavyDark
+import com.bydmatecn.app.ui.theme.TextMuted
+import com.bydmatecn.app.ui.theme.TextPrimary
+import com.bydmatecn.app.ui.theme.TextSecondary
+
+/** Button styles for [SettingActionRow]. */
+enum class SettingButtonStyle { Primary, Secondary, Warning }
+
+/** Title (14sp Medium) + optional description (12sp) column shared by all rows. */
+@Composable
+private fun RowLabel(
+    title: String,
+    description: String?,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onHelp: (() -> Unit)? = null,
+) {
+    Column(modifier = modifier.padding(end = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = title,
+                color = if (enabled) TextPrimary else TextMuted,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            // Optional "?" next to the title (not the switch) — the badge explains the feature.
+            if (onHelp != null) SettingHelpBadge(onHelp)
+        }
+        if (description != null) {
+            Text(
+                text = description,
+                color = if (enabled) TextSecondary else TextMuted,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+    }
+}
+
+/** Row "title + hint + Switch". The whole row toggles. */
+@Composable
+fun SettingToggleRow(
+    title: String,
+    description: String? = null,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+    onHelp: (() -> Unit)? = null,
+    // Names the toggle in the trace; the title is translated text and never goes there.
+    traceId: String? = null,
+) {
+    val onChange: (Boolean) -> Unit = { on ->
+        if (traceId != null) Trace.event(TraceArea.USER, "toggle", "id" to traceId, "on" to on)
+        onCheckedChange(on)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(enabled = enabled) { onChange(!checked) }
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RowLabel(title, description, enabled, Modifier.weight(1f), onHelp)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            enabled = enabled,
+            colors = bydSwitchColors(),
+        )
+    }
+}
+
+/** Row "title + hint + slider with value label on the right". */
+@Composable
+fun SettingSliderRow(
+    title: String,
+    description: String? = null,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    valueLabel: String,
+    steps: Int = 0,
+    enabled: Boolean = true,
+    onValueChangeFinished: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RowLabel(title, description, enabled, Modifier.weight(1f))
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = steps,
+            enabled = enabled,
+            onValueChangeFinished = onValueChangeFinished,
+            colors = SliderDefaults.colors(
+                thumbColor = AccentGreen,
+                activeTrackColor = AccentGreen,
+                inactiveTrackColor = CardBorder,
+            ),
+            modifier = Modifier.width(280.dp),
+        )
+        Text(
+            text = valueLabel,
+            color = if (enabled) AccentGreen else TextMuted,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(64.dp),
+        )
+    }
+}
+
+/** Row "title + hint + one or two buttons on the right". */
+@Composable
+fun SettingActionRow(
+    title: String,
+    description: String? = null,
+    buttonLabel: String,
+    onClick: () -> Unit,
+    style: SettingButtonStyle = SettingButtonStyle.Secondary,
+    enabled: Boolean = true,
+    secondButtonLabel: String? = null,
+    onSecondClick: (() -> Unit)? = null,
+    secondButtonEnabled: Boolean = enabled,
+    onHelp: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RowLabel(title, description, enabled, Modifier.weight(1f), onHelp)
+        if (secondButtonLabel != null && onSecondClick != null) {
+            SettingRowButton(secondButtonLabel, onSecondClick, SettingButtonStyle.Secondary, secondButtonEnabled)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        SettingRowButton(buttonLabel, onClick, style, enabled)
+    }
+}
+
+@Composable
+private fun SettingRowButton(
+    label: String,
+    onClick: () -> Unit,
+    style: SettingButtonStyle,
+    enabled: Boolean,
+) {
+    when (style) {
+        SettingButtonStyle.Primary -> Button(
+            onClick = onClick,
+            enabled = enabled,
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = AccentGreen,
+                contentColor = NavyDark,
+            ),
+        ) { Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        SettingButtonStyle.Secondary -> Button(
+            onClick = onClick,
+            enabled = enabled,
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = CardSurfaceElevated,
+                contentColor = TextPrimary,
+            ),
+            border = BorderStroke(1.dp, CardBorder),
+        ) { Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        SettingButtonStyle.Warning -> OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentOrange),
+            border = BorderStroke(1.dp, AccentOrange.copy(alpha = 0.45f)),
+        ) { Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+    }
+}
+
+/** Row "title + hint + current value with chevron", opens a dialog/picker. */
+@Composable
+fun SettingValueRow(
+    title: String,
+    description: String? = null,
+    value: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RowLabel(title, description, enabled, Modifier.weight(1f))
+        Text(
+            text = value,
+            color = if (enabled) AccentGreen else TextMuted,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            text = "›",
+            color = TextMuted,
+            fontSize = 18.sp,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
+}
+
+/** Row "title + hint + UnitChip group on the right" (scrolls horizontally if long). */
+@Composable
+fun SettingChipRow(
+    title: String,
+    description: String? = null,
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    enabled: Boolean = true,
+    onHelp: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RowLabel(title, description, enabled, Modifier.weight(1f))
+        if (onHelp != null) SettingHelpBadge(onHelp)
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            options.forEachIndexed { index, label ->
+                UnitChip(
+                    label = label,
+                    selected = index == selectedIndex,
+                    onClick = { if (enabled) onSelect(index) },
+                )
+            }
+        }
+    }
+}
+
+/** Small "?" badge that toggles an explanatory SettingHint below the row (BatteryHealthDialog idiom). */
+@Composable
+fun SettingHelpBadge(onClick: () -> Unit) {
+    val source = remember { MutableInteractionSource() }
+    // A vector icon sized in dp: the glyph never outgrows its circle at a larger text size.
+    Icon(
+        Icons.AutoMirrored.Outlined.HelpOutline,
+        contentDescription = stringResource(R.string.help_badge_content_description),
+        tint = TextMuted,
+        modifier = Modifier
+            .padding(horizontal = 6.dp)
+            .size(20.dp)
+            .clickable(indication = null, interactionSource = source, onClick = onClick),
+    )
+}
+
+/** Row with a green/orange status dot + optional button on the right. */
+@Composable
+fun SettingStatusRow(
+    title: String,
+    description: String? = null,
+    ok: Boolean,
+    buttonLabel: String? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(if (ok) AccentGreen else AccentOrange, CircleShape),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        RowLabel(title, description, enabled = true, Modifier.weight(1f))
+        if (buttonLabel != null && onClick != null) {
+            SettingRowButton(buttonLabel, onClick, SettingButtonStyle.Secondary, enabled = true)
+        }
+    }
+}
+
+/** Muted multi-line hint inside a card (replaces ad-hoc Text hints). */
+@Composable
+fun SettingHint(text: String) {
+    Text(
+        text = text,
+        color = TextMuted,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+    )
+}
+
+/** Thin divider between rows inside a settings card. */
+@Composable
+fun SettingDivider() {
+    HorizontalDivider(color = CardBorder.copy(alpha = 0.55f), thickness = 1.dp)
+}
+
+/** Small uppercase caption that groups rows inside a card. */
+@Composable
+fun SettingSubhead(text: String) {
+    Text(
+        text = text.uppercase(),
+        color = TextMuted,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.5.sp,
+        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
+    )
+}
+
+/**
+ * Card whose body opens on a tap on the header. The header carries the feature's main switch —
+ * Switch consumes its own clicks, so toggling the feature does not expand the card. The expanded
+ * state is intentionally not persisted: every card opens collapsed.
+ */
+@Composable
+fun SettingCollapsibleCard(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = CardSurfaceElevated),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier
+                            .padding(start = 2.dp)
+                            .size(18.dp)
+                            .rotate(if (expanded) 90f else 0f),
+                    )
+                }
+                Text(
+                    text = subtitle,
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = bydSwitchColors(),
+            )
+        }
+        if (expanded) {
+            SettingDivider()
+            Column(
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                content = content,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun UnitChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(text = label, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = AccentGreen,
+            selectedLabelColor = Color.White,
+            containerColor = CardSurfaceElevated,
+            labelColor = TextSecondary
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            borderColor = Color.Transparent,
+            selectedBorderColor = Color.Transparent,
+            enabled = true,
+            selected = selected
+        )
+    )
+}

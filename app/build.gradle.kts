@@ -20,11 +20,12 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.bydmate.app"
-    compileSdk = 29
+    namespace = "com.bydmatecn.app"
+    // Modern AndroidX/Compose compile APIs; car head-unit runtime remains API 29+.
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bydmate.app"
+        applicationId = "com.bydmatecn.app"
         minSdk = 29
         // targetSdk 29 matches TripInfo — grants full legacy file access
         // on DiLink Android 12 (requestLegacyExternalStorage works).
@@ -32,6 +33,8 @@ android {
         targetSdk = 29
         versionCode = 508
         versionName = "4.0.1"
+        // Independent fork: no donor APKs may be offered as this application's updates.
+        buildConfigField("String", "APP_UPDATE_URL", "\"\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -65,7 +68,7 @@ android {
         val variant = this
         variant.outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "BYDMate-v${variant.versionName}.apk"
+            output.outputFileName = "BYDMateCN-v${variant.versionName}.apk"
         }
     }
 
@@ -229,9 +232,17 @@ dependencies {
     // Testing
     testImplementation("org.jetbrains.kotlin:kotlin-reflect:2.1.0")
     testImplementation("io.mockk:mockk:1.13.10")
+    // MockK's older transitive Byte Buddy cannot instrument JDK 24 (class version 68).
+    testImplementation("net.bytebuddy:byte-buddy:1.17.8")
+    testImplementation("net.bytebuddy:byte-buddy-agent:1.17.8")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("org.robolectric:robolectric:4.13")
+    // Robolectric 4.13's older ASM cannot parse JDK 24 platform classes (major 68).
+    testImplementation("org.ow2.asm:asm:9.8")
+    testImplementation("org.ow2.asm:asm-tree:9.8")
+    testImplementation("org.ow2.asm:asm-commons:9.8")
+    testImplementation("org.ow2.asm:asm-util:9.8")
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("androidx.room:room-testing:2.6.1")
@@ -276,7 +287,7 @@ kover {
                     "*BuildConfig*",
                 )
                 // Compose screens are not the coverage target
-                packages("com.bydmate.app.ui")
+                packages("com.bydmatecn.app.ui")
             }
         }
     }

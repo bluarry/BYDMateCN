@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BYDMate</string>
+    <string name="app_name">BYDMateCN</string>
     <string name="settings_language_title">Language</string>
     <string name="settings_font_scale_title">Text size</string>
     <string name="settings_font_scale_desc">Applies to the app screens and the voice agent windows. The widget and the cluster stay unchanged.</string>
@@ -85,7 +85,7 @@
     <string name="settings_adb_restore_title">Restore ADB after a reboot</string>
     <string name="settings_adb_restore_desc">For firmwares where ADB turns off at every reboot. Wi-Fi must be on.</string>
     <string name="settings_adb_restore_help_title">How ADB restore works</string>
-    <string name="settings_adb_restore_help_body">On newer DiLink firmwares (since summer 2026) the ADB port closes at every reboot, and BYDMate loses access to the car control features.\n\nThe app can bring ADB back up through the wireless debugging built into Android. For that:\n\n1. Wi-Fi in the car must be on and connected to a network: your home one, a phone hotspot or any other. Without Wi-Fi, Android does not allow wireless debugging to be enabled, that is a system limitation.\n\n2. The first time on each new network the system dialog “Allow wireless debugging on this network?” appears on the screen. When restore is on, BYDMate confirms it by itself through its accessibility service. If the service is off, tick “Always allow on this network” and press ALLOW.\n\n3. Once, while ADB still works, the app grants itself the system permission it needs. If the status line shows “Activation needed”, connect ADB the usual way and restart the app.\n\nIf ADB on your firmware works after a reboot anyway, there is no need to turn this on: the status line will show “Not needed”.</string>
+    <string name="settings_adb_restore_help_body">On newer DiLink firmwares (since summer 2026) the ADB port closes at every reboot, and BYDMateCN loses access to the car control features.\n\nThe app can bring ADB back up through the wireless debugging built into Android. For that:\n\n1. Wi-Fi in the car must be on and connected to a network: your home one, a phone hotspot or any other. Without Wi-Fi, Android does not allow wireless debugging to be enabled, that is a system limitation.\n\n2. The first time on each new network the system dialog “Allow wireless debugging on this network?” appears on the screen. When restore is on, BYDMateCN confirms it by itself through its accessibility service. If the service is off, tick “Always allow on this network” and press ALLOW.\n\n3. Once, while ADB still works, the app grants itself the system permission it needs. If the status line shows “Activation needed”, connect ADB the usual way and restart the app.\n\nIf ADB on your firmware works after a reboot anyway, there is no need to turn this on: the status line will show “Not needed”.</string>
     <string name="settings_adb_restore_status_not_needed">Not needed: ADB already works</string>
     <string name="settings_adb_restore_status_needs_activation">Activation needed: connect ADB once and restart the app</string>
     <string name="settings_adb_restore_status_waiting_wifi">Waiting for Wi-Fi</string>
@@ -97,7 +97,7 @@
     <string name="settings_cloud_wifi_title">BYD cloud over Wi-Fi</string>
     <string name="settings_cloud_wifi_desc">The BYD phone app sees the car while it is on Wi-Fi. Cars on the new BYD servers need a Chinese VPN.</string>
     <string name="settings_cloud_wifi_help_title">How the BYD cloud over Wi-Fi works</string>
-    <string name="settings_cloud_wifi_help_body">Without a link to the BYD cloud there are no over-the-air updates, no NFC key and no control from the BYD phone app.\n\nWith this setting BYDMate connects the car to the cloud over Wi-Fi: your home network, a phone hotspot or any other network with internet.\n\nConditions:\n\n1. Cars on the new BYD servers need a Chinese VPN: the server only lets in connections from a Chinese address. A VPN on the router the car connects to is the most reliable, because it does not depend on the head unit. A VPN app on the head unit itself works only while the head unit is on.\n\n2. If the car already has its own mobile data, nothing changes: the cloud works anyway.\n\nWhen you switch the setting off, the app returns the car\'s previous connection settings.</string>
+    <string name="settings_cloud_wifi_help_body">Without a link to the BYD cloud there are no over-the-air updates, no NFC key and no control from the BYD phone app.\n\nWith this setting BYDMateCN connects the car to the cloud over Wi-Fi: your home network, a phone hotspot or any other network with internet.\n\nConditions:\n\n1. Cars on the new BYD servers need a Chinese VPN: the server only lets in connections from a Chinese address. A VPN on the router the car connects to is the most reliable, because it does not depend on the head unit. A VPN app on the head unit itself works only while the head unit is on.\n\n2. If the car already has its own mobile data, nothing changes: the cloud works anyway.\n\nWhen you switch the setting off, the app returns the car\'s previous connection settings.</string>
     <string name="settings_cloud_wifi_status_connected">Connected to the BYD cloud</string>
     <string name="settings_cloud_wifi_status_own_cellular">The car has its own mobile data, the cloud works anyway</string>
     <string name="settings_cloud_wifi_status_waiting">Waiting for Wi-Fi with internet</string>
@@ -116,14 +116,14 @@
     <string name="adb_verdict_link_more">Details</string>
     <string name="adb_dialog_not_enabled_title">ADB is off</string>
     <string name="adb_dialog_not_enabled_body">Without ADB, live data, car control, split screen, the instrument cluster and the steering wheel button do not work. Trip history is available.</string>
-    <string name="adb_enable_step_1">1. Turn on ADB following the guide: BYDMate on GitHub, section “Enable ADB”</string>
-    <string name="adb_enable_step_2">2. Return to BYDMate and tap “Check”</string>
+    <string name="adb_enable_step_1">1. Turn on ADB following the guide: BYDMateCN on GitHub, section “Enable ADB”</string>
+    <string name="adb_enable_step_2">2. Return to BYDMateCN and tap “Check”</string>
     <string name="adb_dialog_off_after_reboot_title">ADB turned off after reboot</string>
-    <string name="adb_dialog_off_after_reboot_body">On this firmware ADB turns off at every reboot. BYDMate can turn it back on by itself, Wi-Fi is required.</string>
+    <string name="adb_dialog_off_after_reboot_body">On this firmware ADB turns off at every reboot. BYDMateCN can turn it back on by itself, Wi-Fi is required.</string>
     <string name="adb_dialog_off_after_reboot_body_unsupported">On this firmware ADB turns off at every reboot. Turn it on again following the guide on GitHub, section “Enable ADB”.</string>
     <string name="adb_dialog_no_access_title">No ADB access</string>
     <string name="adb_dialog_no_access_body">Confirm the prompt on the screen or reconnect ADB, then tap “Check”.</string>
-    <string name="adb_dialog_helper_down_title">BYDMate helper did not start</string>
+    <string name="adb_dialog_helper_down_title">BYDMateCN helper did not start</string>
     <string name="adb_dialog_helper_down_body">ADB works, but the helper does not respond. Turn on log recording (Settings, “Service &amp; Data”, “Record logs”), wait a minute, stop it and send the file to the developer.</string>
     <string name="adb_dialog_close">Close</string>
     <string name="adb_dialog_check">Check</string>
@@ -245,7 +245,7 @@
     <string name="settings_model_picker_loading">Loading models...</string>
     <string name="settings_widget_section_header">Floating widget</string>
     <string name="settings_widget_show_soc_label">Show SOC widget</string>
-    <string name="settings_widget_hints">- Long tap the widget - hide until BYDMate is opened next time.\n- Drag to the bin at the bottom - turn off completely.\n- Regular tap - open BYDMate.</string>
+    <string name="settings_widget_hints">- Long tap the widget - hide until BYDMateCN is opened next time.\n- Drag to the bin at the bottom - turn off completely.\n- Regular tap - open BYDMateCN.</string>
     <string name="settings_widget_hide_youtube_label">Hide over YouTube</string>
     <string name="settings_widget_hide_youtube_description">The button panel hides while YouTube is on screen</string>
     <string name="settings_widget_home_only_label">Show only on the home screen</string>
@@ -263,20 +263,20 @@
     <string name="orb_agent">Agent:</string>
     <string name="settings_voice_native_assistant_header">Native BYD voice assistant</string>
     <string name="settings_voice_disable_native_label">Disable built-in voice assistant</string>
-    <string name="settings_voice_disable_native_description">Hides the native BYD voice assistant so it does not interrupt. The Shortcuts app (quick commands) disappears with it, it is part of the assistant. Reversible: turn the toggle off and restart the head unit, both come back. Before you uninstall BYDMate, turn this toggle off, or the built-in assistant stays off.</string>
+    <string name="settings_voice_disable_native_description">Hides the native BYD voice assistant so it does not interrupt. The Shortcuts app (quick commands) disappears with it, it is part of the assistant. Reversible: turn the toggle off and restart the head unit, both come back. Before you uninstall BYDMateCN, turn this toggle off, or the built-in assistant stays off.</string>
     <string name="settings_voice_disable_native_confirm_title">Disable the built-in assistant?</string>
-    <string name="settings_voice_disable_native_confirm_body">The built-in BYD assistant will be turned off in the car\'s system. Before you uninstall BYDMate, turn this toggle off, or the built-in assistant stays off. If the app is already uninstalled: install BYDMate again, turn the toggle off and restart the head unit.</string>
+    <string name="settings_voice_disable_native_confirm_body">The built-in BYD assistant will be turned off in the car\'s system. Before you uninstall BYDMateCN, turn this toggle off, or the built-in assistant stays off. If the app is already uninstalled: install BYDMateCN again, turn the toggle off and restart the head unit.</string>
     <string name="settings_voice_disable_native_confirm_button">Disable</string>
     <string name="settings_voice_native_assistant_reboot_note">Takes effect after restarting the head unit.</string>
     <string name="settings_widget_opacity_label">Opacity</string>
     <string name="settings_widget_scale_label">Size</string>
     <string name="settings_widget_tap_section_header">Widget tap</string>
     <string name="settings_widget_left_tap_zoning_label">Tap zoning</string>
-    <string name="settings_widget_left_tap_zoning_description">Left 1/3 - opens the selected app; the rest - BYDMate.</string>
+    <string name="settings_widget_left_tap_zoning_description">Left 1/3 - opens the selected app; the rest - BYDMateCN.</string>
     <string name="settings_widget_left_tap_label">App for left tap</string>
     <string name="settings_widget_left_tap_description">Default is Yandex Navigator. If the app is removed, the tap will not work.</string>
     <string name="settings_widget_buttons_label">Widget buttons</string>
-    <string name="settings_widget_buttons_description">A single tap slides out 4 buttons, a double tap opens BYDMate. A button runs a rule with the "Button press" trigger.</string>
+    <string name="settings_widget_buttons_description">A single tap slides out 4 buttons, a double tap opens BYDMateCN. A button runs a rule with the "Button press" trigger.</string>
     <string name="settings_places_section_header">Places</string>
     <string name="settings_places_entry_title">Automation points</string>
     <string name="settings_places_entry_description">Home, work, favorite places - Place enter / Place exit triggers</string>
@@ -434,7 +434,7 @@
     <string name="automation_trigger_night">Night</string>
     <string name="automation_trigger_dawn">Dawn</string>
     <string name="automation_trigger_dusk">Dusk</string>
-    <string name="automation_trigger_service_start">BYDMate startup</string>
+    <string name="automation_trigger_service_start">BYDMateCN startup</string>
     <string name="automation_trigger_internet">Internet available</string>
     <string name="automation_add_condition_button">+ Add condition</string>
     <string name="automation_trigger_type_param">Parameter</string>
@@ -442,7 +442,7 @@
     <string name="automation_trigger_type_place_empty_hint">Add a place first with the Places button at the top</string>
     <string name="automation_trigger_type_time_of_day">Time of day</string>
     <string name="automation_trigger_type_schedule">Time / schedule</string>
-    <string name="automation_trigger_type_service_start">BYDMate startup</string>
+    <string name="automation_trigger_type_service_start">BYDMateCN startup</string>
     <string name="automation_trigger_type_internet">Internet available</string>
     <string name="automation_trigger_type_button_press">Button press</string>
     <string name="automation_trigger_button_label">Button %1$d</string>
@@ -450,7 +450,7 @@
     <string name="automation_trigger_steering_key_unassigned">Key not assigned</string>
     <string name="automation_trigger_steering_key_assign">assign</string>
     <string name="automation_steering_key_occupied_projection">This key turns navigation on the instrument cluster on. Free it up in Settings, Display section, or pick another one.</string>
-    <string name="automation_steering_key_occupied_voice">This key calls the BYDMate voice assistant. Change the key in Settings, Voice agent section, or pick another one.</string>
+    <string name="automation_steering_key_occupied_voice">This key calls the BYDMateCN voice assistant. Change the key in Settings, Voice agent section, or pick another one.</string>
     <string name="automation_steering_key_occupied_knob">The knob press is taken by play/pause. Turn it off in Settings, Display section, or pick another key.</string>
     <string name="automation_trigger_type_voice">Voice</string>
     <string name="automation_trigger_voice_phrase_label">Trigger phrase</string>
@@ -525,7 +525,7 @@
     <string name="automation_speak_text_label">Text to speak</string>
     <string name="automation_agent_prompt_label">Prompt for the voice agent</string>
     <string name="automation_overlay_permission_title">Permission required</string>
-    <string name="automation_overlay_permission_text">Sound notifications are shown as a popup over other apps. Open system settings and enable \"Display over other apps\" for BYDMate.</string>
+    <string name="automation_overlay_permission_text">Sound notifications are shown as a popup over other apps. Open system settings and enable \"Display over other apps\" for BYDMateCN.</string>
     <string name="automation_overlay_open_settings">Open settings</string>
     <string name="automation_overlay_later">Later</string>
     <string name="automation_tap_to_configure">Tap to configure...</string>
@@ -577,9 +577,9 @@
     <string name="welcome_tariff_home_label">Home AC charge (%1$s/kWh)</string>
     <string name="welcome_tariff_dc_label">Fast DC charge (%1$s/kWh)</string>
     <string name="welcome_autostart_step_title">Autostart on DiLink</string>
-    <string name="welcome_autostart_step_description">To make BYDMate start automatically when the head unit turns on:</string>
+    <string name="welcome_autostart_step_description">To make BYDMateCN start automatically when the head unit turns on:</string>
     <string name="welcome_autostart_instruction_1">1. Tap the button on the right</string>
-    <string name="welcome_autostart_instruction_2">2. Find BYDMate in the list</string>
+    <string name="welcome_autostart_instruction_2">2. Find BYDMateCN in the list</string>
     <string name="welcome_autostart_instruction_3">3. The switch must be OFF</string>
     <string name="welcome_autostart_off_note">OFF = autostart ALLOWED. This is a blacklist: apps disabled in it CAN start by themselves.</string>
     <string name="welcome_autostart_apk_update_warning">Check this setting after updating the APK!</string>
@@ -587,13 +587,13 @@
     <string name="welcome_autostart_dilink_hint">If autostart did not work, add this in Di+:</string>
     <string name="welcome_autostart_dilink_instruction">Di+ -> Predefined -> Startup tasks</string>
     <string name="welcome_autostart_command_copied_toast">Copied!</string>
-    <string name="welcome_autostart_command_explanation">打开应用 = \"open app\" + package name.\nFor two apps separated by semicolon:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmate.app</string>
+    <string name="welcome_autostart_command_explanation">打开应用 = \"open app\" + package name.\nFor two apps separated by semicolon:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmatecn.app</string>
     <string name="welcome_system_settings_section_title">System settings</string>
     <string name="welcome_autostart_open_settings_button">Open autostart settings</string>
     <string name="welcome_autostart_open_settings_error">Could not open DiLink autostart settings. App settings were opened.</string>
     <string name="welcome_loading_default">Loading...</string>
     <string name="welcome_back_button">Back</string>
-    <string name="welcome_done_button">Launch BYDMate</string>
+    <string name="welcome_done_button">Launch BYDMateCN</string>
     <string name="welcome_saving_settings_status">Saving settings...</string>
     <string name="welcome_updating_data_status">Updating data...</string>
     <string name="welcome_importing_trips_status">Importing trips...</string>
@@ -610,7 +610,7 @@
     <string name="widget_trip_km_value">%1$.1f km</string>
     <string name="widget_km_per_percent">%1$.1f</string>
     <string name="widget_voltage_value">%1$.1f V</string>
-    <string name="widget_toast_hidden">Widget hidden. Open BYDMate - it will return.</string>
+    <string name="widget_toast_hidden">Widget hidden. Open BYDMateCN - it will return.</string>
     <string name="widget_button_no_rules">No rules for button %1$d</string>
     <string name="widget_trash_release">release - widget hidden</string>
     <string name="widget_trash_hint">drag here to hide</string>
@@ -669,8 +669,8 @@
     <string name="nav_tab_charges">Charging</string>
     <string name="nav_tab_automation">Automation</string>
     <string name="nav_tab_settings">Settings</string>
-    <string name="nav_autostart_dialog_title">BYDMate updated to v%1$s</string>
-    <string name="nav_autostart_dialog_body">Check that background work is not blocked:\n\nDiLink Settings - General - Disable background Apps - BYDMate - OFF\n\nIf the switch is ON, DiLink may kill the BYDMate service - then trips and GPS will not be recorded.</string>
+    <string name="nav_autostart_dialog_title">BYDMateCN updated to v%1$s</string>
+    <string name="nav_autostart_dialog_body">Check that background work is not blocked:\n\nDiLink Settings - General - Disable background Apps - BYDMateCN - OFF\n\nIf the switch is ON, DiLink may kill the BYDMateCN service - then trips and GPS will not be recorded.</string>
     <string name="nav_autostart_dialog_button">Got it</string>
     <string name="nav_autostart_open_settings_error">Could not open DiLink autostart settings. App settings were opened.</string>
     <string name="applauncher_title">Choose app</string>
@@ -691,7 +691,7 @@
     <string name="battery_health_pumped_value">%1$.0f kWh</string>
     <string name="battery_health_avg_since_charge_label">since last charge</string>
     <string name="battery_health_avg_all_time_label">all time</string>
-    <string name="battery_health_avg_soc_hint" formatted="false">Time-weighted state of charge: the longer the battery sits charged, the higher the value. BYD LFP packs age slower when kept lower: storing at a high charge speeds up calendar aging. Guideline: below 65% is great, 65-85% is fine, above 85% consider charging later or less often. A 100% charge once every 1-2 weeks is still needed for cell balancing. Computed from BYDMate trip and charge history.</string>
+    <string name="battery_health_avg_soc_hint" formatted="false">Time-weighted state of charge: the longer the battery sits charged, the higher the value. BYD LFP packs age slower when kept lower: storing at a high charge speeds up calendar aging. Guideline: below 65% is great, 65-85% is fine, above 85% consider charging later or less often. A 100% charge once every 1-2 weeks is still needed for cell balancing. Computed from BYDMateCN trip and charge history.</string>
     <string name="summary_unit_km">km</string>
     <string name="summary_label_mileage">Mileage</string>
     <string name="summary_unit_kwh">kWh</string>
@@ -724,7 +724,7 @@
     <string name="update_downloading_done">Downloaded. Installing...</string>
     <string name="update_downloading_paused">Paused...</string>
     <string name="update_download_error">Download error (code %1$d)</string>
-    <string name="update_download_notification_description">BYDMate update</string>
+    <string name="update_download_notification_description">BYDMateCN update</string>
     <string name="update_downloading_start" formatted="false">Downloading: 0%</string>
     <string name="charges_day_today">today (%1$s)</string>
     <string name="charges_day_yesterday">yesterday</string>
@@ -842,7 +842,7 @@
     <string name="settings_tg_backup_disconnect">Disconnect</string>
     <string name="settings_tg_backup_hint">Create a bot in @BotFather, paste its token and tap “Check”. The archive is not encrypted, so the bot and the chat must be yours only.</string>
     <string name="settings_tg_backup_checking">Checking…</string>
-    <string name="settings_tg_backup_greeting">BYDMate is connected. Backups will arrive here.</string>
+    <string name="settings_tg_backup_greeting">BYDMateCN is connected. Backups will arrive here.</string>
     <string name="settings_backup_share">Share</string>
     <string name="settings_backup_close">Close</string>
     <string name="settings_backup_share_hint">The archive holds your keys and trip history, share it only with someone you trust.</string>
@@ -864,7 +864,7 @@
     <string name="settings_backup_part_keys_desc">OpenRouter, ABRP, Telegram bot. Uncheck if you give the file to someone else.</string>
     <string name="settings_backup_part_absent">Not in the archive</string>
     <string name="backup_error_newer_archive">The backup was made by a newer app version (schema %1$d, current %2$d). Update the app before restoring.</string>
-    <string name="backup_error_not_bydmate_db">The database file in the backup is not a BYDMate database</string>
+    <string name="backup_error_not_bydmate_db">The database file in the backup is not a BYDMateCN database</string>
     <string name="backup_error_merge_integrity">The database failed the integrity check after the merge with the backup</string>
     <string name="backup_error_export_integrity">The database snapshot for export failed the integrity check</string>
     <string name="backup_error_parts_mismatch">The backup file is damaged: its contents do not match its description</string>
@@ -1174,7 +1174,7 @@
     <string name="auto_msg_media_volume_missing">Action #%1$d: volume level not set</string>
     <!-- automation special triggers/actions -->
     <string name="auto_trig_place_enter">Enter «%1$s»</string>
-    <string name="auto_trig_service_start">BYDMate startup</string>
+    <string name="auto_trig_service_start">BYDMateCN startup</string>
     <string name="auto_trig_network_available">Internet available</string>
     <string name="auto_act_media_volume">Media volume: 2</string>
     <string name="auto_trig_time_of_day_night">Night</string>
@@ -1394,19 +1394,19 @@
     <string name="settings_fid_recorder_file">File: %1$s</string>
     <string name="settings_fid_recorder_error">Not recording: %1$s</string>
     <string name="settings_quiet_notification_title">Quiet tracking notification</string>
-    <string name="settings_quiet_notification_desc">The BYDMate notification moves to the collapsed silent list with no status bar icon. It cannot be removed entirely: Android requires a notification for background work</string>
+    <string name="settings_quiet_notification_desc">The BYDMateCN notification moves to the collapsed silent list with no status bar icon. It cannot be removed entirely: Android requires a notification for background work</string>
     <string name="settings_config_restore_desc">Current data will be replaced with the archive contents.</string>
     <string name="settings_autostart_header">Autostart</string>
-    <string name="settings_autostart_desc">BYDMate starts together with the car. If a firmware update broke autostart, re-enable it in the system setting</string>
+    <string name="settings_autostart_desc">BYDMateCN starts together with the car. If a firmware update broke autostart, re-enable it in the system setting</string>
     <string name="settings_places_inline_hint">A point is added from the map or from the car\'s current position</string>
     <string name="settings_agent_debug_row_title">Testing &amp; debugging</string>
     <string name="settings_agent_debug_row_desc">Model test checks the connection, chat shows a text dialog with the agent</string>
 
     <!-- Donation dialog + support card -->
-    <string name="donate_auto_title">Thanks for using BYDMate</string>
-    <string name="donate_auto_body">The project is non-commercial and completely free, built purely out of enthusiasm. If BYDMate has been useful to you and you would like to say thanks, you can support development with a USDT transfer on the EVM networks below or with a card via ЮMoney.</string>
+    <string name="donate_auto_title">Thanks for using BYDMateCN</string>
+    <string name="donate_auto_body">The project is non-commercial and completely free, built purely out of enthusiasm. If BYDMateCN has been useful to you and you would like to say thanks, you can support development with a USDT transfer on the EVM networks below or with a card via ЮMoney.</string>
     <string name="donate_settings_title">Support the project</string>
-    <string name="donate_settings_body">BYDMate is non-commercial and free. If you would like to support development, send USDT to the address below or pay by card via ЮMoney.</string>
+    <string name="donate_settings_body">BYDMateCN is non-commercial and free. If you would like to support development, send USDT to the address below or pay by card via ЮMoney.</string>
     <string name="donate_qr_hint">Point your phone\'s camera at the code</string>
     <string name="donate_address_label">USDT address · EVM networks</string>
     <string name="donate_copy_button">Copy address</string>
@@ -1420,7 +1420,7 @@
     <string name="donate_already_button">Already donated</string>
     <string name="donate_close_button">Close</string>
     <string name="settings_donate_header">Support</string>
-    <string name="settings_donate_card_body">BYDMate is free and non-commercial. If it\'s useful to you, you can support development.</string>
+    <string name="settings_donate_card_body">BYDMateCN is free and non-commercial. If it\'s useful to you, you can support development.</string>
     <string name="settings_donate_button">Support the project</string>
 
     <!-- HUD navigation -->
@@ -1492,7 +1492,7 @@
     <string name="split_picker_title_narrow">Choose an app for the narrow pane (1/3)</string>
     <string name="split_freeform_reboot_hint">Split screen will activate after restarting the car</string>
     <string name="split_freeform_unsupported_hint">Split screen is not available on this car\'s firmware</string>
-    <string name="navigate_maps_shortcut_failed">Maps did not accept the route: add a «Home» or «Work» Place in BYDMate</string>
+    <string name="navigate_maps_shortcut_failed">Maps did not accept the route: add a «Home» or «Work» Place in BYDMateCN</string>
     <string name="split_launch_failed">Failed to launch split screen</string>
     <string name="split_launch_failed_adb">Failed to launch split screen: unlocked ADB is required</string>
     <!-- Automation action: split_screen -->
@@ -1556,10 +1556,10 @@
     <string name="settings_split_howto_body">There are three ways to turn on split screen.\nThe easiest one: tap the left third of the floating widget. To set that up, turn on Tap zoning in the Widget tap section and pick Launch split screen under Left tap action.\nFrom automations: add the Split Screen action to a rule. Close Split Screen and Toggle Split Screen sit right next to it.\nBy voice: just ask the Voice agent to turn on split screen.</string>
 
     <string name="settings_split_mechanism_title">Split mechanism</string>
-    <string name="settings_split_mechanism_freeform">BYDMate windows</string>
+    <string name="settings_split_mechanism_freeform">BYDMateCN windows</string>
     <string name="settings_split_mechanism_native">Native split</string>
     <string name="settings_split_mechanism_native_hint">The split is done by the car\'s firmware. The look depends on the firmware: either two panes at one-third and two-thirds, or half and half with the second app picked on screen.</string>
-    <string name="settings_split_mechanism_platformized_hint">On this firmware the car itself splits the screen: the 1/3 and 2/3 panes, the divider and the swap gesture are native. BYDMate only starts the chosen pair and returns an app to its pane.</string>
+    <string name="settings_split_mechanism_platformized_hint">On this firmware the car itself splits the screen: the 1/3 and 2/3 panes, the divider and the swap gesture are native. BYDMateCN only starts the chosen pair and returns an app to its pane.</string>
     <string name="settings_split_try_native_hint">Try the Native split mode.</string>
     <string name="split_feature_disabled">Split screen is disabled in settings</string>
     <!-- Tech panel: compact card cell + full screen -->
@@ -1660,9 +1660,9 @@
     <string name="post_restore_download_asr">Download 226 MB</string>
     <string name="post_restore_download">Download</string>
     <string name="post_restore_close">Close</string>
-    <string name="notif_channel_tracking_name">BYDMate Tracking</string>
+    <string name="notif_channel_tracking_name">BYDMateCN Tracking</string>
     <string name="notif_channel_tracking_desc">Trip and charge tracking</string>
-    <string name="notif_channel_tracking_quiet_name">BYDMate Tracking (quiet)</string>
+    <string name="notif_channel_tracking_quiet_name">BYDMateCN Tracking (quiet)</string>
     <string name="notif_channel_tracking_quiet_desc">Trip and charge tracking, collapsed in the shade</string>
     <string name="notif_channel_auto_silent_name">Automation Silent</string>
     <string name="notif_channel_auto_silent_desc">Silent automation notifications</string>
@@ -1687,7 +1687,7 @@
     <string name="automation_import_save_failed">Could not add the automation: %1$s</string>
     <string name="automation_import_pick_title">Automation files in Download</string>
     <string name="automation_import_pick_empty">No bydmate_rule_*.json files in the Download folder</string>
-    <string name="automation_import_invalid">Could not read the file: it is not a BYDMate automation</string>
+    <string name="automation_import_invalid">Could not read the file: it is not a BYDMateCN automation</string>
     <string name="automation_import_newer_version">This automation comes from a newer version, please update the app</string>
     <string name="automation_import_power_off_only">This automation could only fire with the car off, and that condition no longer exists</string>
     <string name="automation_import_preview_title">Check the automation</string>
@@ -1745,7 +1745,7 @@
     <string name="dispatch_volume_invalid">Invalid volume level: %1$s</string>
     <string name="dispatch_package_missing">packageName not set</string>
     <string name="dispatch_app_not_installed">App not installed: %1$s</string>
-    <string name="dispatch_app_close_self">BYDMate does not close itself</string>
+    <string name="dispatch_app_close_self">BYDMateCN does not close itself</string>
     <string name="dispatch_app_close_failed">Could not close the app: %1$s</string>
     <string name="dispatch_media_no_session">No player is running</string>
     <string name="dispatch_media_key_invalid">Unknown player command</string>
@@ -1796,7 +1796,7 @@
     <string name="tg_report_field_temps">Temperature</string>
     <string name="tg_report_field_openings">What is open</string>
     <string name="tg_report_field_tires">Tire pressure</string>
-    <string name="tg_report_header_off">BYDMate: car turned off at %1$s</string>
+    <string name="tg_report_header_off">BYDMateCN: car turned off at %1$s</string>
     <string name="tg_report_map_link">Open on the map</string>
     <string name="tg_report_soc">charge %1$s</string>
     <string name="tg_report_soc_value">%1$d%%</string>

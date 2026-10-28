@@ -1,0 +1,763 @@
+package com.bydmatecn.app.data.nativestack
+
+import com.bydmatecn.app.data.autoservice.AutoserviceClient
+import com.bydmatecn.app.data.remote.DiParsData
+import com.bydmatecn.app.data.repository.SettingsRepository
+import com.bydmatecn.app.data.vehicle.HelperClient
+import io.mockk.Runs
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.slot
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+/**
+ * Integration coverage for the batch-transport dispatch wired into
+ * NativeParsReader.fetch(): BatchMode.ACTIVE/OFF/VALIDATING routing,
+ * the decodeBatch pipeline (both tx=5 and tx=7 entries), and the ADB
+ * fallback whenever the batch path is unavailable or dead-on-arrival.
+ */
+class NativeParsReaderBatchTest {
+
+    private fun fid(field: String) = FidMap.entries.first { it.field == field }
+
+    private fun floatRaw(value: Float) = java.lang.Float.floatToRawIntBits(value)
+
+    /** All FidMap entries decode successfully: tx=5 -> plain int 50 (satisfies every
+     *  range-checked decoder), tx=7 -> IEEE-754 bits of 50.0f. */
+    private fun allOkPairs(): List<Pair<Int, Int>> = FidMap.entries.map { entry ->
+        when (entry.transact) {
+            7 -> 0 to java.lang.Float.floatToRawIntBits(50.0f)
+            else -> 0 to 50
+        }
+    }
+
+    /** Every item fails at the batch protocol level (per-item transact failure, Task 1/2's
+     *  documented -998 status) — decodeBatch nulls out every field regardless of tx, which
+     *  is what drives assembleSnapshot's liveness gate to null the whole snapshot. */
+    private fun allFailedPairs(): List<Pair<Int, Int>> = FidMap.entries.map { -998 to 0 }
+
+    /** [okFields]: field name -> already tx-appropriate raw word (int for tx=5, float bits
+     *  for tx=7). Every other entry gets status=0 / word=-10011 (SentinelDecoder rejects it
+     *  on the tx=5 path; irrelevant here since those fields aren't asserted on). */
+    private fun mostlySentinelPairs(okFields: Map<String, Int>): List<Pair<Int, Int>> =
+        FidMap.entries.map { entry -> 0 to (okFields[entry.field] ?: -10011) }
+
+    /** AutoserviceClient stubbed so fetchViaAdb() returns a real, non-null DiParsData
+     *  (soc + mileage live; everything else null/absent from the mock). */
+    private fun liveAutoservice(soc: Float = 75.0f, mileageRaw: Int = 1000): AutoserviceClient {
+        val auto = mockk<AutoserviceClient>()
+        coEvery { auto.isAvailable() } returns true
+        coEvery { auto.getInt(any(), any()) } returns null
+        coEvery { auto.getIntRaw(any(), any()) } returns null
+        coEvery { auto.getFloat(any(), any()) } returns null
+        coEvery { auto.getFloat(fid("soc").device, fid("soc").fid) } returns soc
+        coEvery { auto.getInt(fid("mileage").device, fid("mileage").fid) } returns mileageRaw
+        return auto
+    }
+
+    private fun settingsWithCapacity(): SettingsRepository {
+        val settings = mockk<SettingsRepository>()
+        coEvery { settings.getBatteryCapacity() } returns 72.9
+        return settings
+    }
+
+    private fun gateFixedAt(mode: BatchMode): BatchReadGate {
+        val gate = mockk<BatchReadGate>()
+        coEvery { gate.mode() } returns mode
+        coEvery { gate.recordComparison(any(), any()) } just Runs
+        every { gate.recordBatchUnavailable() } just Runs
+        return gate
+    }
+
+    @Test
+    fun `ACTIVE plus full ok batch decodes without ever touching autoservice`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        // Deliberately NOT stubbed beyond mockk() defaults — any call throws inside MockK's
+        // strict verification model, but we assert via coVerify(exactly = 0) below anyway.
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery { helper.readBatch(any()) } returns allOkPairs()
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        checkNotNull(data)
+        assertEquals(50, data.soc)
+
+        coVerify(exactly = 0) { auto.isAvailable() }
+        coVerify(exactly = 0) { auto.getInt(any(), any()) }
+        coVerify(exactly = 0) { auto.getFloat(any(), any()) }
+    }
+
+    @Test
+    fun `ACTIVE plus null readBatch falls back to fetchViaAdb`() = runTest {
+        val auto = liveAutoservice(soc = 75.0f)
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery { helper.readBatch(any()) } returns null
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals(75, data!!.soc)
+        coVerify(exactly = 1) { auto.isAvailable() }
+    }
+
+    @Test
+    fun `ACTIVE plus all-sentinel batch triggers liveness gate and falls back to ADB`() = runTest {
+        val auto = liveAutoservice(soc = 80.0f)
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery { helper.readBatch(any()) } returns allFailedPairs()
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals(80, data!!.soc)
+        coVerify(exactly = 1) { auto.isAvailable() }
+    }
+
+    @Test
+    fun `VALIDATING reads both transports, returns the ADB snapshot, and records the comparison`() = runTest {
+        val auto = liveAutoservice(soc = 65.0f)
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery { helper.readBatch(any()) } returns allOkPairs()
+        val gate = gateFixedAt(BatchMode.VALIDATING)
+
+        // Reference: what fetchViaAdb alone (via OFF dispatch) would have produced, from the
+        // exact same autoservice + settings mocks.
+        val referenceReader = NativeParsReader(auto, settings, helper, gateFixedAt(BatchMode.OFF), kindMonitor())
+        val expectedAdb = referenceReader.fetch()
+        assertNotNull(expectedAdb)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertEquals("VALIDATING must still return the proven ADB snapshot", expectedAdb, data)
+
+        val adbSlot = slot<DiParsData>()
+        val batchSlot = slot<DiParsData>()
+        coVerify(exactly = 1) { gate.recordComparison(capture(adbSlot), capture(batchSlot)) }
+        assertEquals(expectedAdb, adbSlot.captured)
+        assertNotNull("batch side of the comparison must be a decoded snapshot", batchSlot.captured)
+        assertEquals(50, batchSlot.captured!!.soc)
+    }
+
+    @Test
+    fun `tx=7 entry decodes through the raw float-bits path`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(87.0f),
+                fid("mileage").field to 1000, // INT_SCALED * 0.1 = 100.0, irrelevant to the assertion
+                fid("voltage12v").field to java.lang.Float.floatToRawIntBits(14.0f),
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals(87, data!!.soc)
+        coVerify(exactly = 0) { auto.isAvailable() }
+    }
+
+    @Test
+    fun `bmsState decodes from batch and drives the chargingStatus derivation`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("mileage").field to 1000,
+                fid("chargeGunState").field to 3,
+                fid("bmsState").field to 1,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals(1, data!!.bmsState)
+        assertEquals(2, data.chargingStatus) // gun connected (3) + bms CHARGING (1) -> code 2
+        coVerify(exactly = 0) { auto.isAvailable() }
+    }
+
+    /** DiLink 5.0: the primary RR fid answers, so the alternative-generation fid is ignored. */
+    @Test
+    fun `windowRR prefers the primary generation fid`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("windowRR").field to 30,
+                fid("windowRRGen3").field to 80,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals(30, data!!.windowRR)
+    }
+
+    /** DiLink 3.0 (#79): the primary RR fid is a link-error sentinel (65535 → null after
+     *  SentinelDecoder), so the value comes from the alternative-generation fid. */
+    @Test
+    fun `windowRR falls back to the alternative generation fid on a link error`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("windowRR").field to 65535,
+                fid("windowRRGen3").field to 80,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals(80, data!!.windowRR)
+    }
+
+    /** A transient sentinel is NOT "this fid does not exist here": answering it from the
+     *  other generation's fid would report a value read somewhere else (codex, wave C). */
+    @Test
+    fun `windowRR does not fall back on a transient sentinel`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("windowRR").field to -10013,   // wrong transact, transient
+                fid("windowRRGen3").field to 80,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val data = NativeParsReader(auto, settings, helper, gate, kindMonitor()).fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertNull("a transient sentinel must not borrow the other generation's fid", data!!.windowRR)
+    }
+
+    /** A per-item protocol failure is not a link error either — no raw value to gate on. */
+    @Test
+    fun `windowRR does not fall back when the primary read itself failed`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        val pairs = FidMap.entries.map { entry ->
+            when (entry.field) {
+                "soc" -> 0 to java.lang.Float.floatToRawIntBits(50.0f)
+                "windowRR" -> -998 to 65535
+                "windowRRGen3" -> 0 to 80
+                else -> 0 to -10011
+            }
+        }
+        coEvery { helper.readBatch(any()) } returns pairs
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val data = NativeParsReader(auto, settings, helper, gate, kindMonitor()).fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertNull(data!!.windowRR)
+    }
+
+    @Test
+    fun `sunroof percent decodes from batch`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("sunroof").field to 50,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals(50, data!!.sunroof)
+    }
+
+    /** driveMode 0 is the transient state while the driver switches modes, not a mode. With
+     *  no mode seen yet in this process there is nothing to hold, so it stays null. */
+    @Test
+    fun `driveMode transient zero is suppressed to null`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("driveMode").field to 0,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertNull(data!!.driveMode)
+    }
+
+    @Test
+    fun `driveMode off-road code 4 decodes from batch`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("driveMode").field to 4,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals(4, data!!.driveMode)
+    }
+
+    /** Codex, wave C: dropping the transient 0 to null and then reporting the real mode again
+     *  is a null→value edge, which "!=" rules read as a change. Holding the last real mode
+     *  means the switch produces no edge at all. */
+    @Test
+    fun `driveMode holds the last real mode across a transient zero`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+        fun pairs(driveMode: Int) = mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("driveMode").field to driveMode,
+            ),
+        )
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+
+        coEvery { helper.readBatch(any()) } returns pairs(3)
+        assertEquals(3, reader.fetch()!!.driveMode)
+
+        coEvery { helper.readBatch(any()) } returns pairs(0)
+        assertEquals("a switch in flight must look like no change", 3, reader.fetch()!!.driveMode)
+
+        coEvery { helper.readBatch(any()) } returns pairs(2)
+        assertEquals(2, reader.fetch()!!.driveMode)
+
+        coEvery { helper.readBatch(any()) } returns pairs(0)
+        assertEquals("and the held value follows the latest real mode", 2, reader.fetch()!!.driveMode)
+    }
+
+    /** An unavailable fid stays unavailable — the hold only covers the transient 0. */
+    @Test
+    fun `driveMode reports null again when the fid goes unavailable`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+
+        coEvery { helper.readBatch(any()) } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("driveMode").field to 3,
+            ),
+        )
+        assertEquals(3, reader.fetch()!!.driveMode)
+
+        // -10011 is rejected by SentinelDecoder, so the field decodes to null.
+        coEvery { helper.readBatch(any()) } returns mostlySentinelPairs(
+            mapOf(fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f)),
+        )
+        assertNull(reader.fetch()!!.driveMode)
+    }
+
+    @Test
+    fun `OFF never touches the batch transport`() = runTest {
+        val auto = liveAutoservice(soc = 42.0f)
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        val gate = gateFixedAt(BatchMode.OFF)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        val data = reader.fetch()
+
+        assertNotNull(data)
+        assertEquals(42, data!!.soc)
+        coVerify(exactly = 0) { helper.readBatch(any()) }
+    }
+
+    /** The ADB path must decide the fallback from ONE raw sample of the primary fid: reading it
+     *  twice (once filtered, once raw) would let a window that moved in between decide the
+     *  generation (codex, wave C). */
+    @Test
+    fun `the ADB path samples the primary window fid exactly once`() = runTest {
+        val rr = fid("windowRR")
+        val gen3 = fid("windowRRGen3")
+        val auto = liveAutoservice(soc = 55.0f)
+        coEvery { auto.getIntRaw(rr.device, rr.fid) } returns 65535
+        coEvery { auto.getInt(gen3.device, gen3.fid) } returns 80
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        val gate = gateFixedAt(BatchMode.OFF)
+
+        val data = NativeParsReader(auto, settings, helper, gate, kindMonitor()).fetch()
+
+        assertNotNull("fetch() returned null", data)
+        assertEquals("the fallback must come from that same sample", 80, data!!.windowRR)
+        coVerify(exactly = 1) { auto.getIntRaw(rr.device, rr.fid) }
+        coVerify(exactly = 0) { auto.getInt(rr.device, rr.fid) }
+    }
+
+    /** The VALIDATING shadow snapshot is compared and thrown away, so nothing it saw may leak
+     *  into the next snapshot that IS returned (codex, wave C). */
+    @Test
+    fun `the VALIDATING shadow snapshot does not seed the sticky driveMode`() = runTest {
+        val auto = liveAutoservice(soc = 60.0f)   // ADB reports no driveMode at all
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        val gate = gateFixedAt(BatchMode.VALIDATING)
+        fun pairs(driveMode: Int) = mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(50.0f),
+                fid("driveMode").field to driveMode,
+            ),
+        )
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+
+        coEvery { helper.readBatch(any()) } returns pairs(3)
+        assertNull("VALIDATING returns the ADB snapshot, which has no driveMode", reader.fetch()!!.driveMode)
+
+        coEvery { gate.mode() } returns BatchMode.ACTIVE
+        coEvery { helper.readBatch(any()) } returns pairs(0)
+        assertNull("the shadow's mode must not be held as the last real mode", reader.fetch()!!.driveMode)
+
+        // Positive control: a mode seen on the production path IS held across a transient 0.
+        coEvery { helper.readBatch(any()) } returns pairs(3)
+        assertEquals(3, reader.fetch()!!.driveMode)
+        coEvery { helper.readBatch(any()) } returns pairs(0)
+        assertEquals(3, reader.fetch()!!.driveMode)
+    }
+
+    @Test
+    fun `ACTIVE with unavailable batch and dead ADB returns null`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        coEvery { auto.isAvailable() } returns false
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery { helper.readBatch(any()) } returns null
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val reader = NativeParsReader(auto, settings, helper, gate, kindMonitor())
+        assertNull(reader.fetch())
+    }
+
+    /** Tech-panel wave: the new fids decode from the same batch, dead ones stay null, and
+     *  battery power is the product of the HV pair (#153: positive = draw). */
+    @Test
+    fun `tech panel fields decode from the batch and derive battery power`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(43.0f),
+                fid("insulationKohm").field to 6800,
+                fid("motorTempFront").field to 17,
+                fid("inverterTempRear").field to 30,
+                fid("hvVoltage").field to 499,
+                fid("hvCurrent").field to java.lang.Float.floatToRawIntBits(2.4f),
+                fid("bmsMaxChargeKw").field to 1732,
+                fid("bmsMaxDischargeAllowKw").field to 3315,
+                fid("bmsMaxDischargeKw").field to 148,
+                fid("motorRpmRear").field to -370,
+                fid("compressorW").field to 576,
+                fid("tyreTempFL").field to 15,
+                fid("pedalBrake").field to 59,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val data = NativeParsReader(auto, settings, helper, gate, kindMonitor()).fetch()
+
+        assertNotNull("fetch() returned null", data)
+        checkNotNull(data)
+        assertEquals(6800, data.insulationKohm)
+        assertEquals(17, data.motorTempFront)
+        assertEquals(30, data.inverterTempRear)
+        assertEquals(499, data.hvVoltage)
+        assertEquals(2.4, data.hvCurrent!!, 0.0001)
+        assertEquals(173.2, data.bmsMaxChargeKw!!, 0.0001)
+        assertEquals(331.5, data.bmsMaxDischargeAllowKw!!, 0.0001)
+        assertEquals(148, data.bmsMaxDischargeKw)
+        assertEquals(-370, data.motorRpmRear)
+        assertEquals(576, data.compressorW)
+        assertEquals(15, data.tyreTempFL)
+        assertEquals(59, data.pedalBrake)
+        assertEquals(499 * 2.4, data.batteryPowerW!!, 0.0001)
+        // -10011 for every other tech fid → null, not a reading.
+        assertNull(data.motorTempRear)
+        assertNull(data.pedalAccel)
+        assertNull(data.tyreTempRR)
+        coVerify(exactly = 0) { auto.isAvailable() }
+    }
+
+    /** #186: a FWD car reports exactly -40 (scale floor) for the rear motor/inverter it does
+     *  not have; that is "no sensor", not a temperature. -39 is still a reading. */
+    @Test
+    fun `tech panel treats -40 motor and inverter temperature as absent`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(43.0f),
+                fid("motorTempFront").field to -39,
+                fid("motorTempRear").field to -40,
+                fid("inverterTempFront").field to 12,
+                fid("inverterTempRear").field to -40,
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val data = checkNotNull(NativeParsReader(auto, settings, helper, gate, kindMonitor()).fetch())
+
+        assertEquals(-39, data.motorTempFront)
+        assertEquals(12, data.inverterTempFront)
+        assertNull(data.motorTempRear)
+        assertNull(data.inverterTempRear)
+    }
+
+    /**
+     * Hybrid dump 2026-10-04: the rear inverter fid answers 202 parked at 9 °C outside. That is
+     * outside the envelope a temperature can be in, so the snapshot holds null («—»), while the
+     * rear motor's real 12 °C passes. The remaining-energy fid's flat 0.0 reaches the snapshot
+     * as read; whether it is a reading is the screen's call, it needs the SoC beside it.
+     */
+    @Test
+    fun `hybrid dump drops the 202 degree inverter and keeps the real readings`() = runTest {
+        val data = HybridTechFixture.snapshot()
+
+        assertEquals(39, data.soc)
+        assertEquals(12, data.motorTempRear)
+        assertNull(data.motorTempFront)
+        assertNull(data.inverterTempFront)
+        assertNull(data.inverterTempRear)
+        assertEquals(602, data.hvVoltage)
+        assertEquals(18360, data.insulationKohm)
+        assertEquals(0.0, data.batteryRemainKwh!!, 0.0)
+    }
+
+    /** A wrong-transact sentinel must null the field, and with no current there is no power. */
+    @Test
+    fun `tech panel sentinels null the fields and suppress battery power`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        coEvery {
+            helper.readBatch(any())
+        } returns mostlySentinelPairs(
+            mapOf(
+                fid("soc").field to java.lang.Float.floatToRawIntBits(43.0f),
+                fid("insulationKohm").field to -10013,
+                fid("hvVoltage").field to 499,
+                fid("hvCurrent").field to java.lang.Float.floatToRawIntBits(-1.0f),
+            ),
+        )
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        val data = NativeParsReader(auto, settings, helper, gate, kindMonitor()).fetch()
+
+        assertNotNull("fetch() returned null", data)
+        checkNotNull(data)
+        assertNull(data.insulationKohm)
+        assertNull(data.hvCurrent)
+        assertNull(data.batteryPowerW)
+        assertEquals(499, data.hvVoltage)
+    }
+
+    /** One transaction for the whole map, tech fids included — and nothing beyond it. */
+    @Test
+    fun `batch carries every FidMap entry in a single readBatch call`() = runTest {
+        val auto = mockk<AutoserviceClient>()
+        val settings = settingsWithCapacity()
+        val helper = mockk<HelperClient>()
+        val items = slot<List<com.bydmatecn.app.data.vehicle.BatchReadItem>>()
+        coEvery { helper.readBatch(capture(items)) } returns allOkPairs()
+        val gate = gateFixedAt(BatchMode.ACTIVE)
+
+        NativeParsReader(auto, settings, helper, gate, kindMonitor()).fetch()
+
+        coVerify(exactly = 1) { helper.readBatch(any()) }
+        // Every decoder indexes the reply by FidMap position, so the request is the map itself.
+        assertEquals(FidMap.entries.size, items.captured.size)
+        assertEquals(
+            FidMap.entries.map { it.transact to it.fid },
+            items.captured.map { it.tx to it.fid },
+        )
+    }
+
+    /** The two backup plug signals are read like any other entry (#charging detector unchanged). */
+    @Test
+    fun `the charge connect candidates reach the snapshot`() = runTest {
+        val helper = mockk<HelperClient>()
+        coEvery { helper.readBatch(any()) } returns mostlySentinelPairs(
+            mapOf(
+                "soc" to java.lang.Float.floatToRawIntBits(43.0f),
+                "chargerConnectState" to 2,
+                "chargeConnectIndicator" to 1,
+            )
+        )
+
+        val data = NativeParsReader(
+            mockk<AutoserviceClient>(), settingsWithCapacity(), helper, gateFixedAt(BatchMode.ACTIVE), kindMonitor()
+        ).fetch()
+
+        assertEquals(2, data?.chargerConnectState)
+        assertEquals(1, data?.chargeConnectIndicator)
+    }
+
+    /**
+     * A pushed value and a polled value of the same fid must land on the same number: the push
+     * applier borrows FidMap's decoder and the shared guards, and this pins that they agree for
+     * every decoder family in the map.
+     */
+    @Test
+    fun `a pushed value decodes exactly as the polled one`() = runTest {
+        val cases = listOf(
+            Triple("gear", 4, { d: DiParsData -> d.gear as Any? }),                       // INT_ENUM
+            Triple("windowFL", 60, { d: DiParsData -> d.windowFL as Any? }),              // INT_PERCENT
+            Triple("acTemp", 22, { d: DiParsData -> d.acTemp as Any? }),                  // INT_TEMP_C
+            Triple("tirePressFL", 250, { d: DiParsData -> d.tirePressFL as Any? }),       // INT_KPA
+            Triple("power", 31, { d: DiParsData -> d.power as Any? }),                    // INT_RAW
+            Triple("mileage", 12345, { d: DiParsData -> d.mileage as Any? }),             // INT_SCALED
+            Triple("maxCellVoltage", 3900, { d: DiParsData -> d.maxCellVoltage as Any? }),
+            Triple("motorRpmFront", 4200, { d: DiParsData -> d.motorRpmFront as Any? }),  // ranged INT_RAW
+            Triple("soc", floatRaw(43.0f), { d: DiParsData -> d.soc as Any? }),           // FLOAT_PERCENT
+            Triple("speed", floatRaw(61.0f), { d: DiParsData -> d.speed as Any? }),       // FLOAT_KW
+            Triple("totalElecConsumption", floatRaw(5432.5f), { d: DiParsData -> d.totalElecConsumption as Any? }),
+            Triple("voltage12v", floatRaw(13.7f), { d: DiParsData -> d.voltage12v as Any? }),  // FLOAT_VOLT
+            Triple("hvCurrent", floatRaw(-12.5f), { d: DiParsData -> d.hvCurrent as Any? }),   // FLOAT_AMP
+        )
+        val helper = mockk<HelperClient>()
+        coEvery { helper.readBatch(any()) } returns mostlySentinelPairs(
+            cases.associate { (field, raw, _) -> field to raw }
+        )
+        val polled = checkNotNull(
+            NativeParsReader(
+                mockk<AutoserviceClient>(), settingsWithCapacity(), helper, gateFixedAt(BatchMode.ACTIVE), kindMonitor()
+            ).fetch()
+        )
+
+        for ((field, raw, read) in cases) {
+            val entry = fid(field)
+            val pushed = checkNotNull(
+                com.bydmatecn.app.data.push.FidPushApplier.apply(
+                    com.bydmatecn.app.data.remote.diParsData(),
+                    field,
+                    intValue = raw,
+                    doubleValue = if (entry.transact == 7) {
+                        java.lang.Float.intBitsToFloat(raw).toDouble()
+                    } else {
+                        0.0
+                    },
+                )
+            ) { "$field was not patched from push" }
+            assertEquals("$field disagrees between push and poll", read(polled), read(pushed))
+        }
+    }
+
+    /**
+     * The odometer's unit follows the address the resolver picked: on a firmware whose
+     * catalog moves that fid the raw word is whole km, not tenths (Song Plus).
+     */
+    @Test
+    fun `a catalog-resolved odometer is decoded with the catalog scale`() = runTest {
+        val catalog = FidCatalog.parse(
+            checkNotNull(javaClass.classLoader?.getResourceAsStream("fid-catalog-songplus.txt"))
+                .bufferedReader().readText()
+        )
+        val plausible = FidProbe { requests ->
+            requests.map { if (it.transact == 7) java.lang.Float.floatToRawIntBits(5.0f) else 5 }
+        }
+        val resolved = FidResolver.resolve(FidMap.all, catalog, plausible, "test").table
+        assertEquals(FidResolution.CATALOG, resolved.notes.first { it.field == "mileage" }.outcome)
+        FidAddresses.install(resolved)
+
+        val helper = mockk<HelperClient>()
+        coEvery { helper.readBatch(any()) } returns mostlySentinelPairs(
+            mapOf(
+                "mileage" to 86472,
+                fid("soc").field to java.lang.Float.floatToRawIntBits(41.0f),
+            )
+        )
+        val reader = NativeParsReader(
+            mockk<AutoserviceClient>(), settingsWithCapacity(), helper, gateFixedAt(BatchMode.ACTIVE), kindMonitor()
+        )
+
+        val data = reader.fetch()
+        assertEquals(86472.0, data!!.mileage!!, 0.001)
+    }
+
+    @After fun restoreConstants() {
+        FidAddresses.resetToConstants()
+    }
+}

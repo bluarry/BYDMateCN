@@ -131,7 +131,7 @@ widget_home_only=true home_packages=[com.android.launcher3, com.byd.mycar]
 07:50:49.077 widget hide reason=app:ru.yandex.weatherplugin #10042 by=#10041
 07:50:49.162 user   app-open #10043
 07:50:49.163 widget detach reason=app_foreground #10044
-07:50:49.543 screen foreground pkg=com.bydmate.app src=poll #10045
+07:50:49.543 screen foreground pkg=com.bydmatecn.app src=poll #10045
 07:50:49.736 screen foreground pkg=com.android.permissioncontroller class=com.android.permissioncontroller.permission.ui.GrantPermissionsActivity src=a11y #10046
 07:51:34.022 car    turn side=left #10047
 07:51:37.924 car    turn-end side=left blinks=1 ms=2402 #10048

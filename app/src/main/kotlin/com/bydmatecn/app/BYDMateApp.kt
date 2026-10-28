@@ -1,0 +1,276 @@
+package com.bydmatecn.app
+
+import android.app.Activity
+import android.app.Application
+import android.app.Application.ActivityLifecycleCallbacks
+import android.content.Context
+import android.os.Build
+import android.os.Bundle
+import android.provider.Settings
+import org.lsposed.hiddenapibypass.HiddenApiBypass
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+import com.bydmatecn.app.data.local.DataThinningWorker
+import com.bydmatecn.app.data.local.HistoryImporter
+import com.bydmatecn.app.data.local.LocalePreferences
+import com.bydmatecn.app.data.local.decideLanguage
+import com.bydmatecn.app.data.automation.DriveModeRuleMigration
+import com.bydmatecn.app.data.automation.PowerStateRuleMigration
+import com.bydmatecn.app.data.automation.TrunkRuleMigration
+import com.bydmatecn.app.data.local.dao.ChargeDao
+import com.bydmatecn.app.data.remote.InsightsManager
+import com.bydmatecn.app.data.repository.SettingsRepository
+import com.bydmatecn.app.diagnostics.Trace
+import com.bydmatecn.app.diagnostics.TraceArea
+import com.bydmatecn.app.diagnostics.TraceJournal
+import com.bydmatecn.app.ui.widget.WidgetController
+import com.bydmatecn.app.ui.widget.WidgetPreferences
+import com.bydmatecn.app.util.CrashLog
+import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import org.osmdroid.config.Configuration as OsmdroidConfig
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.MapTileIndex
+import java.io.File
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+
+@HiltAndroidApp
+class BYDMateApp : Application(), Configuration.Provider {
+
+    @Inject lateinit var historyImporter: HistoryImporter
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var chargeDao: ChargeDao
+    @Inject lateinit var localePreferences: LocalePreferences
+    @Inject lateinit var insightsManager: InsightsManager
+    @Inject lateinit var splitOverlayController: com.bydmatecn.app.split.SplitOverlayController
+    @Inject lateinit var driveModeRuleMigration: DriveModeRuleMigration
+    @Inject lateinit var trunkRuleMigration: TrunkRuleMigration
+    @Inject lateinit var powerStateRuleMigration: PowerStateRuleMigration
+    @Inject lateinit var traceJournal: TraceJournal
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
+
+    override fun onCreate() {
+        super.onCreate()
+        Trace.install(traceJournal)
+        Trace.event(TraceArea.APP, "start", "version" to BuildConfig.VERSION_CODE, "name" to BuildConfig.VERSION_NAME)
+        // Rarely runs on Android (a killed process gets no hooks), but costs nothing when it does.
+        Runtime.getRuntime().addShutdownHook(Thread { traceJournal.flushBlocking(TRACE_FLUSH_MS) })
+        // Allow in-process ServiceManager.getService() on Android 9+ to reach the helper
+        // binder service without hidden-API restrictions (UnsatisfiedLinkError / NoSuchMethodError).
+        // Guarded: under JVM/Robolectric unit tests the HiddenApiBypass static initializer throws
+        // (no Android ART runtime), which would otherwise crash onCreate for every test that
+        // instantiates this Application. Swallow there; on a real device the call succeeds.
+        if (Build.VERSION.SDK_INT >= 28) {
+            runCatching {
+                HiddenApiBypass.addHiddenApiExemptions(
+                    "Landroid/os/ServiceManager;",
+                    // AVMCamera / BmmCameraInfo probe and the BYDAuto*Device listener interfaces.
+                    "Landroid/hardware/",
+                )
+            }.onFailure {
+                android.util.Log.w("BYDMateApp", "hidden-api exemption unavailable", it)
+            }
+        }
+        installCrashHandler()
+        bootstrapLocale()
+        initOsmdroid()
+        appScope.launch {
+            // v2.8.1: clear stale "DIPLUS" data_source value from pre-native-stack
+            // builds. One-shot, gated by its own flag.
+            settingsRepository.migrateDataSourceIfNeeded()
+            // 3.19.1: the odometer joins a power-off report choice saved before it existed. One-shot.
+            settingsRepository.addTgReportOdometerOnce()
+
+            if (!settingsRepository.isInsightCacheV2MigrationDone()) {
+                insightsManager.migrateLegacyCache()
+                settingsRepository.setInsightCacheV2MigrationDone()
+            }
+            // One-shot migration: remove phantom autoservice rows created by the
+            // lifetime_kwh driving-counter bug in v2.4.15/v2.4.16.
+            if (!settingsRepository.isMigrationV2_4_17Done()) {
+                val removed = chargeDao.deletePhantomAutoserviceRows()
+                settingsRepository.setMigrationV2_4_17Done()
+                android.util.Log.i("BYDMateApp", "v2.4.17 migration: removed $removed phantom autoservice rows")
+            }
+            // One-shot: revive DriveMode rules saved against the old "0" = NORMAL code.
+            driveModeRuleMigration.runOnce()
+            // One-shot: revive Trunk rules saved against the old "0" = closed code.
+            trunkRuleMigration.runOnce()
+            // One-shot: move rules off the removed PowerState condition.
+            powerStateRuleMigration.runOnce()
+            // One-time cleanup of existing duplicates from v2.0.0
+            historyImporter.cleanupDuplicates()
+            // Only sync if setup is completed (prevents duplicates during first wizard run)
+            if (settingsRepository.isSetupCompleted()) {
+                historyImporter.runSync()
+            }
+        }
+        scheduleDataThinning()
+        appScope.launch {
+            com.bydmatecn.app.service.UpdateApkCleanup.run(
+                android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
+                BuildConfig.VERSION_NAME,
+            )
+        }
+        registerActivityLifecycleCallbacks(WidgetLifecycleCallbacks(this, splitOverlayController))
+        // Start split-screen overlay observers (mirrors WidgetController init pattern).
+        splitOverlayController.start(appScope)
+    }
+
+    /**
+     * Persist uncaught crashes to SharedPreferences (CrashLog) before the
+     * platform's default handler terminates the process — DiLink's logcat
+     * ring buffer rotates out within minutes, so by the time a crash is
+     * reported the logcat evidence is already gone. Must delegate to the
+     * previous default handler afterwards: skipping it would leave the
+     * process in a state the system doesn't expect and it won't be
+     * restarted the normal way.
+     */
+    private fun installCrashHandler() {
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            // finally, not a bare sequence: record() allocates (stackTraceToString +
+            // split/join) and can itself throw an Error (OOM/StackOverflow) that its
+            // internal catch(Exception) won't hold. The previous handler MUST still run
+            // so the platform kills/restarts the process the normal way.
+            try {
+                CrashLog.record(this, throwable)
+                // The events right before the crash are the ones that explain it: save them now.
+                Trace.event(TraceArea.APP, "crash", "error" to throwable.javaClass.simpleName)
+                traceJournal.flushBlocking(TRACE_FLUSH_MS)
+            } finally {
+                previousHandler?.uncaughtException(thread, throwable)
+            }
+        }
+    }
+
+    private fun bootstrapLocale() {
+        // Already decided on a previous launch: AppCompat autoStoreLocales handles
+        // applying the saved locale before this point, nothing to do.
+        if (localePreferences.getLanguage() != null) return
+
+        val setupCompleted = if (localePreferences.isSetupCompletedMirror()) {
+            true
+        } else {
+            // First v2.8.0 launch - older versions didn't write the mirror flag.
+            // Single Room read, gated to one-time, far below the ANR threshold.
+            runBlocking { settingsRepository.isSetupCompleted() }
+        }
+
+        val lang = decideLanguage(setupCompleted)
+        localePreferences.setLanguage(lang)
+        if (setupCompleted) localePreferences.markSetupCompletedMirror()
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(lang))
+    }
+
+    private fun initOsmdroid() {
+        OsmdroidConfig.getInstance().apply {
+            userAgentValue = packageName
+            val basePath = File(filesDir, "osmdroid")
+            basePath.mkdirs()
+            osmdroidBasePath = basePath
+            val tilePath = File(basePath, "tiles")
+            tilePath.mkdirs()
+            osmdroidTileCache = tilePath
+            tileFileSystemCacheMaxBytes = 100L * 1024 * 1024
+            tileFileSystemCacheTrimBytes = 80L * 1024 * 1024
+            load(this@BYDMateApp, getSharedPreferences("osmdroid", MODE_PRIVATE))
+        }
+    }
+
+    private class WidgetLifecycleCallbacks(
+        private val app: Context,
+        private val splitOverlay: com.bydmatecn.app.split.SplitOverlayController,
+    ) : ActivityLifecycleCallbacks {
+        private val counter = ForegroundActivityCounter()
+
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+        override fun onActivityStarted(activity: Activity) {}
+
+        override fun onActivityResumed(activity: Activity) {
+            if (!counter.onResumed(activity.javaClass)) return
+            Trace.event(TraceArea.USER, "app-open")
+            // User opened BYDMate → widget hides; also clear the
+            // "hidden until app launch" long-press flag so it reappears
+            // next time the app goes to background.
+            WidgetPreferences(app).setHiddenUntilAppLaunch(false)
+            WidgetController.setAppForegrounded(true)
+            // Same edge hides the split pill (390-4) — the session keeps running.
+            splitOverlay.setOwnAppForegrounded(true)
+        }
+
+        override fun onActivityPaused(activity: Activity) {
+            if (!counter.onPaused(activity.javaClass)) return
+            Trace.event(TraceArea.USER, "app-background")
+            // A backgrounded process is the one the system kills first.
+            Trace.flush()
+            WidgetController.setAppForegrounded(false)
+            splitOverlay.setOwnAppForegrounded(false)
+            val prefs = WidgetPreferences(app)
+            if (prefs.isEnabled() && Settings.canDrawOverlays(app)) {
+                WidgetController.attach(app, "app_backgrounded")
+            }
+        }
+
+        override fun onActivityStopped(activity: Activity) {}
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+        override fun onActivityDestroyed(activity: Activity) {}
+    }
+
+    companion object {
+        // How long a dying process may wait for the trace to reach the disk.
+        private const val TRACE_FLUSH_MS = 500L
+
+        /** 高德地图道路瓦片 — 中国大陆可用，免 API Key。
+         *  查询参数风格 (?x=&y=&z=) 需要重写 getTileURLString。 */
+        val AmapTileSource = object : OnlineTileSourceBase(
+            "Amap", 0, 18, 256, ".png",
+            arrayOf(
+                "https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x=%d&y=%d&z=%d",
+                "https://webrd02.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x=%d&y=%d&z=%d",
+                "https://webrd03.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x=%d&y=%d&z=%d",
+                "https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x=%d&y=%d&z=%d",
+            ),
+        ) {
+            override fun getTileURLString(pMapTileIndex: Long): String {
+                return String.format(
+                    baseUrl,
+                    MapTileIndex.getX(pMapTileIndex),
+                    MapTileIndex.getY(pMapTileIndex),
+                    MapTileIndex.getZoom(pMapTileIndex),
+                )
+            }
+        }
+
+        val OsmTileSource = TileSourceFactory.MAPNIK
+    }
+
+    private fun scheduleDataThinning() {
+        val request = PeriodicWorkRequestBuilder<DataThinningWorker>(
+            1, TimeUnit.DAYS
+        ).build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            DataThinningWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+    }
+}

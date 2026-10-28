@@ -31,6 +31,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BYDMate"
+rootProject.name = "BYDMateCN"
 include(":app")
 include(":bydauto-stubs")

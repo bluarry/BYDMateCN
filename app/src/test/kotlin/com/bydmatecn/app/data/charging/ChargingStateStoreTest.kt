@@ -1,0 +1,131 @@
+package com.bydmatecn.app.data.charging
+
+import com.bydmatecn.app.data.local.LocalePreferences
+import com.bydmatecn.app.data.local.entity.SettingEntity
+import com.bydmatecn.app.data.repository.SettingsRepository
+import io.mockk.mockk
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ChargingStateStoreTest {
+
+    private class FakeSettingsDao(initial: Map<String, String> = emptyMap()) :
+        com.bydmatecn.app.data.local.dao.SettingsDao {
+        private val map = mutableMapOf<String, String>().also { it.putAll(initial) }
+        override suspend fun get(key: String): String? = map[key]
+        override suspend fun getMany(keys: List<String>): List<com.bydmatecn.app.data.local.entity.SettingEntity> =
+            keys.mapNotNull { k -> map[k]?.let { com.bydmatecn.app.data.local.entity.SettingEntity(k, it) } }
+        override fun observe(key: String): Flow<String?> = flowOf(map[key])
+        override suspend fun set(entity: SettingEntity) { map[entity.key] = entity.value ?: "" }
+        override suspend fun setAll(settings: List<SettingEntity>) { settings.forEach { set(it) } }
+        override fun getAll(): Flow<List<SettingEntity>> = flowOf(emptyList())
+    }
+
+    private fun store(initial: Map<String, String> = emptyMap()): ChargingStateStore {
+        val dao = FakeSettingsDao(initial)
+        val settings = SettingsRepository(dao, mockk(relaxed = true))
+        return ChargingStateStore(settings)
+    }
+
+    @Test
+    fun `load on empty settings returns State with all nulls and zero ts`() = runTest {
+        val s = store()
+        val state = s.load()
+        assertNull(state.socPercent)
+        assertNull(state.mileageKm)
+        assertNull(state.capacityKwh)
+        assertEquals(0L, state.ts)
+    }
+
+    @Test
+    fun `save then load returns same values`() = runTest {
+        val s = store()
+        s.save(socPercent = 85, mileageKm = 10500.5f, capacityKwh = 7.8f, ts = 1700000000000L)
+        val state = s.load()
+        assertEquals(85, state.socPercent)
+        assertEquals(10500.5f, state.mileageKm!!, 0.01f)
+        assertEquals(7.8f, state.capacityKwh!!, 0.01f)
+        assertEquals(1700000000000L, state.ts)
+    }
+
+    @Test
+    fun `save with null socPercent does not overwrite existing soc`() = runTest {
+        val initial = mapOf(SettingsRepository.KEY_CHARGING_BASELINE_SOC to "80")
+        val s = store(initial)
+        // Save with null soc — should not overwrite the pre-existing 80
+        s.save(socPercent = null, mileageKm = 100f, capacityKwh = 5f, ts = 1000L)
+        val state = s.load()
+        assertEquals(80, state.socPercent)
+    }
+
+    @Test
+    fun `baseline survives concurrent saveLastKnownSoc writes`() = runTest {
+        // Regression: in v2.4.17 ChargingStateStore read socPercent from
+        // the same key TrackingService overwrites every 3s with the live SOC.
+        // That clobbered the cascade detector's pre-charging baseline. After
+        // v2.4.18 the baseline lives on its own key (KEY_CHARGING_BASELINE_SOC)
+        // and survives polling writes on KEY_LAST_KNOWN_SOC.
+        val dao = FakeSettingsDao()
+        val settings = SettingsRepository(dao, mockk(relaxed = true))
+        val s = ChargingStateStore(settings)
+        s.save(socPercent = 80, mileageKm = 100f, capacityKwh = 5f, ts = 1000L)
+        // Simulate live polling overwriting the last-known SOC as SOC climbs.
+        listOf(81, 82, 83, 84, 85).forEach { settings.saveLastKnownSoc(it) }
+        val state = s.load()
+        assertEquals(80, state.socPercent)
+    }
+
+    @Test
+    fun `chargePending defaults to false and round-trips`() = runTest {
+        val s = store()
+        assertFalse(s.loadChargePending())
+        s.setChargePending(true)
+        assertTrue(s.loadChargePending())
+        s.setChargePending(false)
+        assertFalse(s.loadChargePending())
+    }
+
+    @Test
+    fun `save with null capacityKwh persists as null`() = runTest {
+        val s = store()
+        s.save(socPercent = 70, mileageKm = null, capacityKwh = null, ts = 2000L)
+        val state = s.load()
+        assertNull(state.mileageKm)
+        assertNull(state.capacityKwh)
+        assertEquals(2000L, state.ts)
+    }
+
+    @Test
+    fun `save writes the whole anchor in a single setAll batch`() = runTest {
+        // A process kill mid-save must never leave a mixed anchor (new mileage
+        // + stale SOC → false odometerMoved). Room makes a list-@Upsert one
+        // transaction, so save() must issue exactly one setAll and no set().
+        class RecordingDao : com.bydmatecn.app.data.local.dao.SettingsDao {
+            val map = mutableMapOf<String, String>()
+            var setCalls = 0
+            var setAllCalls = 0
+            override suspend fun get(key: String): String? = map[key]
+            override suspend fun getMany(keys: List<String>): List<com.bydmatecn.app.data.local.entity.SettingEntity> =
+                keys.mapNotNull { k -> map[k]?.let { com.bydmatecn.app.data.local.entity.SettingEntity(k, it) } }
+            override fun observe(key: String): Flow<String?> = flowOf(map[key])
+            override suspend fun set(entity: SettingEntity) {
+                setCalls++; map[entity.key] = entity.value ?: ""
+            }
+            override suspend fun setAll(settings: List<SettingEntity>) {
+                setAllCalls++; settings.forEach { map[it.key] = it.value ?: "" }
+            }
+            override fun getAll(): Flow<List<SettingEntity>> = flowOf(emptyList())
+        }
+        val dao = RecordingDao()
+        val s = ChargingStateStore(SettingsRepository(dao, mockk(relaxed = true)))
+        s.save(socPercent = 85, mileageKm = 100f, capacityKwh = 5f, ts = 1000L)
+        assertEquals(1, dao.setAllCalls)
+        assertEquals(0, dao.setCalls)
+    }
+}

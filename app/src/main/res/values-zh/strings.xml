@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BYDMate</string>
+    <string name="app_name">BYDMateCN</string>
     <string name="cluster_a11y_description">拦截方向盘按键用于导航投射到仪表盘。手动启用，仅在功能开启时工作。</string>
     <string name="settings_language_title">语言</string>
     <string name="settings_font_scale_title">文字大小</string>
@@ -162,7 +162,7 @@
     <!-- Settings: Widget section -->
     <string name="settings_widget_section_header">悬浮小组件</string>
     <string name="settings_widget_show_soc_label">显示 SOC 小组件</string>
-    <string name="settings_widget_hints">• 长按小组件 - 隐藏至下次打开 BYDMate。\n• 拖到底部垃圾桶 - 完全关闭。\n• 普通点击 - 打开 BYDMate。</string>
+    <string name="settings_widget_hints">• 长按小组件 - 隐藏至下次打开 BYDMateCN。\n• 拖到底部垃圾桶 - 完全关闭。\n• 普通点击 - 打开 BYDMateCN。</string>
     <string name="settings_widget_hide_youtube_label">YouTube 时隐藏</string>
     <string name="settings_widget_hide_youtube_description">YouTube 在屏幕上时按钮面板自动隐藏</string>
     <string name="settings_widget_home_only_label">仅在主屏幕显示</string>
@@ -180,20 +180,20 @@
     <string name="orb_agent">助手：</string>
     <string name="settings_voice_native_assistant_header">BYD 原车语音助手</string>
     <string name="settings_voice_disable_native_label">关闭原车语音助手</string>
-    <string name="settings_voice_disable_native_description">隐藏 BYD 内置语音助手，避免其打断。快捷指令应用会随之消失，它是语音助手的一部分。可恢复：关闭此开关并重启车机，两者都会回来。卸载 BYDMate 前请先关闭此开关，否则原车语音助手会一直处于关闭状态。</string>
+    <string name="settings_voice_disable_native_description">隐藏 BYD 内置语音助手，避免其打断。快捷指令应用会随之消失，它是语音助手的一部分。可恢复：关闭此开关并重启车机，两者都会回来。卸载 BYDMateCN 前请先关闭此开关，否则原车语音助手会一直处于关闭状态。</string>
     <string name="settings_voice_disable_native_confirm_title">关闭原车语音助手？</string>
-    <string name="settings_voice_disable_native_confirm_body">原车 BYD 语音助手将在车机系统中被关闭。卸载 BYDMate 前请先关闭此开关，否则原车语音助手会一直处于关闭状态。如果已经卸载：请重新安装 BYDMate，关闭此开关并重启车机。</string>
+    <string name="settings_voice_disable_native_confirm_body">原车 BYD 语音助手将在车机系统中被关闭。卸载 BYDMateCN 前请先关闭此开关，否则原车语音助手会一直处于关闭状态。如果已经卸载：请重新安装 BYDMateCN，关闭此开关并重启车机。</string>
     <string name="settings_voice_disable_native_confirm_button">关闭</string>
     <string name="settings_voice_native_assistant_reboot_note">重启车机后生效。</string>
     <string name="settings_widget_opacity_label">不透明度</string>
     <string name="settings_widget_scale_label">大小</string>
     <string name="settings_widget_tap_section_header">点击小组件</string>
     <string name="settings_widget_left_tap_zoning_label">点击区域</string>
-    <string name="settings_widget_left_tap_zoning_description">左侧 1/3 - 打开选定应用；其余部分 - 打开 BYDMate。</string>
+    <string name="settings_widget_left_tap_zoning_description">左侧 1/3 - 打开选定应用；其余部分 - 打开 BYDMateCN。</string>
     <string name="settings_widget_left_tap_label">左侧点击的应用</string>
     <string name="settings_widget_left_tap_description">默认为 Yandex 导航。如果应用已卸载，点击将无效。</string>
     <string name="settings_widget_buttons_label">小组件按钮</string>
-    <string name="settings_widget_buttons_description">单击滑出 4 个按钮，双击打开 BYDMate。按钮运行带有"按钮按下"触发器的规则。</string>
+    <string name="settings_widget_buttons_description">单击滑出 4 个按钮，双击打开 BYDMateCN。按钮运行带有"按钮按下"触发器的规则。</string>
 
     <!-- Settings: Places section -->
     <string name="settings_places_section_header">地点</string>
@@ -387,7 +387,7 @@
     <string name="automation_trigger_night">夜晚</string>
     <string name="automation_trigger_dawn">黎明</string>
     <string name="automation_trigger_dusk">黄昏</string>
-    <string name="automation_trigger_service_start">BYDMate 启动</string>
+    <string name="automation_trigger_service_start">BYDMateCN 启动</string>
     <string name="automation_trigger_internet">网络可用</string>
 
     <!-- Add trigger button -->
@@ -396,7 +396,7 @@
     <string name="automation_trigger_type_place">地点</string>
     <string name="automation_trigger_type_place_empty_hint">请先用顶部的“地点”按钮添加地点</string>
     <string name="automation_trigger_type_time_of_day">时段</string>
-    <string name="automation_trigger_type_service_start">BYDMate 启动</string>
+    <string name="automation_trigger_type_service_start">BYDMateCN 启动</string>
     <string name="automation_trigger_type_internet">网络可用</string>
     <string name="automation_trigger_type_button_press">按钮按下</string>
     <string name="automation_trigger_button_label">按钮 %1$d</string>
@@ -404,7 +404,7 @@
     <string name="automation_trigger_steering_key_unassigned">未分配按键</string>
     <string name="automation_trigger_steering_key_assign">分配</string>
     <string name="automation_steering_key_occupied_projection">该按键用于开启仪表盘导航。请在设置的显示部分释放该按键，或选择其他按键。</string>
-    <string name="automation_steering_key_occupied_voice">该按键用于呼出 BYDMate 语音助手。请在设置的语音智能体部分更改按键，或选择其他按键。</string>
+    <string name="automation_steering_key_occupied_voice">该按键用于呼出 BYDMateCN 语音助手。请在设置的语音智能体部分更改按键，或选择其他按键。</string>
     <string name="automation_steering_key_occupied_knob">旋钮按下已被播放/暂停功能占用。请在设置的显示部分关闭该功能，或选择其他按键。</string>
     <string name="automation_trigger_type_voice">语音</string>
     <string name="automation_trigger_voice_phrase_label">触发短语</string>
@@ -447,7 +447,7 @@
 
     <!-- Overlay permission dialog -->
     <string name="automation_overlay_permission_title">需要权限</string>
-    <string name="automation_overlay_permission_text">声音通知以弹窗形式显示在其他应用上方。请打开系统设置，为 BYDMate 启用"显示在其他应用上层"。</string>
+    <string name="automation_overlay_permission_text">声音通知以弹窗形式显示在其他应用上方。请打开系统设置，为 BYDMateCN 启用"显示在其他应用上层"。</string>
     <string name="automation_overlay_open_settings">打开设置</string>
     <string name="automation_overlay_later">稍后</string>
 
@@ -521,9 +521,9 @@
     <string name="welcome_tariff_home_label">家充电价（%1$s/kWh）</string>
     <string name="welcome_tariff_dc_label">快充电价（%1$s/kWh）</string>
     <string name="welcome_autostart_step_title">DiLink 自启动</string>
-    <string name="welcome_autostart_step_description">要让 BYDMate 在车机开机时自动启动：</string>
+    <string name="welcome_autostart_step_description">要让 BYDMateCN 在车机开机时自动启动：</string>
     <string name="welcome_autostart_instruction_1">1. 点击右侧按钮</string>
-    <string name="welcome_autostart_instruction_2">2. 在列表中找到 BYDMate</string>
+    <string name="welcome_autostart_instruction_2">2. 在列表中找到 BYDMateCN</string>
     <string name="welcome_autostart_instruction_3">3. 开关必须处于关闭（OFF）状态</string>
     <string name="welcome_autostart_off_note">OFF = 允许自启动。这是一个黑名单：被禁用的应用可以自行启动。</string>
     <string name="welcome_autostart_apk_update_warning">更新 APK 后请检查此设置！</string>
@@ -531,13 +531,13 @@
     <string name="welcome_autostart_dilink_hint">如果自启动未生效，请在 Di+ 中添加：</string>
     <string name="welcome_autostart_dilink_instruction">Di+ → Predefined → Startup tasks</string>
     <string name="welcome_autostart_command_copied_toast">已复制！</string>
-    <string name="welcome_autostart_command_explanation">打开应用 = "open app" + 包名。\n两个应用用分号分隔：\n打开应用ru.yandex.yandexnavi;打开应用com.bydmate.app</string>
+    <string name="welcome_autostart_command_explanation">打开应用 = "open app" + 包名。\n两个应用用分号分隔：\n打开应用ru.yandex.yandexnavi;打开应用com.bydmatecn.app</string>
     <string name="welcome_system_settings_section_title">系统设置</string>
     <string name="welcome_autostart_open_settings_button">打开自启动设置</string>
     <string name="welcome_autostart_open_settings_error">无法打开 DiLink 自启动设置。已打开应用设置。</string>
     <string name="welcome_loading_default">加载中...</string>
     <string name="welcome_back_button">返回</string>
-    <string name="welcome_done_button">启动 BYDMate</string>
+    <string name="welcome_done_button">启动 BYDMateCN</string>
     <string name="welcome_saving_settings_status">保存设置...</string>
     <string name="welcome_updating_data_status">更新数据...</string>
     <string name="welcome_importing_trips_status">导入行程...</string>
@@ -557,7 +557,7 @@
     <string name="widget_duration_minutes">%1$d 分钟</string>
     <string name="widget_trip_km_value">%1$.1f 公里</string>
     <string name="widget_voltage_value">%1$.1f V</string>
-    <string name="widget_toast_hidden">小组件已隐藏。打开 BYDMate 即可恢复。</string>
+    <string name="widget_toast_hidden">小组件已隐藏。打开 BYDMateCN 即可恢复。</string>
     <string name="widget_button_no_rules">按钮 %1$d 没有规则</string>
     <string name="widget_trash_release">松手 - 隐藏小组件</string>
     <string name="widget_trash_hint">拖到这里隐藏</string>
@@ -634,8 +634,8 @@
     <string name="nav_tab_settings">设置</string>
 
     <!-- Post-install autostart hint dialog -->
-    <string name="nav_autostart_dialog_title">BYDMate 已更新至 v%1$s</string>
-    <string name="nav_autostart_dialog_body">请检查后台运行是否被阻止：\n\nDiLink 设置 - General - Disable background Apps - BYDMate - OFF\n\n如果开关为 ON，DiLink 可能会终止 BYDMate 服务，导致行程和 GPS 无法记录。</string>
+    <string name="nav_autostart_dialog_title">BYDMateCN 已更新至 v%1$s</string>
+    <string name="nav_autostart_dialog_body">请检查后台运行是否被阻止：\n\nDiLink 设置 - General - Disable background Apps - BYDMateCN - OFF\n\n如果开关为 ON，DiLink 可能会终止 BYDMateCN 服务，导致行程和 GPS 无法记录。</string>
     <string name="nav_autostart_dialog_button">知道了</string>
     <string name="nav_autostart_open_settings_error">无法打开 DiLink 自启动设置。已打开应用设置。</string>
 
@@ -662,7 +662,7 @@
     <string name="battery_health_pumped_value">%1$.0f kWh</string>
     <string name="battery_health_avg_since_charge_label">自上次充电</string>
     <string name="battery_health_avg_all_time_label">全部时间</string>
-    <string name="battery_health_avg_soc_hint" formatted="false">按时间加权的平均电量：电池保持高电量的时间越长，该值越高。比亚迪LFP电池长期高电量存放会加速日历老化，建议保持较低水平。参考：65%以下很好，65-85%正常，高于85%建议推迟或减少充电。每1-2周仍需充满一次以平衡电芯。根据BYDMate行程和充电历史计算。</string>
+    <string name="battery_health_avg_soc_hint" formatted="false">按时间加权的平均电量：电池保持高电量的时间越长，该值越高。比亚迪LFP电池长期高电量存放会加速日历老化，建议保持较低水平。参考：65%以下很好，65-85%正常，高于85%建议推迟或减少充电。每1-2周仍需充满一次以平衡电芯。根据BYDMateCN行程和充电历史计算。</string>
 
     <!-- Shared summary row (Components.kt SummaryRow) -->
     <string name="summary_unit_km">公里</string>
@@ -705,7 +705,7 @@
     <string name="update_downloading_done">已下载。正在安装...</string>
     <string name="update_downloading_paused">已暂停...</string>
     <string name="update_download_error">下载错误（代码 %1$d）</string>
-    <string name="update_download_notification_description">BYDMate 更新</string>
+    <string name="update_download_notification_description">BYDMateCN 更新</string>
     <string name="update_downloading_start" formatted="false">下载中：0%</string>
 
     <!-- Charges: day group labels -->
@@ -819,7 +819,7 @@
     <string name="settings_adb_restore_title">重启后恢复 ADB</string>
     <string name="settings_adb_restore_desc">适用于每次重启后 ADB 都会关闭的固件。需要打开 Wi-Fi。</string>
     <string name="settings_adb_restore_help_title">ADB 恢复功能的工作原理</string>
-    <string name="settings_adb_restore_help_body">在较新的 DiLink 固件上（2026 年夏季之后），ADB 端口在每次重启后都会关闭，BYDMate 会失去对车辆控制功能的访问。\n\n应用可以通过 Android 内置的无线调试重新打开 ADB。为此：\n\n1. 车机的 Wi-Fi 必须打开并连接到网络：家里的网络、手机热点或其他任意网络。没有 Wi-Fi 时 Android 不允许开启无线调试，这是系统限制。\n\n2. 在每个新网络上首次开启时，屏幕上会出现系统对话框“Allow wireless debugging on this network?”。恢复功能开启时，BYDMate 会通过自己的无障碍服务自动确认。如果该服务已关闭，请勾选“Always allow on this network”并点击 ALLOW。\n\n3. 在 ADB 仍然可用时，应用会一次性给自己授予所需的系统权限。如果状态行显示“需要激活”，请按常规方式连接一次 ADB，然后重启应用。\n\n如果您的固件在重启后 ADB 本来就能工作，则无需开启：状态行会显示“无需开启”。</string>
+    <string name="settings_adb_restore_help_body">在较新的 DiLink 固件上（2026 年夏季之后），ADB 端口在每次重启后都会关闭，BYDMateCN 会失去对车辆控制功能的访问。\n\n应用可以通过 Android 内置的无线调试重新打开 ADB。为此：\n\n1. 车机的 Wi-Fi 必须打开并连接到网络：家里的网络、手机热点或其他任意网络。没有 Wi-Fi 时 Android 不允许开启无线调试，这是系统限制。\n\n2. 在每个新网络上首次开启时，屏幕上会出现系统对话框“Allow wireless debugging on this network?”。恢复功能开启时，BYDMateCN 会通过自己的无障碍服务自动确认。如果该服务已关闭，请勾选“Always allow on this network”并点击 ALLOW。\n\n3. 在 ADB 仍然可用时，应用会一次性给自己授予所需的系统权限。如果状态行显示“需要激活”，请按常规方式连接一次 ADB，然后重启应用。\n\n如果您的固件在重启后 ADB 本来就能工作，则无需开启：状态行会显示“无需开启”。</string>
     <string name="settings_adb_restore_status_not_needed">无需开启：ADB 已在工作</string>
     <string name="settings_adb_restore_status_needs_activation">需要激活：请先正常连接一次 ADB，然后重启应用</string>
     <string name="settings_adb_restore_status_waiting_wifi">等待 Wi-Fi</string>
@@ -831,7 +831,7 @@
     <string name="settings_cloud_wifi_title">通过 Wi-Fi 连接 BYD 云</string>
     <string name="settings_cloud_wifi_desc">车辆连上 Wi-Fi 时，手机上的 BYD 应用即可看到车辆。使用新版 BYD 服务器的车辆需要中国 VPN。</string>
     <string name="settings_cloud_wifi_help_title">通过 Wi-Fi 连接 BYD 云的工作方式</string>
-    <string name="settings_cloud_wifi_help_body">没有连接 BYD 云时，收不到 OTA 升级，NFC 钥匙和手机 BYD 应用远程控制都无法使用。\n\n开启此设置后，BYDMate 会通过 Wi-Fi 把车辆连接到云：家里的网络、手机热点或任何能上网的网络都可以。\n\n条件：\n\n1. 使用新版 BYD 服务器的车辆需要中国 VPN：服务器只接受来自中国 IP 的连接。最可靠的是在车辆连接的路由器上设置 VPN，它不依赖车机。车机上的 VPN 应用只在车机开启时工作。\n\n2. 如果车辆已有自己的移动网络，则不会做任何改动：云本来就能正常工作。\n\n关闭此设置后，应用会恢复车辆原来的网络设置。</string>
+    <string name="settings_cloud_wifi_help_body">没有连接 BYD 云时，收不到 OTA 升级，NFC 钥匙和手机 BYD 应用远程控制都无法使用。\n\n开启此设置后，BYDMateCN 会通过 Wi-Fi 把车辆连接到云：家里的网络、手机热点或任何能上网的网络都可以。\n\n条件：\n\n1. 使用新版 BYD 服务器的车辆需要中国 VPN：服务器只接受来自中国 IP 的连接。最可靠的是在车辆连接的路由器上设置 VPN，它不依赖车机。车机上的 VPN 应用只在车机开启时工作。\n\n2. 如果车辆已有自己的移动网络，则不会做任何改动：云本来就能正常工作。\n\n关闭此设置后，应用会恢复车辆原来的网络设置。</string>
     <string name="settings_cloud_wifi_status_connected">已连接 BYD 云</string>
     <string name="settings_cloud_wifi_status_own_cellular">车辆有自己的移动网络，云本来就能正常工作</string>
     <string name="settings_cloud_wifi_status_waiting">正在等待可上网的 Wi-Fi</string>
@@ -850,14 +850,14 @@
     <string name="adb_verdict_link_more">详情</string>
     <string name="adb_dialog_not_enabled_title">ADB 未开启</string>
     <string name="adb_dialog_not_enabled_body">没有 ADB，实时数据、车辆控制、分屏、仪表盘和方向盘按键都无法使用。行程历史仍可查看。</string>
-    <string name="adb_enable_step_1">1. 按照说明开启 ADB：GitHub 上的 BYDMate，“激活 ADB”一节</string>
-    <string name="adb_enable_step_2">2. 返回 BYDMate 并点击“检查”</string>
+    <string name="adb_enable_step_1">1. 按照说明开启 ADB：GitHub 上的 BYDMateCN，“激活 ADB”一节</string>
+    <string name="adb_enable_step_2">2. 返回 BYDMateCN 并点击“检查”</string>
     <string name="adb_dialog_off_after_reboot_title">重启后 ADB 已关闭</string>
-    <string name="adb_dialog_off_after_reboot_body">在此固件上，ADB 每次重启都会关闭。BYDMate 可以自动重新开启，需要 Wi-Fi。</string>
+    <string name="adb_dialog_off_after_reboot_body">在此固件上，ADB 每次重启都会关闭。BYDMateCN 可以自动重新开启，需要 Wi-Fi。</string>
     <string name="adb_dialog_off_after_reboot_body_unsupported">在此固件上，ADB 每次重启都会关闭。请按照 GitHub 上的说明重新开启，见“激活 ADB”一节。</string>
     <string name="adb_dialog_no_access_title">无 ADB 访问权限</string>
     <string name="adb_dialog_no_access_body">请在屏幕上确认请求或重新连接 ADB，然后点击“检查”。</string>
-    <string name="adb_dialog_helper_down_title">BYDMate 助手未启动</string>
+    <string name="adb_dialog_helper_down_title">BYDMateCN 助手未启动</string>
     <string name="adb_dialog_helper_down_body">ADB 正常，但助手没有响应。请开启日志录制（设置，“服务与数据”，“录制日志”），等待一分钟，停止后把文件发给开发者。</string>
     <string name="adb_dialog_close">关闭</string>
     <string name="adb_dialog_check">检查</string>
@@ -909,7 +909,7 @@
     <string name="settings_tg_backup_disconnect">断开</string>
     <string name="settings_tg_backup_hint">在 @BotFather 创建机器人，粘贴其令牌，然后点击“检查”。备份文件未加密，机器人和聊天必须只属于您。</string>
     <string name="settings_tg_backup_checking">正在检查…</string>
-    <string name="settings_tg_backup_greeting">BYDMate 已连接。备份将发送到这里。</string>
+    <string name="settings_tg_backup_greeting">BYDMateCN 已连接。备份将发送到这里。</string>
     <string name="settings_backup_share">分享</string>
     <string name="settings_backup_close">关闭</string>
     <string name="settings_backup_share_hint">备份包含密钥和行程历史，只分享给您信任的人。</string>
@@ -931,7 +931,7 @@
     <string name="settings_backup_part_keys_desc">OpenRouter、ABRP、Telegram 机器人。如果要把文件交给他人，请取消勾选。</string>
     <string name="settings_backup_part_absent">备份中没有</string>
     <string name="backup_error_newer_archive">备份由更新版本的应用创建（架构 %1$d，当前 %2$d）。请先更新应用再恢复。</string>
-    <string name="backup_error_not_bydmate_db">备份中的数据库文件不是 BYDMate 数据库</string>
+    <string name="backup_error_not_bydmate_db">备份中的数据库文件不是 BYDMateCN 数据库</string>
     <string name="backup_error_merge_integrity">与备份合并后的数据库未通过完整性检查</string>
     <string name="backup_error_export_integrity">用于导出的数据库快照未通过完整性检查</string>
     <string name="backup_error_parts_mismatch">备份文件已损坏：内容与其描述不符</string>
@@ -1289,7 +1289,7 @@
     <string name="auto_msg_media_volume_missing">动作 #%1$d：未设置音量</string>
     <!-- automation special triggers/actions -->
     <string name="auto_trig_place_enter">进入「%1$s」</string>
-    <string name="auto_trig_service_start">BYDMate 启动</string>
+    <string name="auto_trig_service_start">BYDMateCN 启动</string>
     <string name="auto_trig_network_available">网络可用</string>
     <string name="auto_act_media_volume">媒体音量: 2</string>
     <string name="auto_trig_time_of_day_night">夜晚</string>
@@ -1509,19 +1509,19 @@
     <string name="settings_fid_recorder_file">文件：%1$s</string>
     <string name="settings_fid_recorder_error">未记录：%1$s</string>
     <string name="settings_quiet_notification_title">安静的通知</string>
-    <string name="settings_quiet_notification_desc">BYDMate 通知移至折叠的静默列表，状态栏不显示图标。无法完全移除：Android 要求后台运行必须有通知</string>
+    <string name="settings_quiet_notification_desc">BYDMateCN 通知移至折叠的静默列表，状态栏不显示图标。无法完全移除：Android 要求后台运行必须有通知</string>
     <string name="settings_config_restore_desc">当前数据将被备份内容替换。</string>
     <string name="settings_autostart_header">自启动</string>
-    <string name="settings_autostart_desc">BYDMate 随车机一起启动。如果固件更新后自启动失效，请在系统设置中重新开启</string>
+    <string name="settings_autostart_desc">BYDMateCN 随车机一起启动。如果固件更新后自启动失效，请在系统设置中重新开启</string>
     <string name="settings_places_inline_hint">可通过地图或车辆当前位置添加地点</string>
     <string name="settings_agent_debug_row_title">测试与调试</string>
     <string name="settings_agent_debug_row_desc">模型测试检查连接，聊天以文字形式显示与助手的对话</string>
 
     <!-- Donation dialog + support card -->
-    <string name="donate_auto_title">感谢您使用 BYDMate</string>
-    <string name="donate_auto_body">该项目非商业化且完全免费，完全出于个人热情开发维护。如果 BYDMate 对您有帮助，想表示感谢，可以通过 EVM 网络转账 USDT，或通过 ЮMoney 用银行卡支持开发。</string>
+    <string name="donate_auto_title">感谢您使用 BYDMateCN</string>
+    <string name="donate_auto_body">该项目非商业化且完全免费，完全出于个人热情开发维护。如果 BYDMateCN 对您有帮助，想表示感谢，可以通过 EVM 网络转账 USDT，或通过 ЮMoney 用银行卡支持开发。</string>
     <string name="donate_settings_title">支持项目</string>
-    <string name="donate_settings_body">BYDMate 非商业化且免费。如果想支持开发，请将 USDT 转到下方地址，或通过 ЮMoney 用银行卡支付。</string>
+    <string name="donate_settings_body">BYDMateCN 非商业化且免费。如果想支持开发，请将 USDT 转到下方地址，或通过 ЮMoney 用银行卡支付。</string>
     <string name="donate_qr_hint">用手机摄像头扫描二维码</string>
     <string name="donate_address_label">USDT 地址 · EVM 网络</string>
     <string name="donate_copy_button">复制地址</string>
@@ -1535,7 +1535,7 @@
     <string name="donate_already_button">我已支持</string>
     <string name="donate_close_button">关闭</string>
     <string name="settings_donate_header">支持</string>
-    <string name="settings_donate_card_body">BYDMate 免费且非商业化。如果它对您有帮助，您可以支持开发。</string>
+    <string name="settings_donate_card_body">BYDMateCN 免费且非商业化。如果它对您有帮助，您可以支持开发。</string>
     <string name="settings_donate_button">支持项目</string>
 
     <!-- HUD navigation -->
@@ -1607,7 +1607,7 @@
     <string name="split_picker_title_narrow">选择窄屏区域 (1/3) 的应用</string>
     <string name="split_freeform_reboot_hint">重启车机后将启用分屏</string>
     <string name="split_freeform_unsupported_hint">此车机固件不支持分屏</string>
-    <string name="navigate_maps_shortcut_failed">地图未接受该路线：请在 BYDMate 中添加「家」或「公司」地点</string>
+    <string name="navigate_maps_shortcut_failed">地图未接受该路线：请在 BYDMateCN 中添加「家」或「公司」地点</string>
     <string name="split_launch_failed">启动分屏失败</string>
     <string name="split_launch_failed_adb">启动分屏失败：需要已解锁的 ADB</string>
     <!-- Automation action: split_screen -->
@@ -1670,10 +1670,10 @@
     <string name="settings_split_app_not_selected">未选择</string>
     <string name="settings_split_howto_body">打开分屏有三种方式。\n最简单的一种：点击悬浮小组件左侧三分之一的区域。先在“点击小组件”里开启“点击区域”，再把“左侧点击操作”设为“启动分屏”。\n用自动化：在规则里添加“分屏”动作，旁边还有“关闭分屏”和“切换分屏”。\n用语音：直接让语音智能体打开分屏就行。</string>
     <string name="settings_split_mechanism_title">分屏方式</string>
-    <string name="settings_split_mechanism_freeform">BYDMate 窗口</string>
+    <string name="settings_split_mechanism_freeform">BYDMateCN 窗口</string>
     <string name="settings_split_mechanism_native">系统分屏</string>
     <string name="settings_split_mechanism_native_hint">分屏由车机固件完成。显示效果取决于固件：可能是 1/3 和 2/3 两个窗口，也可能是左右对半并在屏幕上选择第二个应用。</string>
-    <string name="settings_split_mechanism_platformized_hint">在该固件上由车机自己分屏：1/3 和 2/3 两个窗口、分隔条和左右交换手势都是原生的。BYDMate 只负责启动所选的应用组合，并把跑出去的应用送回它的窗口。</string>
+    <string name="settings_split_mechanism_platformized_hint">在该固件上由车机自己分屏：1/3 和 2/3 两个窗口、分隔条和左右交换手势都是原生的。BYDMateCN 只负责启动所选的应用组合，并把跑出去的应用送回它的窗口。</string>
     <string name="settings_split_try_native_hint">试试“系统分屏”方式。</string>
     <string name="split_feature_disabled">分屏功能已在设置中关闭</string>
     <!-- Tech panel: compact card cell + full screen -->
@@ -1774,9 +1774,9 @@
     <string name="post_restore_download_asr">下载 226 MB</string>
     <string name="post_restore_download">下载</string>
     <string name="post_restore_close">关闭</string>
-    <string name="notif_channel_tracking_name">BYDMate：行程记录</string>
+    <string name="notif_channel_tracking_name">BYDMateCN：行程记录</string>
     <string name="notif_channel_tracking_desc">记录行程和充电</string>
-    <string name="notif_channel_tracking_quiet_name">BYDMate：行程记录（静默）</string>
+    <string name="notif_channel_tracking_quiet_name">BYDMateCN：行程记录（静默）</string>
     <string name="notif_channel_tracking_quiet_desc">记录行程和充电，在通知栏中折叠显示</string>
     <string name="notif_channel_auto_silent_name">静音自动化通知</string>
     <string name="notif_channel_auto_silent_desc">不发声的自动化通知</string>
@@ -1801,7 +1801,7 @@
     <string name="automation_import_save_failed">无法添加自动化：%1$s</string>
     <string name="automation_import_pick_title">Download 中的自动化文件</string>
     <string name="automation_import_pick_empty">Download 文件夹中没有 bydmate_rule_*.json 文件</string>
-    <string name="automation_import_invalid">无法读取文件：这不是 BYDMate 自动化</string>
+    <string name="automation_import_invalid">无法读取文件：这不是 BYDMateCN 自动化</string>
     <string name="automation_import_newer_version">该自动化来自更新的版本，请更新应用</string>
     <string name="automation_import_power_off_only">该自动化只能在车辆熄火时触发，此条件已不再提供</string>
     <string name="automation_import_preview_title">检查自动化</string>
@@ -1859,7 +1859,7 @@
     <string name="dispatch_volume_invalid">音量无效：%1$s</string>
     <string name="dispatch_package_missing">未设置 packageName</string>
     <string name="dispatch_app_not_installed">应用未安装：%1$s</string>
-    <string name="dispatch_app_close_self">BYDMate 不会关闭自身</string>
+    <string name="dispatch_app_close_self">BYDMateCN 不会关闭自身</string>
     <string name="dispatch_app_close_failed">无法关闭应用：%1$s</string>
     <string name="dispatch_media_no_session">没有正在运行的播放器</string>
     <string name="dispatch_media_key_invalid">未知的播放器命令</string>
@@ -1910,7 +1910,7 @@
     <string name="tg_report_field_temps">温度</string>
     <string name="tg_report_field_openings">未关闭项</string>
     <string name="tg_report_field_tires">胎压</string>
-    <string name="tg_report_header_off">BYDMate：车辆于 %1$s 熄火</string>
+    <string name="tg_report_header_off">BYDMateCN：车辆于 %1$s 熄火</string>
     <string name="tg_report_map_link">在地图上打开</string>
     <string name="tg_report_soc">电量 %1$s</string>
     <string name="tg_report_soc_value">%1$d%%</string>

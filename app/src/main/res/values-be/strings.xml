@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BYDMate</string>
+    <string name="app_name">BYDMateCN</string>
     <string name="cluster_a11y_description">Перахоп кнопак руля для праекцыі навігацыі на прыборную панэль. Уключаецца ўручную, працуе толькі пры ўключанай функцыі.</string>
     <string name="settings_language_title">Мова</string>
     <string name="settings_font_scale_title">Памер тэксту</string>
@@ -89,7 +89,7 @@
     <string name="settings_adb_restore_title">Аднаўляць ADB пасля перазагрузкі</string>
     <string name="settings_adb_restore_desc">Для прашывак, дзе ADB выключаецца пры кожнай перазагрузцы. Патрэбны ўключаны Wi-Fi.</string>
     <string name="settings_adb_restore_help_title">Як працуе аднаўленне ADB</string>
-    <string name="settings_adb_restore_help_body">На новых прашыўках DiLink (з лета 2026) порт ADB зачыняецца пры кожнай перазагрузцы, і BYDMate губляе доступ да функцый кіравання машынай.\n\nПраграма ўмее падымаць ADB нанова праз убудаваную ў Android бесправадную адладку. Для гэтага:\n\n1. Wi-Fi у машыне мусіць быць уключаны і падлучаны да сеткі: хатняй, да раздачы з тэлефона ці любой іншай. Без Wi-Fi Android не дазваляе ўключыць бесправадную адладку, гэта абмежаванне сістэмы.\n\n2. Пры першым уключэнні на кожнай новай сетцы на экране з’явіцца сістэмны дыялог «Allow wireless debugging on this network?». Калі аднаўленне ўключана, BYDMate пацвярджае яго сам праз сваю службу спецыяльных магчымасцей. Калі яна выключаная, адзначце «Always allow on this network» і націсніце ALLOW.\n\n3. Адзін раз, пакуль ADB яшчэ працуе, праграма выдае сабе патрэбны сістэмны дазвол. Калі радок стану паказвае «Патрэбна актывацыя», падключыце ADB звычайным спосабам і перазапусціце праграму.\n\nКалі ADB на вашай прашыўцы і так працуе пасля перазагрузкі, уключаць не трэба: радок стану пакажа «Не патрабуецца».</string>
+    <string name="settings_adb_restore_help_body">На новых прашыўках DiLink (з лета 2026) порт ADB зачыняецца пры кожнай перазагрузцы, і BYDMateCN губляе доступ да функцый кіравання машынай.\n\nПраграма ўмее падымаць ADB нанова праз убудаваную ў Android бесправадную адладку. Для гэтага:\n\n1. Wi-Fi у машыне мусіць быць уключаны і падлучаны да сеткі: хатняй, да раздачы з тэлефона ці любой іншай. Без Wi-Fi Android не дазваляе ўключыць бесправадную адладку, гэта абмежаванне сістэмы.\n\n2. Пры першым уключэнні на кожнай новай сетцы на экране з’явіцца сістэмны дыялог «Allow wireless debugging on this network?». Калі аднаўленне ўключана, BYDMateCN пацвярджае яго сам праз сваю службу спецыяльных магчымасцей. Калі яна выключаная, адзначце «Always allow on this network» і націсніце ALLOW.\n\n3. Адзін раз, пакуль ADB яшчэ працуе, праграма выдае сабе патрэбны сістэмны дазвол. Калі радок стану паказвае «Патрэбна актывацыя», падключыце ADB звычайным спосабам і перазапусціце праграму.\n\nКалі ADB на вашай прашыўцы і так працуе пасля перазагрузкі, уключаць не трэба: радок стану пакажа «Не патрабуецца».</string>
     <string name="settings_adb_restore_status_not_needed">Не патрабуецца: ADB ужо працуе</string>
     <string name="settings_adb_restore_status_needs_activation">Патрэбна актывацыя: падключыце ADB адзін раз і перазапусціце праграму</string>
     <string name="settings_adb_restore_status_waiting_wifi">Чаканне Wi-Fi</string>
@@ -101,7 +101,7 @@
     <string name="settings_cloud_wifi_title">Воблака BYD праз Wi-Fi</string>
     <string name="settings_cloud_wifi_desc">Праграма BYD на тэлефоне бачыць машыну, калі яна ў Wi-Fi. На новых серверах BYD патрэбны кітайскі VPN.</string>
     <string name="settings_cloud_wifi_help_title">Як працуе воблака BYD праз Wi-Fi</string>
-    <string name="settings_cloud_wifi_help_body">Без сувязі з воблакам BYD не прыходзяць абнаўленні па паветры, не працуюць NFC-ключ і кіраванне машынай з праграмы BYD на тэлефоне.\n\nЗ гэтай наладай BYDMate падключае машыну да воблака праз Wi-Fi: хатні, раздачу з тэлефона ці любы іншы з інтэрнэтам.\n\nУмовы:\n\n1. Машынам на новых серверах BYD патрэбны кітайскі VPN: сервер пускае толькі з кітайскага адраса. Надзейней за ўсё VPN на роўтары, да якога падключана машына: ён не залежыць ад магнітолы. VPN-праграма на самой магнітоле працуе, толькі пакуль яна ўключана.\n\n2. Калі ў машыны ўжо ёсць свая мабільная сувязь, нічога не мяняецца: воблака і так працуе.\n\nКалі вы выключаеце наладу, праграма вяртае ранейшыя налады сувязі машыны.</string>
+    <string name="settings_cloud_wifi_help_body">Без сувязі з воблакам BYD не прыходзяць абнаўленні па паветры, не працуюць NFC-ключ і кіраванне машынай з праграмы BYD на тэлефоне.\n\nЗ гэтай наладай BYDMateCN падключае машыну да воблака праз Wi-Fi: хатні, раздачу з тэлефона ці любы іншы з інтэрнэтам.\n\nУмовы:\n\n1. Машынам на новых серверах BYD патрэбны кітайскі VPN: сервер пускае толькі з кітайскага адраса. Надзейней за ўсё VPN на роўтары, да якога падключана машына: ён не залежыць ад магнітолы. VPN-праграма на самой магнітоле працуе, толькі пакуль яна ўключана.\n\n2. Калі ў машыны ўжо ёсць свая мабільная сувязь, нічога не мяняецца: воблака і так працуе.\n\nКалі вы выключаеце наладу, праграма вяртае ранейшыя налады сувязі машыны.</string>
     <string name="settings_cloud_wifi_status_connected">Падключана да воблака BYD</string>
     <string name="settings_cloud_wifi_status_own_cellular">У машыны свая мабільная сувязь, воблака працуе і так</string>
     <string name="settings_cloud_wifi_status_waiting">Чакаем Wi-Fi з інтэрнэтам</string>
@@ -120,14 +120,14 @@
     <string name="adb_verdict_link_more">Падрабязней</string>
     <string name="adb_dialog_not_enabled_title">ADB не ўключаны</string>
     <string name="adb_dialog_not_enabled_body">Без ADB не працуюць жывыя даныя, кіраванне машынай, падзел экрана, прыборная панэль і кнопка руля. Гісторыя паездак даступная.</string>
-    <string name="adb_enable_step_1">1. Уключыце ADB па інструкцыі: GitHub BYDMate, раздзел «Активация ADB»</string>
-    <string name="adb_enable_step_2">2. Вярніцеся ў BYDMate і націсніце «Праверыць»</string>
+    <string name="adb_enable_step_1">1. Уключыце ADB па інструкцыі: GitHub BYDMateCN, раздзел «Активация ADB»</string>
+    <string name="adb_enable_step_2">2. Вярніцеся ў BYDMateCN і націсніце «Праверыць»</string>
     <string name="adb_dialog_off_after_reboot_title">ADB адключыўся пасля перазагрузкі</string>
-    <string name="adb_dialog_off_after_reboot_body">На гэтай прашыўцы ADB выключаецца пры кожнай перазагрузцы. BYDMate умее ўключаць яго сам, патрэбны Wi-Fi.</string>
+    <string name="adb_dialog_off_after_reboot_body">На гэтай прашыўцы ADB выключаецца пры кожнай перазагрузцы. BYDMateCN умее ўключаць яго сам, патрэбны Wi-Fi.</string>
     <string name="adb_dialog_off_after_reboot_body_unsupported">На гэтай прашыўцы ADB выключаецца пры кожнай перазагрузцы. Уключыце яго зноў па інструкцыі на GitHub, раздзел «Активация ADB».</string>
     <string name="adb_dialog_no_access_title">Няма доступу да ADB</string>
     <string name="adb_dialog_no_access_body">Пацвердзіце запыт на экране або падключыце ADB нанава, потым націсніце «Праверыць».</string>
-    <string name="adb_dialog_helper_down_title">Памочнік BYDMate не запусціўся</string>
+    <string name="adb_dialog_helper_down_title">Памочнік BYDMateCN не запусціўся</string>
     <string name="adb_dialog_helper_down_body">ADB працуе, але памочнік не адказвае. Уключыце запіс логаў (Налады, «Сэрвіс і даныя», «Запіс логаў»), пачакайце хвіліну, спыніце і адпраўце файл распрацоўшчыку.</string>
     <string name="adb_dialog_close">Закрыць</string>
     <string name="adb_dialog_check">Праверыць</string>
@@ -259,7 +259,7 @@
     <!-- Settings: Widget section -->
     <string name="settings_widget_section_header">Плаваючы віджэт</string>
     <string name="settings_widget_show_soc_label">Паказваць віджэт SOC</string>
-    <string name="settings_widget_hints">• Доўгі тап па віджэце - схаваць да наступнага адкрыцця BYDMate.\n• Перацягнуць у сметніцу ўнізе - выключыць зусім.\n• Звычайны тап - адкрыць BYDMate.</string>
+    <string name="settings_widget_hints">• Доўгі тап па віджэце - схаваць да наступнага адкрыцця BYDMateCN.\n• Перацягнуць у сметніцу ўнізе - выключыць зусім.\n• Звычайны тап - адкрыць BYDMateCN.</string>
     <string name="settings_widget_hide_youtube_label">Хаваць пры YouTube</string>
     <string name="settings_widget_hide_youtube_description">Панэль кнопак хаваецца, пакуль YouTube на экране</string>
     <string name="settings_widget_home_only_label">Паказваць толькі на галоўным экране</string>
@@ -277,20 +277,20 @@
     <string name="orb_agent">Агент:</string>
     <string name="settings_voice_native_assistant_header">Штатны галасавы памочнік BYD</string>
     <string name="settings_voice_disable_native_label">Адключыць штатны галасавы памочнік</string>
-    <string name="settings_voice_disable_native_description">Хавае ўбудаваны галасавы асістэнт BYD, каб ён не перабіваў. Разам з ім знікае і праграма Shortcuts (хуткія каманды), гэта яго частка. Зваротна: выключыце тумблер і перазагрузіце мультымедыя, абодва вернуцца. Перад выдаленнем BYDMate выключыце гэты тумблер, інакш штатны памочнік застанецца адключаным.</string>
+    <string name="settings_voice_disable_native_description">Хавае ўбудаваны галасавы асістэнт BYD, каб ён не перабіваў. Разам з ім знікае і праграма Shortcuts (хуткія каманды), гэта яго частка. Зваротна: выключыце тумблер і перазагрузіце мультымедыя, абодва вернуцца. Перад выдаленнем BYDMateCN выключыце гэты тумблер, інакш штатны памочнік застанецца адключаным.</string>
     <string name="settings_voice_disable_native_confirm_title">Адключыць штатны памочнік?</string>
-    <string name="settings_voice_disable_native_confirm_body">Штатны памочнік BYD будзе адключаны ў сістэме машыны. Перад выдаленнем BYDMate выключыце гэты тумблер, інакш штатны памочнік застанецца адключаным. Калі праграма ўжо выдалена: усталюйце BYDMate зноў, выключыце тумблер і перазагрузіце мультымедыя.</string>
+    <string name="settings_voice_disable_native_confirm_body">Штатны памочнік BYD будзе адключаны ў сістэме машыны. Перад выдаленнем BYDMateCN выключыце гэты тумблер, інакш штатны памочнік застанецца адключаным. Калі праграма ўжо выдалена: усталюйце BYDMateCN зноў, выключыце тумблер і перазагрузіце мультымедыя.</string>
     <string name="settings_voice_disable_native_confirm_button">Адключыць</string>
     <string name="settings_voice_native_assistant_reboot_note">Змена набудзе сілу пасля перазагрузкі галаўной прылады.</string>
     <string name="settings_widget_opacity_label">Празрыстасць</string>
     <string name="settings_widget_scale_label">Памер</string>
     <string name="settings_widget_tap_section_header">Тап па віджэце</string>
     <string name="settings_widget_left_tap_zoning_label">Занаванне тапаў</string>
-    <string name="settings_widget_left_tap_zoning_description">Левая 1/3 - адкрывае выбраную праграму; астатняе - BYDMate.</string>
+    <string name="settings_widget_left_tap_zoning_description">Левая 1/3 - адкрывае выбраную праграму; астатняе - BYDMateCN.</string>
     <string name="settings_widget_left_tap_label">Праграма для левага тапа</string>
     <string name="settings_widget_left_tap_description">Па змаўчанні Яндэкс.Навігатар. Калі праграма выдалена, тап не спрацуе.</string>
     <string name="settings_widget_buttons_label">Кнопкі на віджэце</string>
-    <string name="settings_widget_buttons_description">Адзін тап па віджэце высоўвае 4 кнопкі, двайны тап адкрывае BYDMate. Кнопка запускае правіла з трыгерам «Націсканне кнопкі».</string>
+    <string name="settings_widget_buttons_description">Адзін тап па віджэце высоўвае 4 кнопкі, двайны тап адкрывае BYDMateCN. Кнопка запускае правіла з трыгерам «Націсканне кнопкі».</string>
 
     <!-- Settings: Places section -->
     <string name="settings_places_section_header">Месцы</string>
@@ -485,7 +485,7 @@
     <string name="automation_trigger_night">Ноч</string>
     <string name="automation_trigger_dawn">Світанак</string>
     <string name="automation_trigger_dusk">Захад</string>
-    <string name="automation_trigger_service_start">Запуск BYDMate</string>
+    <string name="automation_trigger_service_start">Запуск BYDMateCN</string>
     <string name="automation_trigger_internet">Даступны інтэрнэт</string>
 
     <!-- Add trigger button -->
@@ -495,7 +495,7 @@
     <string name="automation_trigger_type_place_empty_hint">Спачатку дадайце месца кнопкай «Месцы» уверсе экрана</string>
     <string name="automation_trigger_type_time_of_day">Час сутак</string>
     <string name="automation_trigger_type_schedule">Час / расклад</string>
-    <string name="automation_trigger_type_service_start">Запуск BYDMate</string>
+    <string name="automation_trigger_type_service_start">Запуск BYDMateCN</string>
     <string name="automation_trigger_type_internet">Даступны інтэрнэт</string>
     <string name="automation_trigger_type_button_press">Націсканне кнопкі</string>
     <string name="automation_trigger_button_label">Кнопка %1$d</string>
@@ -503,7 +503,7 @@
     <string name="automation_trigger_steering_key_unassigned">Клавіша не прызначана</string>
     <string name="automation_trigger_steering_key_assign">прызначыць</string>
     <string name="automation_steering_key_occupied_projection">Гэтая клавіша ўключае навігацыю на прыборнай панэлі. Вызваліце яе ў Наладах, раздзел Дысплей, або выберыце іншую.</string>
-    <string name="automation_steering_key_occupied_voice">Гэтая клавіша выклікае галасавога памочніка BYDMate. Змяніце клавішу ў Наладах, раздзел Голас-агент, або выберыце іншую.</string>
+    <string name="automation_steering_key_occupied_voice">Гэтая клавіша выклікае галасавога памочніка BYDMateCN. Змяніце клавішу ў Наладах, раздзел Голас-агент, або выберыце іншую.</string>
     <string name="automation_steering_key_occupied_knob">Націсканне кола занята функцыяй play/pause. Выключыце яе ў Наладах, раздзел Дысплей, або выберыце іншую клавішу.</string>
     <string name="automation_trigger_type_voice">Голас</string>
     <string name="automation_trigger_voice_phrase_label">Фраза-трыгер</string>
@@ -584,7 +584,7 @@
 
     <!-- Overlay permission dialog -->
     <string name="automation_overlay_permission_title">Патрэбны дазвол</string>
-    <string name="automation_overlay_permission_text">Гукавыя апавяшчэнні паказваюцца як усплывальнае акно паверх іншых праграм. Адкрыйце сістэмныя налады і ўключыце \"Паверх іншых вокнаў\" для BYDMate.</string>
+    <string name="automation_overlay_permission_text">Гукавыя апавяшчэнні паказваюцца як усплывальнае акно паверх іншых праграм. Адкрыйце сістэмныя налады і ўключыце \"Паверх іншых вокнаў\" для BYDMateCN.</string>
     <string name="automation_overlay_open_settings">Адкрыць налады</string>
     <string name="automation_overlay_later">Пазней</string>
 
@@ -658,9 +658,9 @@
     <string name="welcome_tariff_home_label">Хатняя зарадка (%1$s/кВт·гадз)</string>
     <string name="welcome_tariff_dc_label">Хуткая зарадка DC (%1$s/кВт·гадз)</string>
     <string name="welcome_autostart_step_title">Аўтазапуск на DiLink</string>
-    <string name="welcome_autostart_step_description">Каб BYDMate запускаўся аўтаматычна пры ўключэнні магнітолы:</string>
+    <string name="welcome_autostart_step_description">Каб BYDMateCN запускаўся аўтаматычна пры ўключэнні магнітолы:</string>
     <string name="welcome_autostart_instruction_1">1. Націсніце кнопку справа</string>
-    <string name="welcome_autostart_instruction_2">2. Знайдзіце BYDMate у спісе</string>
+    <string name="welcome_autostart_instruction_2">2. Знайдзіце BYDMateCN у спісе</string>
     <string name="welcome_autostart_instruction_3">3. Пераключальнік павінен быць ВЫКЛЮЧАНЫ (OFF)</string>
     <string name="welcome_autostart_off_note">OFF = аўтазапуск ДАЗВОЛЕНЫ. Гэта чорны спіс: адключаныя ў ім праграмы МОГУЦЬ запускацца самі.</string>
     <string name="welcome_autostart_apk_update_warning">Пасля абнаўлення APK праверце гэту наладу!</string>
@@ -668,13 +668,13 @@
     <string name="welcome_autostart_dilink_hint">Калі аўтазапуск не спрацаваў, дадайце ў Di+:</string>
     <string name="welcome_autostart_dilink_instruction">Di+ → Predefined → Startup tasks</string>
     <string name="welcome_autostart_command_copied_toast">Скапіравана!</string>
-    <string name="welcome_autostart_command_explanation">打开应用 = «адкрыць праграму» + імя пакета.\nДля дзвюх праграм праз кропку з коскай:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmate.app</string>
+    <string name="welcome_autostart_command_explanation">打开应用 = «адкрыць праграму» + імя пакета.\nДля дзвюх праграм праз кропку з коскай:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmatecn.app</string>
     <string name="welcome_system_settings_section_title">Сістэмныя налады</string>
     <string name="welcome_autostart_open_settings_button">Адкрыць налады аўтазапуску</string>
     <string name="welcome_autostart_open_settings_error">Не ўдалося адкрыць налады аўтазапуску DiLink. Адкрыты налады праграмы.</string>
     <string name="welcome_loading_default">Загрузка...</string>
     <string name="welcome_back_button">Назад</string>
-    <string name="welcome_done_button">Запусціць BYDMate</string>
+    <string name="welcome_done_button">Запусціць BYDMateCN</string>
     <string name="welcome_saving_settings_status">Захаванне налад...</string>
     <string name="welcome_updating_data_status">Абнаўленне даных...</string>
     <string name="welcome_importing_trips_status">Імпарт паездак...</string>
@@ -705,7 +705,7 @@
     <!-- Voltage value with unit: %.1f V -->
     <string name="widget_voltage_value">%1$.1f В</string>
     <!-- Long-press toast -->
-    <string name="widget_toast_hidden">Віджэт схаваны. Адкрыйце BYDMate - вернецца.</string>
+    <string name="widget_toast_hidden">Віджэт схаваны. Адкрыйце BYDMateCN - вернецца.</string>
     <string name="widget_button_no_rules">Няма правілаў для кнопкі %1$d</string>
     <!-- Trash zone labels -->
     <string name="widget_trash_release">адпусціць - віджэт схаваны</string>
@@ -788,8 +788,8 @@
     <string name="nav_tab_settings">Налады</string>
 
     <!-- Post-install autostart hint dialog -->
-    <string name="nav_autostart_dialog_title">BYDMate абноўлены да v%1$s</string>
-    <string name="nav_autostart_dialog_body">Праверце, што фонавая праца не заблакаваная:\n\nНалады DiLink - General - Disable background Apps - BYDMate - OFF\n\nКалі пераключальнік уключаны (ON), DiLink можа забіць сэрвіс BYDMate - тады паездкі і GPS не будуць запісвацца.</string>
+    <string name="nav_autostart_dialog_title">BYDMateCN абноўлены да v%1$s</string>
+    <string name="nav_autostart_dialog_body">Праверце, што фонавая праца не заблакаваная:\n\nНалады DiLink - General - Disable background Apps - BYDMateCN - OFF\n\nКалі пераключальнік уключаны (ON), DiLink можа забіць сэрвіс BYDMateCN - тады паездкі і GPS не будуць запісвацца.</string>
     <string name="nav_autostart_dialog_button">Зразумела</string>
     <string name="nav_autostart_open_settings_error">Не ўдалося адкрыць налады аўтазапуску DiLink. Адкрыты налады праграмы.</string>
 
@@ -821,7 +821,7 @@
     <string name="battery_health_pumped_value">%1$.0f кВт·гадз</string>
     <string name="battery_health_avg_since_charge_label">з апошняй зарадкі</string>
     <string name="battery_health_avg_all_time_label">за ўвесь час</string>
-    <string name="battery_health_avg_soc_hint" formatted="false">Сярэднеўзважаны ўзровень зараду: чым даўжэй батарэя стаіць зараджанай, тым вышэйшае значэнне. Для LFP-батарэі BYD карысна трымаць яго ніжэй: захоўванне на высокім зарадзе паскарае старэнне. Арыенцір: да 65% выдатна, 65-85% нармальна, вышэй 85% лепш зараджаць пазней ці радзей. Зарад да 100% раз у 1-2 тыдні ўсё роўна патрэбны для балансіроўкі ячэек. Лічыцца па гісторыі паездак і зарадак BYDMate.</string>
+    <string name="battery_health_avg_soc_hint" formatted="false">Сярэднеўзважаны ўзровень зараду: чым даўжэй батарэя стаіць зараджанай, тым вышэйшае значэнне. Для LFP-батарэі BYD карысна трымаць яго ніжэй: захоўванне на высокім зарадзе паскарае старэнне. Арыенцір: да 65% выдатна, 65-85% нармальна, вышэй 85% лепш зараджаць пазней ці радзей. Зарад да 100% раз у 1-2 тыдні ўсё роўна патрэбны для балансіроўкі ячэек. Лічыцца па гісторыі паездак і зарадак BYDMateCN.</string>
 
     <!-- Shared summary row (Components.kt SummaryRow) -->
     <string name="summary_unit_km">км</string>
@@ -871,7 +871,7 @@
     <string name="update_downloading_paused">Паўза...</string>
     <!-- %1$d = DownloadManager error code -->
     <string name="update_download_error">Памылка спампоўвання (код %1$d)</string>
-    <string name="update_download_notification_description">Абнаўленне BYDMate</string>
+    <string name="update_download_notification_description">Абнаўленне BYDMateCN</string>
     <!-- Initial 0% progress string -->
     <string name="update_downloading_start" formatted="false">Спампоўванне: 0%</string>
 
@@ -993,7 +993,7 @@
     <string name="settings_tg_backup_disconnect">Адключыць</string>
     <string name="settings_tg_backup_hint">Стварыце бота ў @BotFather, устаўце яго токен і націсніце «Праверыць». Архіў не зашыфраваны, бот і чат павінны быць толькі вашымі.</string>
     <string name="settings_tg_backup_checking">Правяраю…</string>
-    <string name="settings_tg_backup_greeting">BYDMate падключаны. Сюды будуць прыходзіць бэкапы.</string>
+    <string name="settings_tg_backup_greeting">BYDMateCN падключаны. Сюды будуць прыходзіць бэкапы.</string>
     <string name="settings_backup_share">Падзяліцца</string>
     <string name="settings_backup_close">Закрыць</string>
     <string name="settings_backup_share_hint">У архіве ключы і гісторыя паездак, дзяліцеся толькі з тым, каму давяраеце.</string>
@@ -1015,7 +1015,7 @@
     <string name="settings_backup_part_keys_desc">OpenRouter, ABRP, Telegram-бот. Зніміце, калі аддаяце файл іншаму чалавеку.</string>
     <string name="settings_backup_part_absent">У архіве няма</string>
     <string name="backup_error_newer_archive">Бэкап створаны больш новай версіяй праграмы (схема %1$d, бягучая %2$d). Абнавіце праграму перад аднаўленнем.</string>
-    <string name="backup_error_not_bydmate_db">Файл базы даных у бэкапе не з’яўляецца базай BYDMate</string>
+    <string name="backup_error_not_bydmate_db">Файл базы даных у бэкапе не з’яўляецца базай BYDMateCN</string>
     <string name="backup_error_merge_integrity">База пасля зліцця з бэкапам не прайшла праверку цэласнасці</string>
     <string name="backup_error_export_integrity">Здымак базы для экспарту не прайшоў праверку цэласнасці</string>
     <string name="backup_error_parts_mismatch">Файл бэкапа пашкоджаны: склад архіва не супадае з яго апісаннем</string>
@@ -1326,7 +1326,7 @@
     <string name="auto_msg_media_volume_missing">Дзеянне #%1$d: узровень гучнасці не зададзены</string>
     <!-- automation special triggers/actions -->
     <string name="auto_trig_place_enter">Уезд у «%1$s»</string>
-    <string name="auto_trig_service_start">Запуск BYDMate</string>
+    <string name="auto_trig_service_start">Запуск BYDMateCN</string>
     <string name="auto_trig_network_available">Даступны інтэрнэт</string>
     <string name="auto_act_media_volume">Гучнасць медыя: 2</string>
     <string name="auto_trig_time_of_day_night">Ноч</string>
@@ -1547,19 +1547,19 @@
     <string name="settings_fid_recorder_file">Файл: %1$s</string>
     <string name="settings_fid_recorder_error">Не запісвае: %1$s</string>
     <string name="settings_quiet_notification_title">Ціхае апавяшчэнне ў шторцы</string>
-    <string name="settings_quiet_notification_desc">Апавяшчэнне BYDMate пераходзіць у згорнуты спіс без значка ў радку стану. Зусім прыбраць яго нельга: Android патрабуе апавяшчэнне для працы ў фоне</string>
+    <string name="settings_quiet_notification_desc">Апавяшчэнне BYDMateCN пераходзіць у згорнуты спіс без значка ў радку стану. Зусім прыбраць яго нельга: Android патрабуе апавяшчэнне для працы ў фоне</string>
     <string name="settings_config_restore_desc">Бягучыя даныя будуць заменены змесцівам архіва.</string>
     <string name="settings_autostart_header">Аўтазапуск</string>
-    <string name="settings_autostart_desc">BYDMate стартуе разам з машынай. Калі пасля абнаўлення прашыўкі аўтазапуск зляцеў, уключыце яго ў сістэмнай наладзе</string>
+    <string name="settings_autostart_desc">BYDMateCN стартуе разам з машынай. Калі пасля абнаўлення прашыўкі аўтазапуск зляцеў, уключыце яго ў сістэмнай наладзе</string>
     <string name="settings_places_inline_hint">Пункт дадаецца па карце ці па бягучым становішчы машыны</string>
     <string name="settings_agent_debug_row_title">Праверка і адладка</string>
     <string name="settings_agent_debug_row_desc">Тэст мадэлі правярае падключэнне, чат паказвае дыялог з агентам тэкстам</string>
 
     <!-- Donation dialog + support card -->
-    <string name="donate_auto_title">Дзякуй, што вы з BYDMate</string>
-    <string name="donate_auto_body">Праект некамерцыйны і цалкам бясплатны, развіваецца на чыстым энтузіязме. Калі BYDMate аказаўся вам карысным і вы хочаце сказаць дзякуй, падтрымайце распрацоўку: пераводам USDT у сетках EVM або картай праз ЮMoney.</string>
+    <string name="donate_auto_title">Дзякуй, што вы з BYDMateCN</string>
+    <string name="donate_auto_body">Праект некамерцыйны і цалкам бясплатны, развіваецца на чыстым энтузіязме. Калі BYDMateCN аказаўся вам карысным і вы хочаце сказаць дзякуй, падтрымайце распрацоўку: пераводам USDT у сетках EVM або картай праз ЮMoney.</string>
     <string name="donate_settings_title">Падтрымаць праект</string>
-    <string name="donate_settings_body">BYDMate некамерцыйны і бясплатны. Калі хочаце падтрымаць распрацоўку, перавядзіце USDT на адрас ніжэй або аплаціце картай праз ЮMoney.</string>
+    <string name="donate_settings_body">BYDMateCN некамерцыйны і бясплатны. Калі хочаце падтрымаць распрацоўку, перавядзіце USDT на адрас ніжэй або аплаціце картай праз ЮMoney.</string>
     <string name="donate_qr_hint">Навядзіце камеру тэлефона на код</string>
     <string name="donate_address_label">Адрас USDT · сеткі EVM</string>
     <string name="donate_copy_button">Скапіраваць адрас</string>
@@ -1573,7 +1573,7 @@
     <string name="donate_already_button">Я ўжо падтрымаў</string>
     <string name="donate_close_button">Закрыць</string>
     <string name="settings_donate_header">Падтрымка</string>
-    <string name="settings_donate_card_body">BYDMate бясплатны і некамерцыйны. Калі ён вам карысны, вы можаце падтрымаць распрацоўку.</string>
+    <string name="settings_donate_card_body">BYDMateCN бясплатны і некамерцыйны. Калі ён вам карысны, вы можаце падтрымаць распрацоўку.</string>
     <string name="settings_donate_button">Падтрымаць праект</string>
 
     <!-- HUD navigation -->
@@ -1645,7 +1645,7 @@
     <string name="split_picker_title_narrow">Выберыце праграму для вузкай панэлі (1/3)</string>
     <string name="split_freeform_reboot_hint">Падзел экрана ўключыцца пасля перазагрузкі машыны</string>
     <string name="split_freeform_unsupported_hint">Падзел экрана недаступны на прашыўцы гэтай машыны</string>
-    <string name="navigate_maps_shortcut_failed">Карты не прынялі маршрут: дадайце Месца «Дом» або «Праца» ў BYDMate</string>
+    <string name="navigate_maps_shortcut_failed">Карты не прынялі маршрут: дадайце Месца «Дом» або «Праца» ў BYDMateCN</string>
     <string name="split_launch_failed">Не ўдалося запусціць падзел экрана</string>
     <string name="split_launch_failed_adb">Не ўдалося запусціць падзел экрана: патрэбны разблакаваны ADB</string>
     <!-- Automation action: split_screen -->
@@ -1708,10 +1708,10 @@
     <string name="settings_split_app_not_selected">не выбрана</string>
     <string name="settings_split_howto_body">Падзел экрана можна ўключыць трыма спосабамі.\nСамы просты: тап па левай трэці плаваючага віджэта. Для гэтага ў раздзеле «Тап па віджэце» уключыце «Занаванне тапаў», а ў пункце «Дзеянне левага тапа» выберыце «Запускаць падзел экрана».\nПраз аўтаматызацыі: дадайце ў правіла дзеянне «Падзел экрана». Побач ёсць «Закрыць падзел экрана» і «Пераключыць падзел экрана».\nГоласам: проста папрасіце голас-агента ўключыць падзел экрана.</string>
     <string name="settings_split_mechanism_title">Механізм падзелу</string>
-    <string name="settings_split_mechanism_freeform">Вокны BYDMate</string>
+    <string name="settings_split_mechanism_freeform">Вокны BYDMateCN</string>
     <string name="settings_split_mechanism_native">Родны падзел</string>
     <string name="settings_split_mechanism_native_hint">Падзел выконвае прашыўка машыны. Выгляд залежыць ад прашыўкі: дзве панэлі 1/3 і 2/3 або папалам з выбарам другой праграмы на экране.</string>
-    <string name="settings_split_mechanism_platformized_hint">На гэтай прашыўцы экран дзеліць сама машына: панэлі 1/3 і 2/3, падзяляльнік і жэст абмену родныя. BYDMate толькі запускае абраную пару і вяртае праграму ў яе панэль.</string>
+    <string name="settings_split_mechanism_platformized_hint">На гэтай прашыўцы экран дзеліць сама машына: панэлі 1/3 і 2/3, падзяляльнік і жэст абмену родныя. BYDMateCN толькі запускае абраную пару і вяртае праграму ў яе панэль.</string>
     <string name="settings_split_try_native_hint">Паспрабуйце рэжым Родны падзел.</string>
     <string name="split_feature_disabled">Падзел экрана выключаны ў наладах</string>
     <!-- Tech panel: compact card cell + full screen -->
@@ -1812,9 +1812,9 @@
     <string name="post_restore_download_asr">Спампаваць 226 МБ</string>
     <string name="post_restore_download">Спампаваць</string>
     <string name="post_restore_close">Закрыць</string>
-    <string name="notif_channel_tracking_name">BYDMate: улік паездак</string>
+    <string name="notif_channel_tracking_name">BYDMateCN: улік паездак</string>
     <string name="notif_channel_tracking_desc">Улік паездак і зарадак</string>
-    <string name="notif_channel_tracking_quiet_name">BYDMate: улік паездак (ціха)</string>
+    <string name="notif_channel_tracking_quiet_name">BYDMateCN: улік паездак (ціха)</string>
     <string name="notif_channel_tracking_quiet_desc">Улік паездак і зарадак, згорнута ў шторцы</string>
     <string name="notif_channel_auto_silent_name">Аўтаматызацыі без гуку</string>
     <string name="notif_channel_auto_silent_desc">Апавяшчэнні аўтаматызацый без гуку</string>
@@ -1839,7 +1839,7 @@
     <string name="automation_import_save_failed">Не ўдалося дадаць аўтаматызацыю: %1$s</string>
     <string name="automation_import_pick_title">Файлы аўтаматызацый у Download</string>
     <string name="automation_import_pick_empty">У папцы Download няма файлаў bydmate_rule_*.json</string>
-    <string name="automation_import_invalid">Не ўдалося прачытаць файл: гэта не аўтаматызацыя BYDMate</string>
+    <string name="automation_import_invalid">Не ўдалося прачытаць файл: гэта не аўтаматызацыя BYDMateCN</string>
     <string name="automation_import_newer_version">Аўтаматызацыя з больш новай версіі, абнавіце праграму</string>
     <string name="automation_import_power_off_only">Гэтая аўтаматызацыя магла спрацаваць толькі на выключанай машыне, такой умовы больш няма</string>
     <string name="automation_import_preview_title">Праверце аўтаматызацыю</string>
@@ -1897,7 +1897,7 @@
     <string name="dispatch_volume_invalid">Некарэктны ўзровень гучнасці: %1$s</string>
     <string name="dispatch_package_missing">packageName не зададзены</string>
     <string name="dispatch_app_not_installed">Праграма не ўсталявана: %1$s</string>
-    <string name="dispatch_app_close_self">BYDMate не закрывае сам сябе</string>
+    <string name="dispatch_app_close_self">BYDMateCN не закрывае сам сябе</string>
     <string name="dispatch_app_close_failed">Не ўдалося закрыць праграму: %1$s</string>
     <string name="dispatch_media_no_session">Няма запушчанага плэера</string>
     <string name="dispatch_media_key_invalid">Невядомая каманда плэера</string>
@@ -1948,7 +1948,7 @@
     <string name="tg_report_field_temps">Тэмпература</string>
     <string name="tg_report_field_openings">Што адчынена</string>
     <string name="tg_report_field_tires">Ціск у шынах</string>
-    <string name="tg_report_header_off">BYDMate: машына выключана ў %1$s</string>
+    <string name="tg_report_header_off">BYDMateCN: машына выключана ў %1$s</string>
     <string name="tg_report_map_link">Адкрыць на карце</string>
     <string name="tg_report_soc">зарад %1$s</string>
     <string name="tg_report_soc_value">%1$d%%</string>

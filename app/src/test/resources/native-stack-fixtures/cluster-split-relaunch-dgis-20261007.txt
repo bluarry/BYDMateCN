@@ -41,11 +41,11 @@
 10-07 11:55:06.755 I/Trace   (18629): cluster setMode d=OFF_->_FULLSCREEN_(reason=star_key_split=off_navi_wm=4_navi_display=0) #10237
 10-07 11:55:06.831 I/ClusterProjection(18629): cluster display id=3 "shared_fission_bg_XDJAScreenProjection_0" 1920x720 dpi=320 prefer_full=true candidates=[3:"shared_fission_bg_XDJAScreenProjection_0" 1920x720, 4:"shared_fission_bg_XDJAScreenProjection_1" 1920x720]
 10-07 11:55:06.961 I/ClusterProjection(18629): releasing orphaned VirtualDisplay id=9 from a prior session
-10-07 11:55:06.994 W/bydmate_helper( 6369): TX_CREATE_VIRTUAL_DISPLAY: SecurityException flags=323 3310x768 (expected for PUBLIC; app falls back to private flags)
+10-07 11:55:06.994 W/bydmatecn_helper( 6369): TX_CREATE_VIRTUAL_DISPLAY: SecurityException flags=323 3310x768 (expected for PUBLIC; app falls back to private flags)
 10-07 11:55:06.996 W/ClusterProjection(18629): PUBLIC VirtualDisplay rejected; falling back to private flags
 10-07 11:55:07.032 I/ClusterProjection(18629): VirtualDisplay id=10 3310x768@320; launchAndForce ru.dublgis.dgismobile
-10-07 11:55:08.198 I/bydmate_helper( 6369): launchAndForce split: task=22 from=TaskModeState(windowingMode=4, displayId=0) still state=TaskModeState(windowingMode=4, displayId=0) → am start display=10
-10-07 11:55:08.612 I/bydmate_helper( 6369): launchAndForce split: task=22 fallback ok state=TaskModeState(windowingMode=1, displayId=10)
+10-07 11:55:08.198 I/bydmatecn_helper( 6369): launchAndForce split: task=22 from=TaskModeState(windowingMode=4, displayId=0) still state=TaskModeState(windowingMode=4, displayId=0) → am start display=10
+10-07 11:55:08.612 I/bydmatecn_helper( 6369): launchAndForce split: task=22 fallback ok state=TaskModeState(windowingMode=1, displayId=10)
 10-07 11:55:08.720 I/Trace   (18629): cluster projection d=active:_pkg=ru.dublgis.dgismobile_vd=10 #10242
 10-07 11:55:08.774 I/ActivityManager( 1084): Process ru.dublgis.dgismobile (pid 23553) has died: fg  TOP 
 10-07 11:55:08.866 I/ActivityManager( 1084): Start proc 24041:ru.dublgis.dgismobile/u0a102 for null
@@ -57,7 +57,7 @@
 10-07 11:55:35.303 I/Trace   (18629): cluster setMode d=OFF_->_FULLSCREEN_(reason=star_key_split=off_navi_wm=none) #10250
 10-07 11:55:35.337 I/ClusterProjection(18629): cluster display id=3 "shared_fission_bg_XDJAScreenProjection_0" 1920x720 dpi=320 prefer_full=true candidates=[3:"shared_fission_bg_XDJAScreenProjection_0" 1920x720, 4:"shared_fission_bg_XDJAScreenProjection_1" 1920x720]
 10-07 11:55:35.448 I/ClusterProjection(18629): releasing orphaned VirtualDisplay id=10 from a prior session
-10-07 11:55:35.473 W/bydmate_helper( 6369): TX_CREATE_VIRTUAL_DISPLAY: SecurityException flags=323 3310x768 (expected for PUBLIC; app falls back to private flags)
+10-07 11:55:35.473 W/bydmatecn_helper( 6369): TX_CREATE_VIRTUAL_DISPLAY: SecurityException flags=323 3310x768 (expected for PUBLIC; app falls back to private flags)
 10-07 11:55:35.473 W/ClusterProjection(18629): PUBLIC VirtualDisplay rejected; falling back to private flags
 10-07 11:55:35.486 I/ClusterProjection(18629): VirtualDisplay id=11 3310x768@320; launchAndForce ru.dublgis.dgismobile
 10-07 11:55:38.281 I/Trace   (18629): cluster projection d=active:_pkg=ru.dublgis.dgismobile_vd=11 #10256
@@ -66,7 +66,7 @@
 10-07 11:55:48.088 I/Trace   (18629): cluster setMode d=FULLSCREEN_->_OFF_(reason=star_key) #10259
 10-07 11:55:49.450 I/ActivityManager( 1084): Process ru.dublgis.dgismobile (pid 24041) has died: fg  TOP 
 10-07 11:55:49.704 I/ActivityManager( 1084): Start proc 24488:ru.dublgis.dgismobile/u0a102 for null
-10-07 11:55:50.290 I/bydmate_helper( 6369): pullback light path failed: task=23 state=null → remove+relaunch
+10-07 11:55:50.290 I/bydmatecn_helper( 6369): pullback light path failed: task=23 state=null → remove+relaunch
 10-07 11:55:50.314 I/ActivityManager( 1084): Killing 23670:ru.dublgis.dgismobile:service/u0a102 (adj 905): remove task
 10-07 11:55:50.317 I/ActivityManager( 1084): Killing 24488:ru.dublgis.dgismobile/u0a102 (adj 905): remove task
 10-07 11:55:50.397 I/ActivityManager( 1084): Start proc 24564:ru.dublgis.dgismobile/u0a102 for null
@@ -75,11 +75,11 @@
 10-07 11:56:20.293 I/Trace   (18629): cluster setMode d=OFF_->_FULLSCREEN_(reason=star_key_split=off_navi_wm=4_navi_display=0) #10266
 10-07 11:56:20.383 I/ClusterProjection(18629): cluster display id=3 "shared_fission_bg_XDJAScreenProjection_0" 1920x720 dpi=320 prefer_full=true candidates=[3:"shared_fission_bg_XDJAScreenProjection_0" 1920x720, 4:"shared_fission_bg_XDJAScreenProjection_1" 1920x720]
 10-07 11:56:20.539 I/ClusterProjection(18629): releasing orphaned VirtualDisplay id=11 from a prior session
-10-07 11:56:20.556 W/bydmate_helper( 6369): TX_CREATE_VIRTUAL_DISPLAY: SecurityException flags=323 3310x768 (expected for PUBLIC; app falls back to private flags)
+10-07 11:56:20.556 W/bydmatecn_helper( 6369): TX_CREATE_VIRTUAL_DISPLAY: SecurityException flags=323 3310x768 (expected for PUBLIC; app falls back to private flags)
 10-07 11:56:20.558 W/ClusterProjection(18629): PUBLIC VirtualDisplay rejected; falling back to private flags
 10-07 11:56:20.592 I/ClusterProjection(18629): VirtualDisplay id=12 3310x768@320; launchAndForce ru.dublgis.dgismobile
-10-07 11:56:21.695 I/bydmate_helper( 6369): launchAndForce split: task=24 from=TaskModeState(windowingMode=4, displayId=0) still state=TaskModeState(windowingMode=4, displayId=0) → am start display=12
-10-07 11:56:22.101 I/bydmate_helper( 6369): launchAndForce split: task=24 fallback ok state=TaskModeState(windowingMode=1, displayId=12)
+10-07 11:56:21.695 I/bydmatecn_helper( 6369): launchAndForce split: task=24 from=TaskModeState(windowingMode=4, displayId=0) still state=TaskModeState(windowingMode=4, displayId=0) → am start display=12
+10-07 11:56:22.101 I/bydmatecn_helper( 6369): launchAndForce split: task=24 fallback ok state=TaskModeState(windowingMode=1, displayId=12)
 10-07 11:56:22.287 I/Trace   (18629): cluster projection d=active:_pkg=ru.dublgis.dgismobile_vd=12 #10272
 10-07 11:56:22.306 I/ActivityManager( 1084): Process ru.dublgis.dgismobile (pid 24564) has died: fg  TOP 
 10-07 11:56:22.434 I/ActivityManager( 1084): Start proc 25065:ru.dublgis.dgismobile/u0a102 for null

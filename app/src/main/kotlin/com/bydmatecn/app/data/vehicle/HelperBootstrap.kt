@@ -1,0 +1,349 @@
+package com.bydmatecn.app.data.vehicle
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.os.Build
+import android.util.Log
+import com.bydmatecn.app.data.autoservice.AdbOnDeviceClient
+import com.bydmatecn.app.helper.HelperBinderHolder
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.security.SecureRandom
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Single owner of the helper daemon's lifecycle. Idempotent — ensureRunning()
+ * converges to "one alive helper of THIS app version".
+ *
+ * Version awareness (the stale-daemon fix): the daemon is a detached app_process
+ * under shell uid that survives app reinstalls and reboots-less updates. A daemon
+ * spawned by a previous app version still answers the binder ping but lacks any
+ * handler added in the update — so newer ops (sentry mode, assistant disable)
+ * silently failed until a head-unit reboot. The authoritative staleness signal is
+ * a live query to the daemon itself (TX_GET_VERSION): the daemon's CLASSPATH is
+ * frozen at spawn time, so BuildConfig.VERSION_CODE in the running JVM reflects
+ * exactly which APK spawned it. A pref-based bookkeeping value can drift (e.g.
+ * daemon re-spawned by a boot path after the pref was already updated); the live
+ * query cannot.
+ */
+@Singleton
+class HelperBootstrap @Inject constructor(
+    private val adb: AdbOnDeviceClient,
+    private val helper: HelperClient,
+    @ApplicationContext private val context: Context,
+) {
+    private val prefs by lazy { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+
+    // Serializes ensureRunning(): TrackingService start, the foreground refresh, and the
+    // cluster star-control path all call it independently. Without this, two callers race
+    // into the kill→spawn path and fight over the daemon's lock + binder name — the very
+    // stale-daemon hazard this class exists to prevent.
+    private val lock = Mutex()
+
+    /**
+     * Returns true if a helper daemon matching the current app version is reachable
+     * after this call. Serialized: concurrent callers run one at a time.
+     */
+    suspend fun ensureRunning(): Boolean = lock.withLock {
+        ensureRunningLocked().also { if (it) markEverAlive() }
+    }
+
+    /**
+     * True once a daemon of our version has answered on this install — i.e. ADB worked here at
+     * least once. Separates "ADB was never enabled" from "ADB closed after a reboot". Never cleared.
+     */
+    fun daemonEverAlive(): Boolean = prefs.getBoolean(KEY_DAEMON_EVER_ALIVE, false)
+
+    // ensureRunning runs often: write only on the first success.
+    private fun markEverAlive() {
+        if (!daemonEverAlive()) prefs.edit().putBoolean(KEY_DAEMON_EVER_ALIVE, true).apply()
+    }
+
+    /**
+     * Order of operations:
+     *   1. Ask the live daemon which versionCode it was built from (TX_GET_VERSION). The daemon's
+     *      CLASSPATH is frozen at spawn time, so this reply is authoritative. If it matches the
+     *      installed versionCode, the daemon is current — reuse it.
+     *   2. Otherwise the daemon is stale (wrong version, too old for TX_GET_VERSION, or dead).
+     *      Kill when either the binder ping succeeds (isAlive) OR the ps-level check shows a
+     *      process still holding the lock (helperHeartbeat). The binder check alone is
+     *      insufficient: after an uninstall+reinstall the app uid changes, and the daemon's
+     *      UID gate rejects TX_PING, so isAlive()=false while the process is very much alive.
+     *   3. Spawn via app_process; poll daemonVersion() up to [POLL_ATTEMPTS] times — this
+     *      simultaneously confirms liveness AND that the fresh daemon carries the right version.
+     *      A spawn that answers with the wrong version is treated as a failure (return false).
+     *   4. Persist the versionCode (secondary bookkeeping) ONLY after the version poll succeeds.
+     *      A failed kill or spawn dispatch bails without persisting.
+     */
+    private suspend fun ensureRunningLocked(): Boolean {
+        val want = installedVersionCode()
+        // If our own versionCode cannot be read (should never happen), degrade gracefully:
+        // trust the binder ping rather than hammering the daemon with kill+spawn on every call.
+        if (want == VERSION_READ_FAILED) return helper.isAlive()
+        // Live query is authoritative: daemon's CLASSPATH is frozen at spawn time, so
+        // VERSION_CODE in the running JVM reflects which APK it was spawned from.
+        val version = helper.daemonVersion()
+        if (version == want) return true
+        // Daemon is stale (wrong version, too old for TX_GET_VERSION) or dead.
+        val alive = helper.isAlive()
+        val heartbeat = adb.helperHeartbeat()
+        val lastTransport = prefs.getString(HelperBinderHolder.KEY_LAST_TRANSPORT, null)
+        // The one line that says WHY the kill path was entered — its absence hid the trigger in
+        // the field log of build 459 (crazyhack, Song Plus).
+        Log.i(TAG, "daemon stale or unreachable: version=${version ?: "null"} want=$want " +
+            "alive=$alive heartbeat=$heartbeat lastTransport=${lastTransport ?: "absent"}")
+        // On broadcast-only firmwares (#64/#148) a recreated app process has no binder and no way
+        // to ask for one — but the daemon re-announces. Give it one interval before killing a
+        // daemon that is perfectly healthy. Right after an app update the old daemon does not
+        // re-announce at all: that costs this wait once, then the kill path runs as before.
+        if (lastTransport == HelperBinderHolder.TRANSPORT_BROADCAST && heartbeat) {
+            HelperBinderHolder.spawnInFlight = false
+            if (awaitReannounce(want)) return true
+        }
+        // Kill when either the binder ping responds (isAlive) OR the process is visible in ps
+        // (helperHeartbeat): a process holding the file lock must be killed before we spawn even
+        // if its UID gate has gone mute (uid change after reinstall makes every transact fail).
+        if (alive || heartbeat) {
+            // If the kill could not even be dispatched (no ADB connection / exec threw), we have
+            // no evidence the stale daemon is gone. Bail rather than spawn over a possibly-live
+            // old daemon; the next call retries.
+            if (!adb.killHelper()) {
+                Log.w(TAG, "killHelper dispatch failed; not spawning to avoid stale daemon")
+                recordSpawnFailure(adbAwareReason(SpawnFailReason.KILL_DISPATCH_FAILED),
+                    "kill of the stale daemon could not be dispatched")
+                return false
+            }
+            // kill -9 is async, and the old daemon holds the exclusive lock + binder name until
+            // it actually dies. The fresh daemon uses a NON-blocking tryLock() and exits cleanly
+            // if the lock is still held — which would leave the STALE daemon registered, so
+            // daemonVersion() below would falsely confirm the new version. Wait (bounded) for the
+            // old process to disappear before spawning.
+            var stillAlive = adb.helperHeartbeat()
+            var attempts = 0
+            var killRounds = 0
+            while (stillAlive && killRounds < KILL_ROUNDS) {
+                attempts = 0
+                while (stillAlive && attempts < KILL_CONFIRM_ATTEMPTS) {
+                    delay(KILL_CONFIRM_INTERVAL_MS)
+                    attempts++
+                    stillAlive = adb.helperHeartbeat()
+                }
+                killRounds++
+                // The first kill can be lost on a stale ADB socket (field incident 2026-07-05:
+                // 26 consecutive bails over 2 minutes). One re-dispatched kill per ensureRunning
+                // call is cheap and bounded; more rounds would just stack latency on a daemon
+                // that genuinely refuses to die.
+                if (stillAlive && killRounds < KILL_ROUNDS && !adb.killHelper()) break
+            }
+            // If the stale daemon refuses to die, do NOT spawn over it: the fresh daemon would
+            // lose the lock race and exit, and daemonVersion() would then reflect the OLD daemon
+            // and wrongly confirm a fresh version. Bail so the next ensureRunning() retries the
+            // kill instead of silently accepting a stale daemon.
+            if (stillAlive) {
+                Log.w(TAG, "stale helper still alive after kill; not spawning to avoid lock race")
+                recordSpawnFailure(SpawnFailReason.STALE_DAEMON_ALIVE,
+                    "stale daemon survived $KILL_ROUNDS kill rounds; spawn skipped to avoid the lock race")
+                return false
+            }
+        }
+        // If the spawn dispatch itself failed, do NOT fall through to the poll: a stale daemon (or
+        // any leftover process) answering daemonVersion() would otherwise get the current
+        // versionCode persisted against it, masking that no fresh daemon was actually launched.
+        // Token for THIS spawn: the daemon echoes it back if it has to publish its Binder by
+        // broadcast (#64/#148). It must be in the holder BEFORE the spawn — the daemon can
+        // broadcast within milliseconds, and an intent that arrives with no expected token set
+        // is rejected.
+        val token = newSpawnToken()
+        val persistedToken = prefs.getString(HelperBinderHolder.KEY_SPAWN_TOKEN, null)
+        HelperBinderHolder.armToken(token)
+        HelperBinderHolder.spawnInFlight = true
+        if (!adb.spawnHelper(token)) {
+            Log.w(TAG, "spawnHelper dispatch failed; not persisting version")
+            // No daemon is coming for this token. Fall back to the token of the daemon that IS
+            // running (persisted by an earlier spawn, possibly from a previous app process): with
+            // ADB down that live daemon's re-announce is the only way back to a working channel,
+            // and it can only present the token it was spawned with.
+            HelperBinderHolder.armToken(persistedToken)
+            HelperBinderHolder.spawnInFlight = false
+            recordSpawnFailure(adbAwareReason(SpawnFailReason.SPAWN_DISPATCH_FAILED),
+                "app_process spawn could not be dispatched")
+            return false
+        }
+        repeat(POLL_ATTEMPTS) {
+            delay(POLL_INTERVAL_MS)
+            // daemonVersion() == want confirms both liveness and that the fresh daemon carries
+            // the right handlers. A spawn that answers a wrong version is treated as failure.
+            if (helper.daemonVersion() == want) {
+                // A successful spawn clears the last failure, or the diagnostic dump keeps
+                // showing a stale `last_spawn_failure` next to a healthy daemon.
+                prefs.edit()
+                    .putLong(KEY_SPAWNED_VERSION, want)
+                    .removeLastFailure()
+                    .apply()
+                // The daemon answered — via ServiceManager or via an accepted broadcast. Nothing
+                // else may claim this spawn's token in THIS process any more; the persisted copy
+                // is written by the receiver on accept, so it always names the daemon that really
+                // handed us a binder.
+                HelperBinderHolder.armToken(null)
+                HelperBinderHolder.spawnInFlight = false
+                return true
+            }
+        }
+        val log = adb.readHelperLog()
+        Log.w(TAG, "helper unreachable after spawn; daemon log:\n$log")
+        val tail = log?.lines()?.filter { it.isNotBlank() }?.takeLast(FAIL_LOG_LINES)
+            ?.joinToString("\n")
+            ?.takeIf { it.isNotEmpty() }
+            ?: "(daemon log unavailable)"
+        // On a firmware that refuses addService the whole story is in the holder: whether an
+        // intent arrived at all, and why it was turned away if it did.
+        val holderState = "holder: transport=${HelperBinderHolder.transport} " +
+            "lastReject=${HelperBinderHolder.lastReject ?: "(none)"}"
+        // The token STAYS armed on purpose: a daemon that boots slower than our poll window
+        // publishes its binder by broadcast after we gave up (trinket, crazyhack 2026-09-12),
+        // and disarming here threw that healthy binder away — every write then failed until
+        // the watchdog respawned. A binder we already hold cannot be swapped (already_held), the
+        // next spawn overwrites the token, and a forged intent still needs this exact token plus
+        // our daemon's interface descriptor.
+        // The poll gave up, so a binder arriving from now on is a late delivery / re-announce.
+        HelperBinderHolder.spawnInFlight = false
+        recordSpawnFailure(SpawnFailReason.DAEMON_SILENT, "$tail\n$holderState")
+        return false
+    }
+
+    /**
+     * Polls the holder for a re-announced binder. True only when one arrives AND the daemon
+     * behind it carries the version we want; a daemon of another version is genuinely stale and
+     * must go through the kill path.
+     */
+    private suspend fun awaitReannounce(want: Long): Boolean {
+        // Attempt 0 carries no delay: the binder can land while the checks above were suspended
+        // (daemonVersion, isAlive, helperHeartbeat are all round trips), and a holder that is
+        // already full must be examined instead of ignored — the old gate killed that daemon.
+        repeat(REANNOUNCE_POLL_ATTEMPTS + 1) { attempt ->
+            if (attempt > 0) delay(REANNOUNCE_POLL_INTERVAL_MS)
+            if (HelperBinderHolder.binder == null) return@repeat
+            val version = helper.daemonVersion()
+            if (version == want) {
+                Log.i(TAG, if (attempt == 0) "adopted live daemon (arrived during checks)"
+                    else "adopted live daemon via re-announce")
+                return true
+            }
+            Log.i(TAG, "re-announced daemon carries version=${version ?: "null"} want=$want; stale")
+            return false
+        }
+        Log.i(TAG, "no re-announce within ${REANNOUNCE_WAIT_MS / 1000} s")
+        return false
+    }
+
+    /** Spawn token: 32 hex characters from SecureRandom, matching AdbOnDeviceClient's shape gate. */
+    private fun newSpawnToken(): String {
+        val bytes = ByteArray(SPAWN_TOKEN_BYTES)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /** Cheap reachability check — no side effects. */
+    suspend fun isHealthy(): Boolean = helper.isAlive()
+
+    /**
+     * Records WHY the daemon is not running (#64, #133), so the diagnostic dump does not have to
+     * rely on logcat — it has usually rotated by the time the user files the report.
+     *
+     * Until 3.11 only the last branch (spawn dispatched, daemon never answered) was recorded, so
+     * every failure that ended earlier — and the ADB-channel failures in particular, which are the
+     * common field case — left the dump printing `last_spawn_failure: (none)` next to a dead daemon.
+     */
+    private fun recordSpawnFailure(reason: SpawnFailReason, detail: String) {
+        prefs.edit()
+            .putLong(KEY_LAST_FAIL_TS, System.currentTimeMillis())
+            .putString(KEY_LAST_FAIL_REASON, reason.name)
+            .putString(KEY_LAST_FAIL_LOG, detail)
+            .apply()
+    }
+
+    /**
+     * Distinguishes "the ADB channel itself is down" from a dispatch that failed over a live one.
+     * [AdbOnDeviceClient.isConnected] is a cheap socket-state read with no side effects — the
+     * connect attempt has already happened inside the failed call.
+     */
+    private suspend fun adbAwareReason(overChannel: SpawnFailReason): SpawnFailReason =
+        if (adb.isConnected()) overChannel else SpawnFailReason.ADB_UNREACHABLE
+
+    /**
+     * Forgets the recorded spawn failure. Called when a binder arrives after the poll window
+     * gave up: the daemon is healthy, and a dump still printing `last_spawn_failure:
+     * DAEMON_SILENT` next to it sends the triage the wrong way.
+     */
+    fun clearLastSpawnFailure() {
+        prefs.edit().removeLastFailure().apply()
+    }
+
+    private fun SharedPreferences.Editor.removeLastFailure(): SharedPreferences.Editor =
+        remove(KEY_LAST_FAIL_TS).remove(KEY_LAST_FAIL_REASON).remove(KEY_LAST_FAIL_LOG)
+
+    /** Last recorded spawn failure, or null if the daemon has never failed to come up. */
+    fun lastSpawnFailure(): SpawnFailure? {
+        val ts = prefs.getLong(KEY_LAST_FAIL_TS, 0L)
+        if (ts <= 0L) return null
+        val reason = runCatching {
+            SpawnFailReason.valueOf(prefs.getString(KEY_LAST_FAIL_REASON, "").orEmpty())
+        }.getOrDefault(SpawnFailReason.DAEMON_SILENT)
+        return SpawnFailure(ts, reason, prefs.getString(KEY_LAST_FAIL_LOG, "").orEmpty())
+    }
+
+    /** Why the daemon is not running. */
+    enum class SpawnFailReason {
+        /** No ADB channel to 127.0.0.1:5555 — wireless debugging is off or the grant was revoked. */
+        ADB_UNREACHABLE,
+        /** ADB is alive but the kill of the stale daemon could not be dispatched. */
+        KILL_DISPATCH_FAILED,
+        /** The stale daemon survived the kill rounds; spawning over it would lose the lock race. */
+        STALE_DAEMON_ALIVE,
+        /** ADB is alive but the spawn command could not be dispatched. */
+        SPAWN_DISPATCH_FAILED,
+        /** Spawn dispatched, daemon never answered — [detail] holds the daemon log tail. */
+        DAEMON_SILENT,
+    }
+
+    /** Timestamp, classification and either an explanation or the daemon log tail. */
+    data class SpawnFailure(val ts: Long, val reason: SpawnFailReason, val detail: String)
+
+    /** Installed versionCode of our own package; a distinct sentinel if it cannot be read
+     *  (never expected — our own package always exists). The sentinel differs from the stored
+     *  default so a read failure can never be mistaken for "same version, reuse". */
+    private fun installedVersionCode(): Long = runCatching {
+        val pi = context.packageManager.getPackageInfo(context.packageName, 0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pi.longVersionCode
+        else @Suppress("DEPRECATION") pi.versionCode.toLong()
+    }.getOrDefault(VERSION_READ_FAILED)
+
+    companion object {
+        private const val TAG = "HelperBootstrap"
+        private const val PREFS = HelperBinderHolder.PREFS_NAME
+        private const val KEY_SPAWNED_VERSION = "spawned_version_code"
+        private const val KEY_LAST_FAIL_TS = "helper_last_fail_ts"
+        private const val KEY_LAST_FAIL_LOG = "helper_last_fail_log"
+        private const val KEY_LAST_FAIL_REASON = "helper_last_fail_reason"
+        private const val KEY_DAEMON_EVER_ALIVE = "daemon_ever_alive"
+        private const val FAIL_LOG_LINES = 10
+        private const val VERSION_READ_FAILED = Long.MIN_VALUE
+        private const val POLL_ATTEMPTS = 15
+        private const val POLL_INTERVAL_MS = 200L
+        // Bounded wait for the killed daemon to actually exit before respawning.
+        private const val KILL_CONFIRM_ATTEMPTS = 10
+        private const val KILL_CONFIRM_INTERVAL_MS = 100L
+        // Kill-then-wait rounds before giving up on a stale daemon (the initial kill counts as
+        // round 1; one extra kill is re-dispatched before round 2 if it is still alive).
+        private const val KILL_ROUNDS = 2
+        private const val SPAWN_TOKEN_BYTES = 16
+        // Wait for a re-announce before killing a live daemon on broadcast-only firmwares.
+        // Longer than one daemon re-announce interval (10 s) so a single missed tick is enough.
+        private const val REANNOUNCE_WAIT_MS = 12_000L
+        private const val REANNOUNCE_POLL_INTERVAL_MS = 500L
+        private const val REANNOUNCE_POLL_ATTEMPTS = (REANNOUNCE_WAIT_MS / REANNOUNCE_POLL_INTERVAL_MS).toInt()
+    }
+}

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BYDMate</string>
+    <string name="app_name">BYDMateCN</string>
     <string name="settings_language_title">Idioma</string>
     <string name="settings_font_scale_title">Tamanho do texto</string>
     <string name="settings_font_scale_desc">Aplica-se às telas do aplicativo e às janelas do agente de voz. O widget e o painel não mudam.</string>
@@ -86,7 +86,7 @@
     <string name="settings_adb_restore_title">Restaurar o ADB após reiniciar</string>
     <string name="settings_adb_restore_desc">Para firmwares em que o ADB desliga a cada reinício. É necessário Wi-Fi ligado.</string>
     <string name="settings_adb_restore_help_title">Como funciona a restauração do ADB</string>
-    <string name="settings_adb_restore_help_body">Nos firmwares DiLink mais recentes (desde o verão de 2026) a porta ADB fecha a cada reinício e o BYDMate perde o acesso às funções de controlo do carro.\n\nA aplicação consegue repor o ADB através da depuração sem fios integrada no Android. Para isso:\n\n1. O Wi-Fi do carro tem de estar ligado e associado a uma rede: a de casa, a partilha do telemóvel ou qualquer outra. Sem Wi-Fi o Android não permite ativar a depuração sem fios, é uma limitação do sistema.\n\n2. Na primeira ativação em cada rede nova aparece no ecrã a caixa do sistema “Allow wireless debugging on this network?”. Com a restauração ativada, o BYDMate confirma-a sozinho através do seu serviço de acessibilidade. Se o serviço estiver desligado, marque “Always allow on this network” e toque em ALLOW.\n\n3. Uma vez, enquanto o ADB ainda funciona, a aplicação concede a si própria a permissão de sistema necessária. Se a linha de estado mostrar “É necessário ativar”, ligue o ADB da forma habitual e reinicie a aplicação.\n\nSe no seu firmware o ADB continuar a funcionar depois de reiniciar, não precisa de ativar: a linha de estado mostra “Não é necessário”.</string>
+    <string name="settings_adb_restore_help_body">Nos firmwares DiLink mais recentes (desde o verão de 2026) a porta ADB fecha a cada reinício e o BYDMateCN perde o acesso às funções de controlo do carro.\n\nA aplicação consegue repor o ADB através da depuração sem fios integrada no Android. Para isso:\n\n1. O Wi-Fi do carro tem de estar ligado e associado a uma rede: a de casa, a partilha do telemóvel ou qualquer outra. Sem Wi-Fi o Android não permite ativar a depuração sem fios, é uma limitação do sistema.\n\n2. Na primeira ativação em cada rede nova aparece no ecrã a caixa do sistema “Allow wireless debugging on this network?”. Com a restauração ativada, o BYDMateCN confirma-a sozinho através do seu serviço de acessibilidade. Se o serviço estiver desligado, marque “Always allow on this network” e toque em ALLOW.\n\n3. Uma vez, enquanto o ADB ainda funciona, a aplicação concede a si própria a permissão de sistema necessária. Se a linha de estado mostrar “É necessário ativar”, ligue o ADB da forma habitual e reinicie a aplicação.\n\nSe no seu firmware o ADB continuar a funcionar depois de reiniciar, não precisa de ativar: a linha de estado mostra “Não é necessário”.</string>
     <string name="settings_adb_restore_status_not_needed">Não é necessário: o ADB já funciona</string>
     <string name="settings_adb_restore_status_needs_activation">É necessário ativar: ligue o ADB uma vez e reinicie a aplicação</string>
     <string name="settings_adb_restore_status_waiting_wifi">À espera de Wi-Fi</string>
@@ -98,7 +98,7 @@
     <string name="settings_cloud_wifi_title">Nuvem BYD via Wi-Fi</string>
     <string name="settings_cloud_wifi_desc">O app BYD no telefone vê o carro quando ele está no Wi-Fi. Carros nos novos servidores BYD precisam de uma VPN chinesa.</string>
     <string name="settings_cloud_wifi_help_title">Como funciona a nuvem BYD via Wi-Fi</string>
-    <string name="settings_cloud_wifi_help_body">Sem ligação à nuvem BYD não chegam atualizações pelo ar, não funcionam a chave NFC nem o controle do carro pelo app BYD no telefone.\n\nCom esta opção o BYDMate liga o carro à nuvem via Wi-Fi: a rede de casa, o hotspot do telefone ou qualquer outra rede com internet.\n\nCondições:\n\n1. Carros nos novos servidores BYD precisam de uma VPN chinesa: o servidor só aceita ligações de um endereço chinês. O mais fiável é uma VPN no roteador a que o carro se liga, porque não depende da central multimídia. Um app de VPN na própria central só funciona enquanto ela está ligada.\n\n2. Se o carro já tem dados móveis próprios, nada muda: a nuvem já funciona.\n\nAo desligar a opção, o app devolve as configurações de ligação anteriores do carro.</string>
+    <string name="settings_cloud_wifi_help_body">Sem ligação à nuvem BYD não chegam atualizações pelo ar, não funcionam a chave NFC nem o controle do carro pelo app BYD no telefone.\n\nCom esta opção o BYDMateCN liga o carro à nuvem via Wi-Fi: a rede de casa, o hotspot do telefone ou qualquer outra rede com internet.\n\nCondições:\n\n1. Carros nos novos servidores BYD precisam de uma VPN chinesa: o servidor só aceita ligações de um endereço chinês. O mais fiável é uma VPN no roteador a que o carro se liga, porque não depende da central multimídia. Um app de VPN na própria central só funciona enquanto ela está ligada.\n\n2. Se o carro já tem dados móveis próprios, nada muda: a nuvem já funciona.\n\nAo desligar a opção, o app devolve as configurações de ligação anteriores do carro.</string>
     <string name="settings_cloud_wifi_status_connected">Ligado à nuvem BYD</string>
     <string name="settings_cloud_wifi_status_own_cellular">O carro tem dados móveis próprios, a nuvem já funciona</string>
     <string name="settings_cloud_wifi_status_waiting">Aguardando Wi-Fi com internet</string>
@@ -117,14 +117,14 @@
     <string name="adb_verdict_link_more">Detalhes</string>
     <string name="adb_dialog_not_enabled_title">ADB está desligado</string>
     <string name="adb_dialog_not_enabled_body">Sem ADB, os dados em tempo real, o controle do carro, a tela dividida, o painel de instrumentos e o botão do volante não funcionam. O histórico de viagens continua disponível.</string>
-    <string name="adb_enable_step_1">1. Ative o ADB seguindo o guia: BYDMate no GitHub, seção “Enable ADB”</string>
-    <string name="adb_enable_step_2">2. Volte ao BYDMate e toque em “Verificar”</string>
+    <string name="adb_enable_step_1">1. Ative o ADB seguindo o guia: BYDMateCN no GitHub, seção “Enable ADB”</string>
+    <string name="adb_enable_step_2">2. Volte ao BYDMateCN e toque em “Verificar”</string>
     <string name="adb_dialog_off_after_reboot_title">O ADB desligou após reiniciar</string>
-    <string name="adb_dialog_off_after_reboot_body">Neste firmware o ADB desliga a cada reinício. O BYDMate consegue ligá-lo sozinho, é preciso Wi-Fi.</string>
+    <string name="adb_dialog_off_after_reboot_body">Neste firmware o ADB desliga a cada reinício. O BYDMateCN consegue ligá-lo sozinho, é preciso Wi-Fi.</string>
     <string name="adb_dialog_off_after_reboot_body_unsupported">Neste firmware o ADB desliga a cada reinício. Ative-o de novo seguindo o guia no GitHub, seção “Enable ADB”.</string>
     <string name="adb_dialog_no_access_title">Sem acesso ao ADB</string>
     <string name="adb_dialog_no_access_body">Confirme o pedido na tela ou conecte o ADB de novo e depois toque em “Verificar”.</string>
-    <string name="adb_dialog_helper_down_title">O assistente do BYDMate não iniciou</string>
+    <string name="adb_dialog_helper_down_title">O assistente do BYDMateCN não iniciou</string>
     <string name="adb_dialog_helper_down_body">O ADB funciona, mas o assistente não responde. Ative a gravação de logs (Configurações, “Serviço e dados”, “Gravar logs”), espere um minuto, pare e envie o arquivo ao desenvolvedor.</string>
     <string name="adb_dialog_close">Fechar</string>
     <string name="adb_dialog_check">Verificar</string>
@@ -243,7 +243,7 @@
     <string name="settings_model_picker_loading">Carregando modelos...</string>
     <string name="settings_widget_section_header">Widget flutuante</string>
     <string name="settings_widget_show_soc_label">Mostrar widget de SoC</string>
-    <string name="settings_widget_hints">- Toque longo no widget - oculta até o BYDMate ser aberto na próxima vez.\n- Arraste para a lixeira na parte inferior - desliga completamente.\n- Toque normal - abre o BYDMate.</string>
+    <string name="settings_widget_hints">- Toque longo no widget - oculta até o BYDMateCN ser aberto na próxima vez.\n- Arraste para a lixeira na parte inferior - desliga completamente.\n- Toque normal - abre o BYDMateCN.</string>
     <string name="settings_widget_hide_youtube_label">Ocultar sobre o YouTube</string>
     <string name="settings_widget_hide_youtube_description">O painel de botões fica oculto enquanto o YouTube está na tela</string>
     <string name="settings_widget_home_only_label">Mostrar só na tela inicial</string>
@@ -261,20 +261,20 @@
     <string name="orb_agent">Agente:</string>
     <string name="settings_voice_native_assistant_header">Assistente de voz nativo da BYD</string>
     <string name="settings_voice_disable_native_label">Desativar o assistente de voz integrado</string>
-    <string name="settings_voice_disable_native_description">Oculta o assistente de voz nativo da BYD para que ele não interrompa. O app Shortcuts (comandos rápidos) desaparece junto, ele faz parte do assistente. Reversível: desligue o botão e reinicie a central multimídia, os dois voltam. Antes de desinstalar o BYDMate, desligue este botão, senão o assistente integrado continuará desativado.</string>
+    <string name="settings_voice_disable_native_description">Oculta o assistente de voz nativo da BYD para que ele não interrompa. O app Shortcuts (comandos rápidos) desaparece junto, ele faz parte do assistente. Reversível: desligue o botão e reinicie a central multimídia, os dois voltam. Antes de desinstalar o BYDMateCN, desligue este botão, senão o assistente integrado continuará desativado.</string>
     <string name="settings_voice_disable_native_confirm_title">Desativar o assistente integrado?</string>
-    <string name="settings_voice_disable_native_confirm_body">O assistente integrado da BYD será desativado no sistema do carro. Antes de desinstalar o BYDMate, desligue este botão, senão o assistente integrado continuará desativado. Se o app já foi desinstalado: instale o BYDMate de novo, desligue o botão e reinicie a central multimídia.</string>
+    <string name="settings_voice_disable_native_confirm_body">O assistente integrado da BYD será desativado no sistema do carro. Antes de desinstalar o BYDMateCN, desligue este botão, senão o assistente integrado continuará desativado. Se o app já foi desinstalado: instale o BYDMateCN de novo, desligue o botão e reinicie a central multimídia.</string>
     <string name="settings_voice_disable_native_confirm_button">Desativar</string>
     <string name="settings_voice_native_assistant_reboot_note">Entra em vigor após reiniciar a central multimídia.</string>
     <string name="settings_widget_opacity_label">Opacidade</string>
     <string name="settings_widget_scale_label">Tamanho</string>
     <string name="settings_widget_tap_section_header">Toque no widget</string>
     <string name="settings_widget_left_tap_zoning_label">Zonas de toque</string>
-    <string name="settings_widget_left_tap_zoning_description">1/3 esquerdo - abre o app selecionado; o restante - BYDMate.</string>
+    <string name="settings_widget_left_tap_zoning_description">1/3 esquerdo - abre o app selecionado; o restante - BYDMateCN.</string>
     <string name="settings_widget_left_tap_label">App para toque à esquerda</string>
     <string name="settings_widget_left_tap_description">O padrão é o Yandex Navigator. Se o aplicativo for removido, o toque não funcionará.</string>
     <string name="settings_widget_buttons_label">Botões do widget</string>
-    <string name="settings_widget_buttons_description">Um toque exibe 4 botões, dois toques abrem o BYDMate. Um botão executa uma regra com o gatilho «Pressionamento de botão».</string>
+    <string name="settings_widget_buttons_description">Um toque exibe 4 botões, dois toques abrem o BYDMateCN. Um botão executa uma regra com o gatilho «Pressionamento de botão».</string>
     <string name="settings_places_section_header">Locais</string>
     <string name="settings_places_entry_title">Pontos de automação</string>
     <string name="settings_places_entry_description">Casa, trabalho, locais favoritos - Gatilhos de entrada / saída do local</string>
@@ -431,7 +431,7 @@
     <string name="automation_trigger_night">Noite</string>
     <string name="automation_trigger_dawn">Madrugada</string>
     <string name="automation_trigger_dusk">Anoitecer</string>
-    <string name="automation_trigger_service_start">Inicialização do BYDMate</string>
+    <string name="automation_trigger_service_start">Inicialização do BYDMateCN</string>
     <string name="automation_trigger_internet">Internet disponível</string>
     <string name="automation_add_condition_button">+ Adicionar condição</string>
     <string name="automation_trigger_type_param">Parâmetro</string>
@@ -439,7 +439,7 @@
     <string name="automation_trigger_type_place_empty_hint">Adicione primeiro um local com o botão Locais no topo</string>
     <string name="automation_trigger_type_time_of_day">Período do dia</string>
     <string name="automation_trigger_type_schedule">Horário / programação</string>
-    <string name="automation_trigger_type_service_start">Inicialização do BYDMate</string>
+    <string name="automation_trigger_type_service_start">Inicialização do BYDMateCN</string>
     <string name="automation_trigger_type_internet">Internet disponível</string>
     <string name="automation_trigger_type_button_press">Pressionamento de botão</string>
     <string name="automation_trigger_button_label">Botão %1$d</string>
@@ -447,7 +447,7 @@
     <string name="automation_trigger_steering_key_unassigned">Tecla não atribuída</string>
     <string name="automation_trigger_steering_key_assign">atribuir</string>
     <string name="automation_steering_key_occupied_projection">Esta tecla liga a navegação no painel de instrumentos. Libere-a em Configurações, seção Tela, ou escolha outra.</string>
-    <string name="automation_steering_key_occupied_voice">Esta tecla chama o assistente de voz do BYDMate. Altere a tecla em Configurações, seção Agente de voz, ou escolha outra.</string>
+    <string name="automation_steering_key_occupied_voice">Esta tecla chama o assistente de voz do BYDMateCN. Altere a tecla em Configurações, seção Agente de voz, ou escolha outra.</string>
     <string name="automation_steering_key_occupied_knob">O toque no botão giratório está ocupado pela função play/pause. Desative-a em Configurações, seção Tela, ou escolha outra tecla.</string>
 
     <!-- Schedule trigger (exact time / range + days of week) -->
@@ -518,7 +518,7 @@
     <string name="automation_speak_text_label">Texto a falar</string>
     <string name="automation_agent_prompt_label">Pedido ao agente de voz</string>
     <string name="automation_overlay_permission_title">Permissão necessária</string>
-    <string name="automation_overlay_permission_text">Notificações com som são exibidas como um popup sobre outros aplicativos. Abra as configurações do sistema e ative \"Exibir sobre outros aplicativos\" para o BYDMate.</string>
+    <string name="automation_overlay_permission_text">Notificações com som são exibidas como um popup sobre outros aplicativos. Abra as configurações do sistema e ative \"Exibir sobre outros aplicativos\" para o BYDMateCN.</string>
     <string name="automation_overlay_open_settings">Abrir configurações</string>
     <string name="automation_overlay_later">Mais tarde</string>
     <string name="automation_tap_to_configure">Toque para configurar...</string>
@@ -570,9 +570,9 @@
     <string name="welcome_tariff_home_label">Carregamento residencial AC (%1$s/kWh)</string>
     <string name="welcome_tariff_dc_label">Carregamento rápido DC (%1$s/kWh)</string>
     <string name="welcome_autostart_step_title">Inicialização automática no DiLink</string>
-    <string name="welcome_autostart_step_description">Para fazer o BYDMate iniciar automaticamente quando a central multimídia ligar:</string>
+    <string name="welcome_autostart_step_description">Para fazer o BYDMateCN iniciar automaticamente quando a central multimídia ligar:</string>
     <string name="welcome_autostart_instruction_1">1. Toque no botão à direita</string>
-    <string name="welcome_autostart_instruction_2">2. Encontre o BYDMate na lista</string>
+    <string name="welcome_autostart_instruction_2">2. Encontre o BYDMateCN na lista</string>
     <string name="welcome_autostart_instruction_3">3. O interruptor deve estar DESLIGADO</string>
     <string name="welcome_autostart_off_note">DESLIGADO = inicialização automática PERMITIDA. Esta é uma lista negra: os aplicativos desativados nela PODEM iniciar sozinhos.</string>
     <string name="welcome_autostart_apk_update_warning">Verifique esta configuração após atualizar o APK!</string>
@@ -580,13 +580,13 @@
     <string name="welcome_autostart_dilink_hint">Se a inicialização automática não funcionar, adicione isto no Di+:</string>
     <string name="welcome_autostart_dilink_instruction">Di+ -&gt; Predefinidos -&gt; Tarefas de inicialização</string>
     <string name="welcome_autostart_command_copied_toast">Copiado!</string>
-    <string name="welcome_autostart_command_explanation">打开应用 = \"abrir aplicativo\" + nome do pacote.\nPara dois aplicativos separados por ponto e vírgula:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmate.app</string>
+    <string name="welcome_autostart_command_explanation">打开应用 = \"abrir aplicativo\" + nome do pacote.\nPara dois aplicativos separados por ponto e vírgula:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmatecn.app</string>
     <string name="welcome_system_settings_section_title">Configurações do sistema</string>
     <string name="welcome_autostart_open_settings_button">Abrir configurações de inicialização automática</string>
     <string name="welcome_autostart_open_settings_error">Não foi possível abrir as configurações de inicialização automática do DiLink. As configurações do aplicativo foram abertas.</string>
     <string name="welcome_loading_default">Carregando...</string>
     <string name="welcome_back_button">Voltar</string>
-    <string name="welcome_done_button">Abrir o BYDMate</string>
+    <string name="welcome_done_button">Abrir o BYDMateCN</string>
     <string name="welcome_saving_settings_status">Salvando configurações...</string>
     <string name="welcome_updating_data_status">Atualizando dados...</string>
     <string name="welcome_importing_trips_status">Importando viagens...</string>
@@ -603,7 +603,7 @@
     <string name="widget_trip_km_value">%1$.1f km</string>
     <string name="widget_km_per_percent">%1$.1f</string>
     <string name="widget_voltage_value">%1$.1f V</string>
-    <string name="widget_toast_hidden">Widget oculto. Abra o BYDMate - ele retornará.</string>
+    <string name="widget_toast_hidden">Widget oculto. Abra o BYDMateCN - ele retornará.</string>
     <string name="widget_button_no_rules">Nenhuma regra para o botão %1$d</string>
     <string name="widget_trash_release">solte - widget oculto</string>
     <string name="widget_trash_hint">arraste aqui para ocultar</string>
@@ -662,8 +662,8 @@
     <string name="nav_tab_charges">Carregamento</string>
     <string name="nav_tab_automation">Automação</string>
     <string name="nav_tab_settings">Configurações</string>
-    <string name="nav_autostart_dialog_title">BYDMate atualizado para v%1$s</string>
-    <string name="nav_autostart_dialog_body">Verifique se o trabalho em segundo plano não está bloqueado:\n\nConfigurações do DiLink - Geral - Desativar aplicativos em segundo plano - BYDMate - DESLIGADO\n\nSe o interruptor estiver LIGADO, o DiLink pode encerrar o serviço do BYDMate - e as viagens e o GPS não serão gravados.</string>
+    <string name="nav_autostart_dialog_title">BYDMateCN atualizado para v%1$s</string>
+    <string name="nav_autostart_dialog_body">Verifique se o trabalho em segundo plano não está bloqueado:\n\nConfigurações do DiLink - Geral - Desativar aplicativos em segundo plano - BYDMateCN - DESLIGADO\n\nSe o interruptor estiver LIGADO, o DiLink pode encerrar o serviço do BYDMateCN - e as viagens e o GPS não serão gravados.</string>
     <string name="nav_autostart_dialog_button">Entendi</string>
     <string name="nav_autostart_open_settings_error">Não foi possível abrir as configurações de inicialização automática do DiLink. As configurações do aplicativo foram abertas.</string>
     <string name="applauncher_title">Escolher aplicativo</string>
@@ -684,7 +684,7 @@
     <string name="battery_health_pumped_value">%1$.0f kWh</string>
     <string name="battery_health_avg_since_charge_label">desde a última carga</string>
     <string name="battery_health_avg_all_time_label">todo o período</string>
-    <string name="battery_health_avg_soc_hint" formatted="false">Nível de carga médio ponderado pelo tempo: quanto mais a bateria fica carregada, maior o valor. Baterias LFP da BYD envelhecem menos quando mantidas mais baixas: armazenar com carga alta acelera o envelhecimento. Referência: até 65% ótimo, 65-85% normal, acima de 85% considere carregar mais tarde ou com menos frequência. Uma carga a 100% a cada 1-2 semanas ainda é necessária para balancear as células. Calculado pelo histórico de viagens e cargas do BYDMate.</string>
+    <string name="battery_health_avg_soc_hint" formatted="false">Nível de carga médio ponderado pelo tempo: quanto mais a bateria fica carregada, maior o valor. Baterias LFP da BYD envelhecem menos quando mantidas mais baixas: armazenar com carga alta acelera o envelhecimento. Referência: até 65% ótimo, 65-85% normal, acima de 85% considere carregar mais tarde ou com menos frequência. Uma carga a 100% a cada 1-2 semanas ainda é necessária para balancear as células. Calculado pelo histórico de viagens e cargas do BYDMateCN.</string>
     <string name="summary_unit_km">km</string>
     <string name="summary_label_mileage">Quilometragem</string>
     <string name="summary_unit_kwh">kWh</string>
@@ -717,7 +717,7 @@
     <string name="update_downloading_done">Baixado. Instalando...</string>
     <string name="update_downloading_paused">Pausado...</string>
     <string name="update_download_error">Erro no download (código %1$d)</string>
-    <string name="update_download_notification_description">Atualização do BYDMate</string>
+    <string name="update_download_notification_description">Atualização do BYDMateCN</string>
     <string name="update_downloading_start" formatted="false">Baixando: 0%</string>
     <string name="charges_day_today">hoje (%1$s)</string>
     <string name="charges_day_yesterday">ontem</string>
@@ -835,7 +835,7 @@
     <string name="settings_tg_backup_disconnect">Desconectar</string>
     <string name="settings_tg_backup_hint">Crie um bot no @BotFather, cole o token dele e toque em “Verificar”. O arquivo não é criptografado, o bot e o chat devem ser só seus.</string>
     <string name="settings_tg_backup_checking">Verificando…</string>
-    <string name="settings_tg_backup_greeting">BYDMate conectado. Os backups chegarão aqui.</string>
+    <string name="settings_tg_backup_greeting">BYDMateCN conectado. Os backups chegarão aqui.</string>
     <string name="settings_backup_share">Compartilhar</string>
     <string name="settings_backup_close">Fechar</string>
     <string name="settings_backup_share_hint">O arquivo contém suas chaves e o histórico de viagens, compartilhe só com quem você confia.</string>
@@ -857,7 +857,7 @@
     <string name="settings_backup_part_keys_desc">OpenRouter, ABRP, bot do Telegram. Desmarque se for entregar o arquivo a outra pessoa.</string>
     <string name="settings_backup_part_absent">Não está no arquivo</string>
     <string name="backup_error_newer_archive">O backup foi criado por uma versão mais nova do app (esquema %1$d, atual %2$d). Atualize o app antes de restaurar.</string>
-    <string name="backup_error_not_bydmate_db">O arquivo de banco de dados do backup não é um banco do BYDMate</string>
+    <string name="backup_error_not_bydmate_db">O arquivo de banco de dados do backup não é um banco do BYDMateCN</string>
     <string name="backup_error_merge_integrity">O banco de dados não passou na verificação de integridade após a mesclagem com o backup</string>
     <string name="backup_error_export_integrity">A cópia do banco de dados para exportação não passou na verificação de integridade</string>
     <string name="backup_error_parts_mismatch">O arquivo de backup está danificado: o conteúdo não corresponde à descrição</string>
@@ -1167,7 +1167,7 @@
     <string name="auto_msg_media_volume_missing">Ação nº %1$d: nível de volume não definido</string>
     <!-- automation special triggers/actions -->
     <string name="auto_trig_place_enter">Entrada em «%1$s»</string>
-    <string name="auto_trig_service_start">Inicialização do BYDMate</string>
+    <string name="auto_trig_service_start">Inicialização do BYDMateCN</string>
     <string name="auto_trig_network_available">Internet disponível</string>
     <string name="auto_act_media_volume">Volume de mídia: 2</string>
     <string name="auto_trig_time_of_day_night">Noite</string>
@@ -1322,19 +1322,19 @@
     <string name="settings_fid_recorder_file">Arquivo: %1$s</string>
     <string name="settings_fid_recorder_error">Não está gravando: %1$s</string>
     <string name="settings_quiet_notification_title">Notificação silenciosa</string>
-    <string name="settings_quiet_notification_desc">A notificação do BYDMate vai para a lista recolhida sem ícone na barra de status. Não é possível removê-la totalmente: o Android exige uma notificação para o trabalho em segundo plano</string>
+    <string name="settings_quiet_notification_desc">A notificação do BYDMateCN vai para a lista recolhida sem ícone na barra de status. Não é possível removê-la totalmente: o Android exige uma notificação para o trabalho em segundo plano</string>
     <string name="settings_config_restore_desc">Os dados atuais serão substituídos pelo conteúdo do arquivo.</string>
     <string name="settings_autostart_header">Início automático</string>
-    <string name="settings_autostart_desc">O BYDMate inicia junto com o carro. Se uma atualização de firmware desativou o início automático, reative-o na configuração do sistema</string>
+    <string name="settings_autostart_desc">O BYDMateCN inicia junto com o carro. Se uma atualização de firmware desativou o início automático, reative-o na configuração do sistema</string>
     <string name="settings_places_inline_hint">O ponto é adicionado pelo mapa ou pela posição atual do carro</string>
     <string name="settings_agent_debug_row_title">Teste e depuração</string>
     <string name="settings_agent_debug_row_desc">O teste do modelo verifica a conexão, o chat mostra o diálogo com o agente em texto</string>
 
     <!-- Donation dialog + support card -->
-    <string name="donate_auto_title">Obrigado por usar o BYDMate</string>
-    <string name="donate_auto_body">O projeto é sem fins lucrativos e totalmente gratuito, desenvolvido por puro entusiasmo. Se o BYDMate foi útil para você e quiser agradecer, apoie o desenvolvimento: com uma transferência de USDT nas redes EVM ou com cartão via ЮMoney.</string>
+    <string name="donate_auto_title">Obrigado por usar o BYDMateCN</string>
+    <string name="donate_auto_body">O projeto é sem fins lucrativos e totalmente gratuito, desenvolvido por puro entusiasmo. Se o BYDMateCN foi útil para você e quiser agradecer, apoie o desenvolvimento: com uma transferência de USDT nas redes EVM ou com cartão via ЮMoney.</string>
     <string name="donate_settings_title">Apoiar o projeto</string>
-    <string name="donate_settings_body">O BYDMate é sem fins lucrativos e gratuito. Se quiser apoiar o desenvolvimento, envie USDT para o endereço abaixo ou pague com cartão via ЮMoney.</string>
+    <string name="donate_settings_body">O BYDMateCN é sem fins lucrativos e gratuito. Se quiser apoiar o desenvolvimento, envie USDT para o endereço abaixo ou pague com cartão via ЮMoney.</string>
     <string name="donate_qr_hint">Aponte a câmera do celular para o código</string>
     <string name="donate_address_label">Endereço USDT · redes EVM</string>
     <string name="donate_copy_button">Copiar endereço</string>
@@ -1348,7 +1348,7 @@
     <string name="donate_already_button">Já apoiei</string>
     <string name="donate_close_button">Fechar</string>
     <string name="settings_donate_header">Apoio</string>
-    <string name="settings_donate_card_body">O BYDMate é gratuito e sem fins lucrativos. Se ele é útil para você, você pode apoiar o desenvolvimento.</string>
+    <string name="settings_donate_card_body">O BYDMateCN é gratuito e sem fins lucrativos. Se ele é útil para você, você pode apoiar o desenvolvimento.</string>
     <string name="settings_donate_button">Apoiar o projeto</string>
 
     <!-- Integrations: OpenRouter / Exa / weather attribution -->
@@ -1489,7 +1489,7 @@
     <string name="split_picker_title_narrow">Escolha um aplicativo para o painel estreito (1/3)</string>
     <string name="split_freeform_reboot_hint">A tela dividida será ativada após reiniciar o carro</string>
     <string name="split_freeform_unsupported_hint">A tela dividida não está disponível no firmware deste carro</string>
-    <string name="navigate_maps_shortcut_failed">O Mapas não aceitou a rota: adicione um Local «Casa» ou «Trabalho» no BYDMate</string>
+    <string name="navigate_maps_shortcut_failed">O Mapas não aceitou a rota: adicione um Local «Casa» ou «Trabalho» no BYDMateCN</string>
     <string name="split_launch_failed">Falha ao iniciar a tela dividida</string>
     <string name="split_launch_failed_adb">Falha ao iniciar a tela dividida: é necessário ADB desbloqueado</string>
     <!-- Automation action: split_screen -->
@@ -1552,10 +1552,10 @@
     <string name="settings_split_app_not_selected">não selecionado</string>
     <string name="settings_split_howto_body">Há três maneiras de ligar a tela dividida.\nA mais simples: toque no terço esquerdo do widget flutuante. Para isso, ative Zonas de toque na seção Toque no widget e escolha Iniciar tela dividida em Ação do toque esquerdo.\nPelas automações: adicione a ação Tela dividida a uma regra. Ao lado ficam Fechar tela dividida e Alternar tela dividida.\nPor voz: basta pedir ao Agente de voz para ligar a tela dividida.</string>
     <string name="settings_split_mechanism_title">Mecanismo de divisão</string>
-    <string name="settings_split_mechanism_freeform">Janelas do BYDMate</string>
+    <string name="settings_split_mechanism_freeform">Janelas do BYDMateCN</string>
     <string name="settings_split_mechanism_native">Divisão nativa</string>
     <string name="settings_split_mechanism_native_hint">A divisão é feita pelo firmware do carro. O resultado depende do firmware: dois painéis de 1/3 e 2/3 ou metade a metade, escolhendo o segundo aplicativo na tela.</string>
-    <string name="settings_split_mechanism_platformized_hint">Neste firmware o próprio carro divide a tela: os painéis de 1/3 e 2/3, o divisor e o gesto de troca são nativos. O BYDMate apenas inicia o par escolhido e devolve o aplicativo ao seu painel.</string>
+    <string name="settings_split_mechanism_platformized_hint">Neste firmware o próprio carro divide a tela: os painéis de 1/3 e 2/3, o divisor e o gesto de troca são nativos. O BYDMateCN apenas inicia o par escolhido e devolve o aplicativo ao seu painel.</string>
     <string name="settings_split_try_native_hint">Experimente o modo Divisão nativa.</string>
     <string name="split_feature_disabled">Tela dividida desativada nas configurações</string>
     <!-- Tech panel: compact card cell + full screen -->
@@ -1656,9 +1656,9 @@
     <string name="post_restore_download_asr">Baixar 226 MB</string>
     <string name="post_restore_download">Baixar</string>
     <string name="post_restore_close">Fechar</string>
-    <string name="notif_channel_tracking_name">BYDMate: viagens e carregamentos</string>
+    <string name="notif_channel_tracking_name">BYDMateCN: viagens e carregamentos</string>
     <string name="notif_channel_tracking_desc">Registo de viagens e carregamentos</string>
-    <string name="notif_channel_tracking_quiet_name">BYDMate: viagens e carregamentos (silencioso)</string>
+    <string name="notif_channel_tracking_quiet_name">BYDMateCN: viagens e carregamentos (silencioso)</string>
     <string name="notif_channel_tracking_quiet_desc">Registo de viagens e carregamentos, recolhido nas notificações</string>
     <string name="notif_channel_auto_silent_name">Automações sem som</string>
     <string name="notif_channel_auto_silent_desc">Notificações de automações sem som</string>
@@ -1683,7 +1683,7 @@
     <string name="automation_import_save_failed">Não foi possível adicionar a automação: %1$s</string>
     <string name="automation_import_pick_title">Arquivos de automação em Download</string>
     <string name="automation_import_pick_empty">Nenhum arquivo bydmate_rule_*.json na pasta Download</string>
-    <string name="automation_import_invalid">Não foi possível ler o arquivo: não é uma automação do BYDMate</string>
+    <string name="automation_import_invalid">Não foi possível ler o arquivo: não é uma automação do BYDMateCN</string>
     <string name="automation_import_newer_version">Automação de uma versão mais nova, atualize o app</string>
     <string name="automation_import_power_off_only">Esta automação só podia disparar com o carro desligado, e essa condição não existe mais</string>
     <string name="automation_import_preview_title">Confira a automação</string>
@@ -1741,7 +1741,7 @@
     <string name="dispatch_volume_invalid">Nível de volume inválido: %1$s</string>
     <string name="dispatch_package_missing">packageName não definido</string>
     <string name="dispatch_app_not_installed">Aplicativo não instalado: %1$s</string>
-    <string name="dispatch_app_close_self">O BYDMate não fecha a si mesmo</string>
+    <string name="dispatch_app_close_self">O BYDMateCN não fecha a si mesmo</string>
     <string name="dispatch_app_close_failed">Não foi possível fechar o aplicativo: %1$s</string>
     <string name="dispatch_media_no_session">Nenhum player aberto</string>
     <string name="dispatch_media_key_invalid">Comando de player desconhecido</string>
@@ -1792,7 +1792,7 @@
     <string name="tg_report_field_temps">Temperatura</string>
     <string name="tg_report_field_openings">O que está aberto</string>
     <string name="tg_report_field_tires">Pressão dos pneus</string>
-    <string name="tg_report_header_off">BYDMate: carro desligado às %1$s</string>
+    <string name="tg_report_header_off">BYDMateCN: carro desligado às %1$s</string>
     <string name="tg_report_map_link">Abrir no mapa</string>
     <string name="tg_report_soc">carga %1$s</string>
     <string name="tg_report_soc_value">%1$d%%</string>

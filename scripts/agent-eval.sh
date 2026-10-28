@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the voice agent's eval set (app/src/test/kotlin/com/bydmate/app/agent/AgentEvalCases.kt)
+# Runs the voice agent's eval set (app/src/test/kotlin/com/bydmatecn/app/agent/AgentEvalCases.kt)
 # against a REAL model and prints a per-case verdict. Costs tokens; run it by hand before a
 # release, never in CI.
 #

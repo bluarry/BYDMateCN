@@ -21,11 +21,11 @@
 }
 
 # Keep data classes for Room
--keepclassmembers class com.bydmate.app.data.local.entity.** { *; }
--keepclassmembers class com.bydmate.app.data.local.dao.** { *; }
+-keepclassmembers class com.bydmatecn.app.data.local.entity.** { *; }
+-keepclassmembers class com.bydmatecn.app.data.local.dao.** { *; }
 
 # Guard the reflective app_process entry point for the binder daemon
--keep public class com.bydmate.app.helper.HelperDaemon { public static void main(java.lang.String[]); }
+-keep public class com.bydmatecn.app.helper.HelperDaemon { public static void main(java.lang.String[]); }
 
 # --- П10 R8 keep-set: reflective / JNI entry points R8 must not strip or rename ---
 
@@ -35,15 +35,15 @@
 -keep class com.k2fsa.sherpa.** { *; }
 -dontwarn com.k2fsa.sherpa.**
 
-# Our TTS sample callback (com.bydmate.app.voice.TtsSamplesCallback) is
+# Our TTS sample callback (com.bydmatecn.app.voice.TtsSamplesCallback) is
 # instantiated in Kotlin and invoked from sherpa native code -- keep name+members.
--keep class com.bydmate.app.voice.TtsSamplesCallback { *; }
+-keep class com.bydmatecn.app.voice.TtsSamplesCallback { *; }
 
-# The helper package runs under app_process via reflection (the bydmate_helper
+# The helper package runs under app_process via reflection (the bydmatecn_helper
 # binder daemon: HelperDaemon.main entry + HelperBinderProtocol transaction codes).
-# This also covers com.bydmate.app.helper.push, whose listener subclasses the vendor
+# This also covers com.bydmatecn.app.helper.push, whose listener subclasses the vendor
 # framework instantiates and calls back by name.
--keep class com.bydmate.app.helper.** { *; }
+-keep class com.bydmatecn.app.helper.** { *; }
 
 # The push listeners extend hidden BYD framework classes that exist only on the head unit
 # (see the compileOnly :bydauto-stubs module), so R8 never sees their supertypes.

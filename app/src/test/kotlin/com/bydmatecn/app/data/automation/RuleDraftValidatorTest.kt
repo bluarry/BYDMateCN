@@ -1,0 +1,279 @@
+package com.bydmatecn.app.data.automation
+
+import com.bydmatecn.app.data.local.entity.ActionDef
+import com.bydmatecn.app.data.local.entity.RuleEntity
+import com.bydmatecn.app.data.local.entity.TriggerDef
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class RuleDraftValidatorTest {
+
+    // --- validateActions ---
+
+    @Test fun telegram_report_without_items_or_text_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "telegram_report", displayName = "x", kind = "telegram_report",
+                payload = """{"fields":[],"text":"  "}""")))
+        assertEquals(ActionValidationError.TelegramReportEmpty(1), err)
+    }
+
+    @Test fun telegram_report_with_only_own_text_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "telegram_report", displayName = "x", kind = "telegram_report",
+                payload = """{"fields":[],"text":"Я выехал"}"""))))
+    }
+
+    @Test fun empty_actions_list_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(emptyList()))
+    }
+
+    @Test fun param_action_blank_command_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "param")))
+        assertEquals(ActionValidationError.CommandMissing(1), err)
+    }
+
+    @Test fun param_action_with_command_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "车窗关闭", displayName = "x", kind = "param"))))
+    }
+
+    @Test fun notification_action_blank_title_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "notification_silent",
+                payload = """{"title":"","text":""}""")))
+        assertEquals(ActionValidationError.NotifTitleEmpty(1), err)
+    }
+
+    @Test fun `merged notification kind with blank title is rejected`() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "notification",
+                payload = """{"title":"","text":"body"}""")
+        ))
+        assertTrue(err is ActionValidationError.NotifTitleEmpty)
+    }
+
+    @Test fun app_launch_action_blank_package_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "app_launch",
+                payload = """{"packageName":"","appLabel":""}""")))
+        assertEquals(ActionValidationError.AppNotSelected(1), err)
+    }
+
+    @Test fun app_close_action_blank_package_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "app_close",
+                payload = """{"packageName":"","appLabel":""}""")))
+        assertEquals(ActionValidationError.AppNotSelected(1), err)
+    }
+
+    @Test fun media_key_action_takes_only_play_or_pause() {
+        fun key(p: String) = listOf(ActionDef(command = "", displayName = "x", kind = "media_key", payload = p))
+        assertEquals(null, RuleDraftValidator.validateActions(key("play")))
+        assertEquals(null, RuleDraftValidator.validateActions(key("pause")))
+        assertEquals(ActionValidationError.MediaKeyInvalid(1), RuleDraftValidator.validateActions(key("toggle")))
+    }
+
+    @Test fun call_action_phone_too_short_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "call", payload = """{"phone":"123"}""")))
+        assertEquals(ActionValidationError.PhoneInvalid(1), err)
+    }
+
+    @Test fun call_action_valid_phone_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "call", payload = """{"phone":"+79161234567"}"""))))
+    }
+
+    @Test fun navigate_action_both_zero_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "navigate", payload = """{"lat":0,"lon":0}""")))
+        assertEquals(ActionValidationError.NavDestMissing(1), err)
+    }
+
+    @Test fun navigate_action_valid_coords_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "navigate", payload = """{"lat":55.7,"lon":37.6}"""))))
+    }
+
+    @Test fun url_action_empty_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "url", payload = """{"url":""}""")))
+        assertEquals(ActionValidationError.UrlEmpty(1), err)
+    }
+
+    @Test fun url_action_no_scheme_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "url", payload = """{"url":"example.com"}""")))
+        assertEquals(ActionValidationError.UrlNoScheme(1), err)
+    }
+
+    @Test fun url_action_with_scheme_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "url", payload = """{"url":"https://example.com"}"""))))
+    }
+
+    @Test fun yandex_music_action_blank_mode_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "yandex_music", payload = """{"mode":""}""")))
+        assertEquals(ActionValidationError.YandexMusicModeMissing(1), err)
+    }
+
+    // Signed "-N" is a relative volume step (ActionDispatcher.resolveVolumeOp), not an
+    // absolute negative level, so it is valid — was previously (incorrectly) rejected.
+    @Test fun media_volume_action_signed_negative_is_valid_relative_step() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "media_volume", displayName = "x", kind = "media_volume", payload = "-1"))))
+    }
+
+    @Test fun media_volume_action_valid_level_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "media_volume", displayName = "x", kind = "media_volume", payload = "5"))))
+    }
+
+    @Test fun media_volume_action_mute_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "media_volume", displayName = "x", kind = "media_volume", payload = "mute"))))
+    }
+
+    @Test fun media_volume_action_unmute_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "media_volume", displayName = "x", kind = "media_volume", payload = "unmute"))))
+    }
+
+    @Test fun media_volume_action_garbage_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "media_volume", displayName = "x", kind = "media_volume", payload = "loud")))
+        assertEquals(ActionValidationError.MediaVolumeMissing(1), err)
+    }
+
+    @Test fun sentry_action_invalid_payload_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "sentry", displayName = "x", kind = "sentry", payload = "2")))
+        assertEquals(ActionValidationError.SentryInvalid(1), err)
+    }
+
+    @Test fun sentry_action_valid_payload_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "sentry", displayName = "x", kind = "sentry", payload = "1"))))
+    }
+
+    @Test fun screen_action_payload_is_0_or_1() {
+        fun check(payload: String?) = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "screen", displayName = "x", kind = "screen", payload = payload)))
+        assertNull(check("0"))
+        assertNull(check("1"))
+        assertEquals(ActionValidationError.ScreenInvalid(1), check("2"))
+        assertEquals(ActionValidationError.ScreenInvalid(1), check(null))
+    }
+
+    @Test fun hotspot_action_invalid_payload_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "hotspot", displayName = "x", kind = "hotspot", payload = "2")))
+        assertEquals(ActionValidationError.HotspotInvalid(1), err)
+    }
+
+    @Test fun hotspot_action_valid_payload_on_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "hotspot", displayName = "x", kind = "hotspot", payload = "1"))))
+    }
+
+    @Test fun hotspot_action_valid_payload_off_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "hotspot", displayName = "x", kind = "hotspot", payload = "0"))))
+    }
+
+    @Test fun hotspot_action_garbage_payload_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "hotspot", displayName = "x", kind = "hotspot", payload = "on")))
+        assertEquals(ActionValidationError.HotspotInvalid(1), err)
+    }
+
+    @Test fun speak_action_blank_text_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "speak",
+                payload = """{"text":""}""")))
+        assertEquals(ActionValidationError.SpeakTextEmpty(1), err)
+    }
+
+    @Test fun speak_action_with_text_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "speak",
+                payload = """{"text":"Добро пожаловать"}"""))))
+    }
+
+    @Test fun agent_query_action_blank_prompt_is_invalid() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "agent_query",
+                payload = """{"prompt":""}""")))
+        assertEquals(ActionValidationError.AgentQueryPromptEmpty(1), err)
+    }
+
+    @Test fun agent_query_action_with_prompt_is_valid() {
+        assertNull(RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "", displayName = "x", kind = "agent_query",
+                payload = """{"prompt":"Какой заряд?"}"""))))
+    }
+
+    @Test fun second_action_failing_reports_index_2() {
+        val err = RuleDraftValidator.validateActions(listOf(
+            ActionDef(command = "车窗关闭", displayName = "ok", kind = "param"),
+            ActionDef(command = "", displayName = "bad", kind = "param"),
+        ))
+        assertEquals(ActionValidationError.CommandMissing(2), err)
+    }
+
+    // --- validateTriggers ---
+
+    private fun ruleWithVoice(id: Long, phrase: String) = RuleEntity(
+        id = id, name = "r$id",
+        triggers = TriggerDef.listToJson(listOf(
+            TriggerDef(param = "Voice", chineseName = "语音", operator = "==", value = phrase, displayName = phrase, kind = "voice"))),
+        actions = "[]",
+    )
+
+    @Test fun no_voice_triggers_is_valid() {
+        val triggers = listOf(TriggerDef(param = "SOC", chineseName = "电量百分比", operator = "<", value = "20", displayName = "x"))
+        assertNull(RuleDraftValidator.validateTriggers(triggers, -1L, emptyList()))
+    }
+
+    @Test fun blank_voice_phrase_is_invalid() {
+        val triggers = listOf(TriggerDef(param = "Voice", chineseName = "语音", operator = "==", value = "  ", displayName = "x", kind = "voice"))
+        assertEquals(TriggerValidationError.VoicePhraseEmpty, RuleDraftValidator.validateTriggers(triggers, -1L, emptyList()))
+    }
+
+    @Test fun phrase_the_builtin_parser_understands_is_valid() {
+        // Automations resolve before built-in commands, so the rule takes the phrase over.
+        val triggers = listOf(TriggerDef(param = "Voice", chineseName = "语音", operator = "==", value = "открой окна", displayName = "x", kind = "voice"))
+        assertNull(RuleDraftValidator.validateTriggers(triggers, -1L, emptyList()))
+    }
+
+    @Test fun user_phrase_of_a_builtin_command_is_invalid_and_names_the_command() {
+        val triggers = listOf(TriggerDef(param = "Voice", chineseName = "语音", operator = "==", value = "Проветрить!", displayName = "x", kind = "voice"))
+        val userPhrases = mapOf(com.bydmatecn.app.voice.VoicePhrase.normalize("проветрить") to "все окна на проветривание")
+        assertEquals(
+            TriggerValidationError.VoicePhraseBuiltin("все окна на проветривание"),
+            RuleDraftValidator.validateTriggers(triggers, -1L, emptyList(), userPhrases),
+        )
+    }
+
+    @Test fun voice_phrase_taken_by_other_rule_is_invalid_and_names_the_rule() {
+        val triggers = listOf(TriggerDef(param = "Voice", chineseName = "语音", operator = "==", value = "навигатор", displayName = "x", kind = "voice"))
+        val existing = listOf(ruleWithVoice(id = 2, phrase = "навигатор"))
+        assertEquals(TriggerValidationError.VoicePhraseTaken("r2"), RuleDraftValidator.validateTriggers(triggers, -1L, existing))
+    }
+
+    @Test fun voice_phrase_taken_by_the_rule_being_edited_is_not_a_collision() {
+        val triggers = listOf(TriggerDef(param = "Voice", chineseName = "语音", operator = "==", value = "навигатор", displayName = "x", kind = "voice"))
+        val existing = listOf(ruleWithVoice(id = 7, phrase = "навигатор"))
+        assertNull(RuleDraftValidator.validateTriggers(triggers, editingId = 7L, existingRules = existing))
+    }
+
+    @Test fun fresh_unique_voice_phrase_is_valid() {
+        val triggers = listOf(TriggerDef(param = "Voice", chineseName = "语音", operator = "==", value = "поехали", displayName = "x", kind = "voice"))
+        assertNull(RuleDraftValidator.validateTriggers(triggers, -1L, emptyList()))
+    }
+}

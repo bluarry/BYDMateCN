@@ -1,0 +1,244 @@
+package com.bydmatecn.app.service
+
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
+import android.os.Environment
+import androidx.core.content.FileProvider
+import com.bydmatecn.app.R
+import com.bydmatecn.app.BuildConfig
+import com.bydmatecn.app.util.AppStrings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.io.File
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class UpdateChecker @Inject constructor(
+    private val httpClient: OkHttpClient,
+    private val appStrings: AppStrings,
+) {
+    companion object {
+        private val GITHUB_API get() = BuildConfig.APP_UPDATE_URL
+        private const val PREFS_NAME = "update_prefs"
+        private const val KEY_LAST_CHECK = "last_check"
+        private const val KEY_AUTO_CHECK = "auto_check_enabled"
+        private const val KEY_LAST_SEEN_VERSION = "last_seen_version"
+        private const val CHECK_INTERVAL_MS = 10 * 60 * 1000L // 10 minutes (protects only against repeated launches within one session)
+
+        fun isAutoCheckEnabled(context: Context): Boolean =
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_AUTO_CHECK, false) && BuildConfig.APP_UPDATE_URL.isNotBlank()
+
+        fun setAutoCheckEnabled(context: Context, enabled: Boolean) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_AUTO_CHECK, enabled).apply()
+        }
+
+        fun getLastSeenVersion(context: Context): String? =
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getString(KEY_LAST_SEEN_VERSION, null)
+
+        fun setLastSeenVersion(context: Context, version: String) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(KEY_LAST_SEEN_VERSION, version).apply()
+        }
+    }
+
+    data class UpdateInfo(
+        val version: String,
+        val downloadUrl: String,
+        val releaseNotes: String
+    )
+
+    suspend fun checkForUpdate(context: Context, forceCheck: Boolean = false): UpdateInfo? = withContext(Dispatchers.IO) {
+        if (GITHUB_API.isBlank()) {
+            if (forceCheck) error("独立本地版尚未配置更新源，请手动安装开发者提供的APK")
+            return@withContext null
+        }
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0)
+        val now = System.currentTimeMillis()
+
+        if (!forceCheck && now - lastCheck < CHECK_INTERVAL_MS) return@withContext null
+
+        prefs.edit().putLong(KEY_LAST_CHECK, now).apply()
+
+        val request = Request.Builder()
+            .url(GITHUB_API)
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "BYDMateCN-UpdateCheck")
+            .build()
+        val body = httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw Exception("GitHub API: HTTP ${response.code}")
+            }
+            response.body?.string() ?: throw Exception("Пустой ответ от GitHub")
+        }
+
+        val json = JSONObject(body)
+        val tagName = json.optString("tag_name", "").removePrefix("v")
+        val currentVersion = getAppVersion(context)
+
+        if (tagName.isEmpty()) throw Exception("Нет tag_name в ответе GitHub")
+        if (tagName == currentVersion || !isNewer(tagName, currentVersion)) {
+            return@withContext null // genuinely up to date
+        }
+
+        val assets = json.optJSONArray("assets")
+            ?: throw Exception("Нет assets в релизе $tagName")
+        var apkUrl: String? = null
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            val name = asset.optString("name", "")
+            if (name.endsWith(".apk")) {
+                apkUrl = asset.optString("browser_download_url")
+                break
+            }
+        }
+
+        if (apkUrl == null) throw Exception("Нет APK в релизе $tagName")
+
+        UpdateInfo(
+            version = tagName,
+            downloadUrl = apkUrl,
+            releaseNotes = json.optString("body", "")
+        )
+    }
+
+    /**
+     * Download APK and report progress via [onProgress] callback.
+     * Calls [onProgress] with status strings like "Скачивание: 45%".
+     * When done, triggers the install dialog.
+     */
+    suspend fun downloadAndInstall(
+        context: Context,
+        update: UpdateInfo,
+        onProgress: (String) -> Unit = {}
+    ) = withContext(Dispatchers.IO) {
+        check(GITHUB_API.isNotBlank()) { "独立本地版未配置更新源，不能下载原BYDMate的APK" }
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+
+        // Delete old file if exists
+        val destFile = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "BYDMateCN-${update.version}.apk"
+        )
+        if (destFile.exists()) destFile.delete()
+
+        val request = DownloadManager.Request(Uri.parse(update.downloadUrl))
+            .setTitle("BYDMateCN ${update.version}")
+            .setDescription(appStrings.get(R.string.update_download_notification_description))
+            .setDestinationInExternalPublicDir(
+                Environment.DIRECTORY_DOWNLOADS,
+                "BYDMateCN-${update.version}.apk"
+            )
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+
+        val downloadId = downloadManager.enqueue(request)
+        onProgress(appStrings.get(R.string.update_downloading_start))
+
+        // Poll download progress
+        var finished = false
+        while (!finished) {
+            val query = DownloadManager.Query().setFilterById(downloadId)
+            // .use{} closes the cursor on every path — the old code only closed it inside the
+            // moveToFirst() block, leaking one cursor per poll when the row was momentarily absent.
+            val rowPresent = downloadManager.query(query)?.use { cursor ->
+                if (!cursor.moveToFirst()) return@use false
+                val status = cursor.getInt(
+                    cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)
+                )
+                when (status) {
+                    DownloadManager.STATUS_RUNNING -> {
+                        val total = cursor.getLong(
+                            cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+                        )
+                        val downloaded = cursor.getLong(
+                            cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                        )
+                        if (total > 0) {
+                            val pct = (downloaded * 100 / total).toInt()
+                            onProgress(appStrings.get(R.string.update_downloading_progress, pct))
+                        }
+                    }
+                    DownloadManager.STATUS_SUCCESSFUL -> {
+                        finished = true
+                        onProgress(appStrings.get(R.string.update_downloading_done))
+                    }
+                    DownloadManager.STATUS_FAILED -> {
+                        finished = true
+                        val reason = cursor.getInt(
+                            cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)
+                        )
+                        throw Exception(appStrings.get(R.string.update_download_error, reason))
+                    }
+                    DownloadManager.STATUS_PAUSED -> {
+                        onProgress(appStrings.get(R.string.update_downloading_paused))
+                    }
+                }
+                true
+            } ?: false
+            // Download row vanished (query null or cleared by the user): stop instead of spinning
+            // forever every 500 ms with no row that could ever flip `finished`.
+            if (!rowPresent) {
+                throw Exception(appStrings.get(R.string.update_download_error, -1))
+            }
+            if (!finished) {
+                kotlinx.coroutines.delay(500)
+            }
+        }
+
+        // Trigger install
+        withContext(Dispatchers.Main) {
+            installApk(context, update.version)
+        }
+    }
+
+    private fun installApk(context: Context, version: String) {
+        val file = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "BYDMate-$version.apk"
+        )
+        if (!file.exists()) return
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(intent)
+    }
+
+    private fun getAppVersion(context: Context): String {
+        return try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
+        } catch (e: Exception) {
+            "0.0.0"
+        }
+    }
+
+    private fun isNewer(remote: String, local: String): Boolean {
+        val r = remote.split(".").mapNotNull { it.toIntOrNull() }
+        val l = local.split(".").mapNotNull { it.toIntOrNull() }
+        for (i in 0 until maxOf(r.size, l.size)) {
+            val rv = r.getOrElse(i) { 0 }
+            val lv = l.getOrElse(i) { 0 }
+            if (rv > lv) return true
+            if (rv < lv) return false
+        }
+        return false
+    }
+}

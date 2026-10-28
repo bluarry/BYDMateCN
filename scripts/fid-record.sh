@@ -14,8 +14,8 @@
 set -euo pipefail
 
 ADB_TARGET="${ADB_TARGET:-192.168.2.69:5555}"
-PKG="com.bydmate.app"
-ACTION="com.bydmate.app.FID_RECORD"
+PKG="com.bydmatecn.app"
+ACTION="com.bydmatecn.app.FID_RECORD"
 
 cmd="${1:-status}"
 devs="${2:-}"

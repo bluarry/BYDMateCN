@@ -1,0 +1,324 @@
+package com.bydmatecn.app.data.autoservice
+
+import android.content.Context
+import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Connects to the on-device ADB daemon at 127.0.0.1:5555 (DiLink has WiFi
+ * ADB enabled in dev settings) using a persistent RSA keypair stored in
+ * `filesDir/adb_keys/`. Once paired, exposes `exec(cmd)` for one-shot
+ * shell commands.
+ *
+ * Why on-device ADB? `service call autoservice ...` requires either system
+ * UID, hidden API access, or shell UID. BYDMate runs as a normal app —
+ * ADB shell uid is the only path. See `reference_adb_on_device_pattern.md`.
+ *
+ * Implementation: hand-rolled binary ADB protocol in [AdbProtocolClient]
+ * (no external deps, no `adblib`). Auth flow uses standard RSA pubkey on
+ * port 5555 — no TLS pairing / 6-digit code, the user accepts the «Allow USB
+ * debugging?» dialog directly on DiLink.
+ */
+interface AdbOnDeviceClient {
+    /** Initiates the ADB handshake. Suspends until handshake completes or fails. */
+    suspend fun connect(): Result<Unit>
+    suspend fun isConnected(): Boolean
+    /** Why the last connect attempt failed; null after a successful one or before any. No side effects. */
+    fun lastConnectFailure(): AdbConnectFailure?
+    /** Executes a one-shot shell command and returns stdout, or null on failure. */
+    suspend fun exec(cmd: String): String?
+    /**
+     * Grants PACKAGE_USAGE_STATS appop to our own package via shell uid. The
+     * only non-autoservice write we permit through this client — needed so
+     * UsageStatsManager.queryEvents returns data for camera-overlay detection.
+     * No-op effect if already granted. Returns true on success.
+     */
+    suspend fun grantUsageStatsAppop(packageName: String): Boolean
+
+    /**
+     * Grants WRITE_SECURE_SETTINGS to our own package via shell uid, so the app can turn
+     * Android's wireless debugging back on after a reboot on firmwares that no longer keep
+     * port 5555 open (see AdbRestoreManager). Granted while the classic port is still alive,
+     * regardless of whether the restore toggle is on — afterwards there is no channel left
+     * to grant it through. Idempotent. Returns true on success.
+     */
+    suspend fun grantWriteSecureSettings(packageName: String): Boolean
+
+    /**
+     * Spawns the helper daemon under shell uid via app_process, using the app's
+     * own signed base.apk as CLASSPATH (no dex push — integrity comes from the
+     * APK signature). The daemon registers itself as the `bydmatecn_helper` binder
+     * service; reachability is verified separately by the binder client's ping,
+     * not here. Returns true if the spawn command was dispatched without error
+     * (NOT a liveness guarantee).
+     *
+     * Hardcoded cmdline + process name — caller cannot inject. Uses the raw
+     * protocol exec path (the public exec() write barrier only permits autoservice
+     * GETs and would reject this).
+     *
+     * [token] is the spawn token the daemon echoes back when it has to publish its Binder by
+     * broadcast (#64/#148). It lands in a shell command line, so it is validated to be
+     * alphanumeric — an ill-formed token throws IllegalArgumentException rather than being
+     * quoted away.
+     */
+    suspend fun spawnHelper(token: String): Boolean
+
+    /**
+     * Kills any running helper daemon (by exact nice-name) under shell uid, so a fresh
+     * daemon from a newer app version can re-take the binder service and the exclusive
+     * file lock. The lock auto-releases on process death. Hardcoded cmdline — no caller
+     * input; harmless no-op when no daemon is running. Returns true if the kill command
+     * was dispatched (NOT a guarantee the process is gone).
+     */
+    suspend fun killHelper(): Boolean
+
+    /** Reads the daemon's stdout/stderr log (READY / ERR lines) for diagnostics. Null on transport error. */
+    suspend fun readHelperLog(): String?
+
+    /** Read-only check: is a process named `bydmatecn_helper` running? */
+    suspend fun helperHeartbeat(): Boolean
+
+    /** Closes any underlying socket. Idempotent. */
+    suspend fun shutdown()
+}
+
+@Singleton
+class AdbOnDeviceClientImpl @Inject constructor(
+    @ApplicationContext context: Context,
+    private val keyStore: AdbKeyStore,
+) : AdbOnDeviceClient {
+
+    /**
+     * Test seam — UNIT TESTS ONLY. Lets the test layer swap the real
+     * socket-backed protocol for a fake. Default factory creates the real
+     * [AdbProtocolClient] with the persisted keypair.
+     */
+    @Suppress("unused")  // assigned via internal setter from tests
+    internal var protocolFactory: () -> AdbProtocol = {
+        AdbProtocolClient(
+            keyPair = keyStore.loadOrGenerate(),
+            certificateProvider = { keyStore.loadOrGenerateCertificate() },
+        )
+    }
+
+    @Volatile private var protocol: AdbProtocol? = null
+
+    // used for packageCodePath when spawning the helper daemon
+    private val ctx = context
+
+    override suspend fun connect(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val p = protocol ?: protocolFactory().also { protocol = it }
+            val ok = p.connect()
+            if (ok) Result.success(Unit) else Result.failure(IOException("ADB connect refused"))
+        } catch (e: Exception) {
+            Log.w(TAG, "connect failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun isConnected(): Boolean = withContext(Dispatchers.IO) {
+        protocol?.isConnected() ?: false
+    }
+
+    override fun lastConnectFailure(): AdbConnectFailure? = protocol?.lastConnectFailure
+
+    override suspend fun exec(cmd: String): String? = withContext(Dispatchers.IO) {
+        // Structural barrier against accidental WRITE — only allow GETs to autoservice, plus the
+        // fixed cloud-over-Wi-Fi command set the user switches on explicitly.
+        require(cmd.matches(WRITE_BARRIER_REGEX) || cmd.matches(CLOUD_OVER_WIFI_REGEX)) {
+            "AdbOnDeviceClient: refused command (write barrier): $cmd"
+        }
+        val p = protocol ?: return@withContext null
+        try {
+            // runInterruptible bridges coroutine cancellation to the blocking
+            // ADB socket read: a parent withTimeout/withTimeoutOrNull will
+            // post a Thread.interrupt(), which the socket implementation
+            // raises as InterruptedIOException and unwinds out of p.exec.
+            // Without this wrapper, withTimeoutOrNull(900ms) abandons the
+            // coroutine but the socket read keeps blocking up to 5 s
+            // (SOCKET_TIMEOUT_MS), pinning single-flight in TrackingService.
+            kotlinx.coroutines.runInterruptible { p.exec(cmd) }
+        } catch (e: Exception) {
+            Log.w(TAG, "exec failed: ${e.message}")
+            null
+        }
+    }
+
+    override suspend fun grantUsageStatsAppop(packageName: String): Boolean = withContext(Dispatchers.IO) {
+        // Only permit our own package — never grant appops to anything else.
+        require(packageName.matches(PACKAGE_NAME_REGEX)) {
+            "grantUsageStatsAppop: refused package $packageName"
+        }
+        val cmd = "appops set $packageName GET_USAGE_STATS allow"
+        val p = protocol ?: return@withContext false
+        try {
+            // appops prints nothing on success; null means transport error.
+            // Treat any non-null output as failure (e.g. "Bad permission") too.
+            val out = p.exec(cmd) ?: return@withContext false
+            out.isBlank()
+        } catch (e: Exception) {
+            Log.w(TAG, "grantUsageStatsAppop failed: ${e.message}")
+            false
+        }
+    }
+
+    override suspend fun grantWriteSecureSettings(packageName: String): Boolean = withContext(Dispatchers.IO) {
+        // Only permit our own package — never grant permissions to anything else.
+        require(packageName.matches(PACKAGE_NAME_REGEX)) {
+            "grantWriteSecureSettings: refused package $packageName"
+        }
+        val cmd = "pm grant $packageName android.permission.WRITE_SECURE_SETTINGS"
+        val p = protocol ?: return@withContext false
+        try {
+            // pm prints nothing on success (and on a re-grant); any output is an error.
+            val out = p.exec(cmd)
+            if (out == null) {
+                Log.w(TAG, "grantWriteSecureSettings: transport error")
+                return@withContext false
+            }
+            if (out.isNotBlank()) Log.w(TAG, "grantWriteSecureSettings: pm answered: ${out.trim().take(300)}")
+            out.isBlank()
+        } catch (e: Exception) {
+            Log.w(TAG, "grantWriteSecureSettings failed: ${e.message}")
+            false
+        }
+    }
+
+    override suspend fun spawnHelper(token: String): Boolean = withContext(Dispatchers.IO) {
+        // The token is interpolated into a shell command line — nothing but [A-Za-z0-9] may
+        // reach it. Callers build it themselves (HelperBootstrap), so this is a programming
+        // error, not a runtime condition.
+        require(token.matches(SPAWN_TOKEN_REGEX)) { "spawnHelper: refused token" }
+        val p = protocol ?: run {
+            val r = connect()
+            if (r.isFailure) return@withContext false
+            protocol ?: return@withContext false
+        }
+        try {
+            // Raw protocol exec — bypasses the public exec() write barrier by design
+            // (this is not an autoservice GET). Hardcoded, no caller input.
+            // CLASSPATH = the app's own signed base.apk; setsid detaches the daemon
+            // into its own session. The trailing poll-loop keeps THIS shell alive until
+            // the daemon registers (or 3s elapse): the on-device ADB closes the exec
+            // stream the instant `&` backgrounds the job, and adbd SIGHUPs the subprocess
+            // — without the loop the still-booting JVM dies before its first println
+            // (empty log, no registration). Mirrors the proven BYD EV Pro / aps_diplus
+            // spawn recipe; see reference_autoservice_write_channel.md.
+            // The loop also breaks on READY in the daemon log: a daemon that had to publish
+            // its Binder by broadcast (#64/#148) never appears in `service list`, and without
+            // this second condition every spawn on such a firmware would burn the full 3s.
+            // The log is truncated in THIS shell first: the background job's own `>` truncation
+            // happens after the fork, so the loop could otherwise read the previous daemon's
+            // READY line and break before the new one has printed anything.
+            val spawnCmd =
+                ": >$HELPER_LOG_PATH; " +
+                "CLASSPATH=${ctx.packageCodePath} setsid app_process /system/bin " +
+                "--nice-name=$HELPER_PROCESS_NAME com.bydmatecn.app.helper.HelperDaemon " +
+                "${android.os.Process.myUid()} $token </dev/null >$HELPER_LOG_PATH 2>&1 & " +
+                "for i in 1 2 3; do { service list 2>/dev/null | grep -q $HELPER_PROCESS_NAME || " +
+                "grep -q READY $HELPER_LOG_PATH 2>/dev/null; } && break; sleep 1; done"
+            // exec() returns null only on a dead/disconnected socket (AdbProtocolClient.exec) — an
+            // honest false here matters: HelperBootstrap.ensureRunningLocked() persists the spawned
+            // versionCode ONLY after a dispatch that actually succeeded, and bails otherwise.
+            p.exec(spawnCmd) != null
+        } catch (e: Exception) {
+            Log.w(TAG, "spawnHelper failed: ${e.message}")
+            false
+        }
+    }
+
+    override suspend fun killHelper(): Boolean = withContext(Dispatchers.IO) {
+        val p = protocol ?: run {
+            val r = connect()
+            if (r.isFailure) return@withContext false
+            protocol ?: return@withContext false
+        }
+        try {
+            // Raw protocol exec (hardcoded, no caller input). Kill by exact process NAME (comm)
+            // so a fresh daemon (newer app version) can re-take the binder service + file lock;
+            // the exclusive flock auto-releases on death. Selecting via `ps -A -o PID,NAME` +
+            // exact `==` match (same discipline as helperHeartbeat below) — NOT `pgrep -f`:
+            // `pgrep -f` matches the whole cmdline, and this kill shell's OWN argv contains
+            // "bydmatecn_helper", so it self-matched and could `kill -9` itself before reaching
+            // the daemon (pid-order dependent), leaving the stale daemon alive. The ps/awk/sh
+            // shells here have comm != "bydmatecn_helper" and cannot self-match. Empty match →
+            // `kill -9` runs for no pids → harmless.
+            // Honest false on a dead socket, same reasoning as spawnHelper above.
+            p.exec("for p in \$(ps -A -o PID,NAME | awk '\$2==\"$HELPER_PROCESS_NAME\"{print \$1}'); do kill -9 \$p; done") != null
+        } catch (e: Exception) {
+            Log.w(TAG, "killHelper failed: ${e.message}")
+            false
+        }
+    }
+
+    override suspend fun readHelperLog(): String? = withContext(Dispatchers.IO) {
+        val p = protocolOrConnect() ?: return@withContext null
+        runCatching { p.exec("cat $HELPER_LOG_PATH") }.getOrNull()
+    }
+
+    override suspend fun helperHeartbeat(): Boolean = withContext(Dispatchers.IO) {
+        val p = protocolOrConnect() ?: return@withContext false
+        val out = runCatching { p.exec("ps -A -o NAME") }.getOrNull() ?: return@withContext false
+        out.lineSequence().any { it.trim() == HELPER_PROCESS_NAME }
+    }
+
+    /**
+     * The live protocol, connecting lazily like spawnHelper/killHelper do. A process recreated
+     * while the daemon runs has no protocol yet, and a bare `protocol ?: return false` reported
+     * "no daemon process" for a daemon that is very much alive — which sent HelperBootstrap
+     * straight into kill+respawn (#64/#148). Null only when the connect itself failed.
+     */
+    private suspend fun protocolOrConnect(): AdbProtocol? {
+        protocol?.let { return it }
+        if (connect().isFailure) return null
+        return protocol
+    }
+
+    override suspend fun shutdown() {
+        withContext(Dispatchers.IO) {
+            try {
+                protocol?.disconnect()
+            } catch (_: Exception) { /* idempotent */ }
+            protocol = null
+        }
+    }
+
+    companion object {
+        private const val TAG = "AdbOnDevice"
+
+        // Block ANY write attempt at the boundary.
+        // Allow only: service call autoservice <5|7|9> i32 <dev> i32 <fid>
+        // Rejects tx=6 (setInt), tx=8 (setBuffer), and arbitrary shell.
+        private val WRITE_BARRIER_REGEX = Regex("""^service call autoservice [579] i32 \d+ i32 -?\d+$""")
+
+        // The exact commands of CloudOverWifiManager (#310) and nothing around them: reads of the
+        // listed properties, the cloud status, the cloud start/stop, and the BYD data-profile
+        // broadcast whose profile name is plain [a-z_] (it is read back from the car).
+        private val CLOUD_OVER_WIFI_REGEX = Regex(
+            """^(getprop (persist\.sys\.byd\.apn_type|ro\.build\.byd\.apn_type|""" +
+                """persist\.radio\.net\.lte\.apn1\.disable|net\.lte\.apn[13]\.state|sys\.tcp_step|""" +
+                """sys\.tcp_reg_errcode|persist\.sys\.cloud\.app_reg_status|""" +
+                """gsm\.sim\.operator\.(numeric|iso-country))""" +
+                """|service call cloudmanager (7|1 i32 (4|-5))""" +
+                """|am broadcast --user 0 -a com\.byd\.action\.RADIO_CONFIG -p com\.android\.phone """ +
+                """-f 0x01000000 --es opt_name set_default_data --es apn_type [a-z_]+)$"""
+        )
+
+        // Narrow whitelist for the two self-grants — only our own package.
+        private val PACKAGE_NAME_REGEX = Regex("""^com\.bydmate\.app$""")
+
+        // Spawn token shape — alphanumeric only, so it can never break out of the spawn
+        // command line. HelperBootstrap generates 32 hex characters.
+        private val SPAWN_TOKEN_REGEX = Regex("""^[A-Za-z0-9]{16,64}$""")
+
+        // Helper daemon — hardcoded so neither caller can inject paths/cmdlines.
+        private const val HELPER_PROCESS_NAME = "bydmatecn_helper"
+        private const val HELPER_LOG_PATH = "/data/local/tmp/bydmatecn_helper.log"
+    }
+}
