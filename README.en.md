@@ -87,7 +87,6 @@ The main changes in version 4.0.0.
 
 **Dashboard**
 
-<img src="docs/screenshots/dashboard.jpg" alt="Dashboard" width="800">
 
 Around the SOC ring there are four fields laid out like the floating widget: at the top, trip duration, odometer, and temperature (cabin and outside temperature share one slot; if the car does not report outside temperature, the slot shows only cabin temperature, as before); at the bottom, the current trip's distance, the estimated range, and the current trip's consumption with a trend arrow. The colors and trend logic are the same as in the floating widget, so the information reads the same on the home screen and over other apps. On a hybrid, the car's own battery range sits under the ring, with no calculation of ours, and below it is a “Fuel” card: the tank level and the fuel range; a tap shows engine rpm, engine and battery mileage, litres for all time and the litre price of the current period. Consumption for a period on a hybrid is shown as l/100 and kWh/100 over all kilometres, as on the instrument cluster.
 
@@ -95,19 +94,16 @@ Below the ring: an AI insight, a small battery health card (SoH on Leopard 3 and
 
 **AI Insights**
 
-<img src="docs/screenshots/dashboard-insight-expanded.jpg" alt="AI Insight expanded" width="800">
 
 *Driving efficiency analysis: consumption, trends, battery, recommendations (computed on the device)*
 
 **Battery Health**
 
-<img src="docs/screenshots/dashboard-battery.jpg" alt="Battery health" width="800">
 
 *Temperature, SoH (Leopard 3, DiLink 3.0), 12V battery, cell balance, voltage*
 
 **Trips**
 
-<img src="docs/screenshots/trips.jpg" alt="Trips accordion" width="800">
 
 *Month > Day > Trip accordion with filters and color-coded consumption*
 
@@ -119,19 +115,16 @@ On a hybrid the list has an “l” column. In the “/100” column a trip with
 
 **Automation**
 
-<img src="docs/screenshots/automation-en.jpg" alt="Automation" width="800">
 
 *WHEN→THEN rules, condition and action editor, trigger settings*
 
 **Settings**
 
-<img src="docs/screenshots/settings.jpg" alt="Settings" width="800">
 
 *Sections: Voice agent, Widget, Display, Split screen, Car and battery, Integrations, Service & Data, App*
 
 **Split Screen**
 
-<img src="docs/screenshots/split-screen.jpg" alt="Split screen: Yandex Music on the left, Yandex Navigator on the right" width="800">
 
 *Two panes, 1/3 and 2/3, with the BYDMate widget on top*
 
@@ -248,7 +241,6 @@ After that, a short press of the chosen steering-wheel button (right star by def
 
 If you turn "Show on the cluster right away" off, you will need to put the cluster into projection mode once yourself: the projection icon on the head unit's home screen, then the **IPC** button on the map that appears. It is worth turning off if, after projecting, ADAS or the native widget disappears from the cluster and does not come back by itself (on some DiLink 5.0 firmware the projection screen lives inside the native mini-map): with the toggle off the app does not touch the cluster mode at all, including for blind-spot cameras, and the picture is visible in the mini-map.
 
-<img src="docs/screenshots/settings-display-en.jpg" alt="Settings → Display: cluster projection, what each option does" width="800">
 
 ### Projection Modes: Factory and Extended
 
@@ -291,9 +283,7 @@ On some models the stock cluster shows the projection not full screen but in a f
 
 Values confirmed by a Sea Lion 07 owner: **width 32%, height 92%, horizontal offset 100%, vertical offset 6%, scale 90%**.
 
-<img src="docs/screenshots/cluster-mini-settings.jpg" alt="Window settings for Sea Lion 07" width="800">
 
-<img src="docs/screenshots/cluster-mini-view.jpg" alt="Yandex Navigator in the Sea Lion 07 mini cluster zone" width="800">
 
 You cannot make the window fill the whole cluster on these cars: the display zone is set by the cluster's own firmware and cannot be controlled.
 
@@ -321,7 +311,6 @@ Enable it in **Settings → Display**, section "HUD (head-up display)": the "Nav
 
 With the turn signal on, BYDMate shows the side camera picture by itself: the left turn signal puts the left camera on the cluster, the right one shows a small window on the main screen. If the sensor sees a car behind and to the side, the window lights up with an orange frame.
 
-<img src="docs/screenshots/settings-blindspot-en.jpg" alt="Settings → Display → Blind spots" width="800">
 
 Enable it in **Settings → Display**, "Blind spots" section (off by default). The same place has the speed threshold below which the camera does not show, the window width, and its position: the "Adjust position" button shows an empty window you drag with a finger to where the camera should be. If the left camera on the cluster gets in the way, turn on "Both cameras on the main screen" there too: both pictures show on the tablet, the cluster is left alone. The left window mirrors the right one by default, and the "Left camera position" button under the toggle gives it its own spot. The "Vertical camera window" toggle turns the window vertical and rotates the picture 90 degrees, like a mirror: if the picture ends up facing the wrong way after turning it on, open an issue. Requires a car equipped with a surround-view system. On some cars with DiLink 4.0 the firmware does not let apps access the cameras, the feature does not work there.
 
@@ -345,7 +334,6 @@ The stock BYD voice assistant already works natively in English and Chinese. Bui
 6. Press the wheel button and say "Сколько заряда?" (How much charge is left?). *What should happen:* a "Listening" pill appears, a short beep follows the phrase, and an answer comes a second or two later.
 7. TTS is optional: in the **"Agent replies"** section, turn on the toggle and download a voice (a regular one is 18-21 MB, or the improved Mark or Sofia share a 145 MB download). *What should happen:* the agent starts answering out loud; without TTS the answer stays as text on the screen.
 
-<img src="docs/screenshots/settings-voice.jpg" alt="Settings → Voice agent: agent, name, personality, voice" width="800">
 
 ### How to Talk to It
 
@@ -428,7 +416,6 @@ How it works:
 - Windows and the sunroof open by a fraction: "наполовину" (halfway), "на 50 процентов" (at 50 percent), "чуть-чуть" (just a bit), "полностью" (all the way), "на треть" (a third). The percent is rounded down to the nearest supported position, the window never opens wider than asked.
 - Everything else goes to the cloud AI agent, if it is on. Without the agent, such a phrase gets "didn't understand" as the answer, while the phrases from the list keep working.
 
-Examples from the list. Full list with wording variants: [docs/VOICE_COMMANDS.md](docs/VOICE_COMMANDS.md).
 
 | Phrase | What happens |
 |-------|----------------|
@@ -522,7 +509,6 @@ Tell the agent your name or what you usually prefer, and it remembers this betwe
 
 A compact 260×108 dp overlay over other apps, visible on the map, in media, and inside BYD apps.
 
-<img src="docs/screenshots/widget-infographic.jpg" alt="Widget legend: what is shown where" width="900">
 
 ### What Is Shown
 
@@ -577,7 +563,6 @@ The arrow does not jump around at every red light, there is some inertia built i
 
 Two apps on screen at once: one takes two thirds, the other takes a third. A typical pair is a wider navigator and narrower music or a messenger. The sides can be swapped, the apps changed on the fly, and the chosen pair is remembered.
 
-<img src="docs/screenshots/split-screen.jpg" alt="Split screen 1/3 + 2/3" width="800">
 
 ### Enabling
 
@@ -586,7 +571,6 @@ Two apps on screen at once: one takes two thirds, the other takes a third. A typ
 
 While the feature is off, the app does not touch the car's system settings. Turning the toggle off restores the setting to its factory value, unless the window mode is also needed by "Extended" projection: then it returns to factory once you turn that off too.
 
-<img src="docs/screenshots/settings-split-en.jpg" alt="Settings → Split screen" width="800">
 
 ### Split Mechanism
 
@@ -879,7 +863,6 @@ These features turn on automatically, no separate switch is needed. The first ti
 - **DiLink 3 / 4**: you can enable ADB yourself: install [BydDevelopmentTools](https://disk.yandex.by/d/e3gEnY9P2Y9_fQ), go to *Settings → Version Management*, tap *Reset to factory default* 10 times, then turn on *Debug Mode when USB is Connected* and *Wireless adb debug switch*. On updated DiLink 3/4 firmware ADB may be locked the same way as on DiLink 5, then follow the path below.
 - **DiLink 5.0**: ADB debugging is **locked** and can only be unlocked remotely, from China. This can be done through sellers on **TaoBao** (search for `DiLink 5.0`, about 40 CNY inside China or about 80 CNY from outside, paid via AliPay). The seller remotely opens the engineering menu using a QR code you send them, after which ADB turns on as usual.
 
-  Step-by-step guide: [PDF guide (Russian)](docs/guides/dilink5-adb-activation-ru.pdf), included in the repository.
 
 #### ADB Turns Off After Every Reboot
 
@@ -917,7 +900,6 @@ If you used earlier versions and installed D+, you can remove it from DiLink onc
 
 **Important:** turn off "Disable background Apps" for BYDMate, otherwise DiLink kills the app:
 
-<img src="docs/screenshots/dilink-whitelist.jpg" alt="Disable background apps: toggle OFF for BYDMate" width="600">
 
 *DiLink > Settings > General > Disable background Apps > BYDMate = **OFF***
 
@@ -1016,7 +998,6 @@ Full rules and thresholds are in `LocalInsightEngine.kt` and the `LocalInsightEn
 
 BYDMate can send live vehicle data to [A Better Route Planner](https://abetterrouteplanner.com/) (ABRP) through the official Iternio Telemetry API. ABRP uses this data so the route plan and the remaining-range estimate update from your battery's real state, instead of average book values.
 
-<img src="docs/screenshots/settings-integrations-en.jpg" alt="Settings → Integrations: ABRP" width="800">
 
 The feature is **optional**, off by default, and turned on by hand in Settings.
 

@@ -8,7 +8,6 @@
 
 `0xBca867Ae608428ac869D4B44C875446C6137b803`
 
-<img src="docs/donations/usdt-evm.png" alt="USDT EVM QR" width="200">
 
 Принимаемые сети (все ведут на этот адрес): Arbitrum One, Optimism, Polygon, BNB Smart Chain (BEP20), Avalanche C-Chain, Ethereum (ERC20).
 
@@ -29,6 +28,5 @@
 
 `https://yoomoney.ru/fundraise/1K60HLUIS32.260908`
 
-<img src="docs/donations/yoomoney.png" alt="ЮMoney QR" width="200">
 
 Оплата картой или кошельком ЮMoney, любая сумма.

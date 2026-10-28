@@ -6,9 +6,9 @@
 
 ## 项目来源与定位
 
-**BYDMateCN fork 自 [BYDMate](https://github.com/AndyShaman/BYDMate)**，本工作目录基于 [bluarry/BYDMate](https://github.com/bluarry/BYDMate) 分支继续开发。保留原项目版权、贡献者署名与 [LICENSE](LICENSE)，并非 AutoTark 官方版本，也不代表比亚迪官方适配。
+**BYDMateCN fork 自 [BYDMate](https://github.com/AndyShaman/BYDMate)**，本工作目录基于 [bluarry/BYDMate](https://github.com/bluarry/BYDMate) 分支继续开发。保留原项目版权、贡献者署名与 [LICENSE](LICENSE)，本项目为独立社区分支，不代表比亚迪官方适配。
 
-在继承 BYDMate 功能的基础上，本分支参考 AutoTark 的功能组织及固件接口证据，新增离线、本地可执行能力。**有入口不等于功能已完成，接口调用成功不等于实车已经出声或显示。** 当前主要适配目标为宋 L DM-i / DiLink；必须按实际固件、权限和硬件验证，不能照搬原项目支持车型列表作为本分支兼容承诺。
+在继承 BYDMate 功能的基础上，本分支结合车机固件接口分析，新增离线、本地可执行能力。**有入口不等于功能已完成，接口调用成功不等于实车已经出声或显示。** 当前主要适配目标为宋 L DM-i / DiLink；必须按实际固件、权限和硬件验证，不能照搬原项目支持车型列表作为本分支兼容承诺。
 
 - 应用显示名：**BYDMateCN**
 - applicationId / namespace：`com.bydmatecn.app`
@@ -41,7 +41,7 @@
 - 本地音频导入、播放/暂停/停止、进度、音量、循环和可用输出设备选择；设备断开时停止，不偷偷换扬声器。
 - LRC 歌词导入与时间同步；仅使用本地资源。
 - 麦克风录音：AAC，单次上限 60 秒。
-- 本地 TTS 播放与 WAV 导出，依赖车机安装的可用 TTS 引擎/音色；不调用 AutoTark 后端。
+- 本地 TTS 播放与 WAV 导出，依赖车机安装的可用 TTS 引擎/音色；使用车机本地能力。
 - 固件音频属性路径：锁车事件 `11001`、车外 `11002`、锁车试听 `11003`，经固件证据确定，不猜测 stream/FID。手动试听上限 15 秒。
 - 按住喊话：MIC → PCM 16kHz 单声道 → 车外 AudioTrack，最长 15 秒，默认限制音量；需要麦克风权限、驻车及人工确认车外实际出声。
 - 锁车/解锁音效：人工启动前台布防服务，最长两小时；使用确认过的门锁边沿、去抖/冷却、P 挡和 12V 条件，单次音频最长 5 秒。不自启动、不申请持续唤醒、不承诺熄火全天工作。
@@ -79,17 +79,16 @@
 | 米篓宝专用蓝牙功能 | 标准蓝牙入口不代表已实现厂商协议 |
 | 仪表触控板 | 输入注入/厂商协议未补齐 |
 | 熄火全天守护/后台 DVR | 尚未完成可靠供电、后台唤醒及厂商链路；现有 12V 状态/原厂哨兵入口不是全天运行保障 |
-| AutoTark 云服务 | 不使用其激活码、账号、支付或后端配置；车外资源使用本地文件 |
+| 云端服务 | 当前新增能力不提供云端账号、支付或配置服务；车外资源使用本地文件 |
 | 中文离线语音识别 | 中文 UI 与本地 TTS 可用性独立；原俄语 ASR 模型不因此转换成中文模型 |
 
-更细的状态见 [功能对齐说明](docs/autotark-local-alignment-status.md)。
 
 ## 安装与实车验收
 
 1. 安装 `app/build/outputs/apk/debug/BYDMateCN.apk`，仅用于已获授权的车机测试。
 2. 独立包名与原 BYDMate 可并存，但**不继承旧包数据或权限**。重新授权相机/麦克风、悬浮窗、通知访问、辅助功能等实际需要项。厂商包名白名单可能需合法固件配置。
 3. 停用旧应用的相机、自动化与常驻服务，避免竞争车辆硬件。先 P 挡驻车、低音量、单路相机标定，再逐项测试。
-4. 按 [宋 L DM-i 实车验证文档](docs/song-l-dmi-real-car-validation.md) 记录结果。出现问题：导出 TXT，附发生时间、权限、车机版本、操作顺序和实际现象；必要时另附已授权采集的系统日志/视频。
+4. 逐项记录实车测试结果。出现问题：导出 TXT，附发生时间、权限、车机版本、操作顺序和实际现象；必要时另附已授权采集的系统日志/视频。
 5. 硬件接口调用不保证实车功能已经成功。禁止驾驶员行驶中操作；相机/车外音频未验收前不要投入日常使用。
 
 ## 构建
@@ -107,9 +106,6 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 `bydauto-stubs` 是编译期接口签名，不提供车机硬件实现；执行时由固件上的 BYD 类、Binder 服务、HAL 和权限提供实现。源码原来使用反射的路径继续用反射，已有可确认接口复用 stub。普通 Android SDK 不能凭空生成 OEM 服务，APK 内也不打包厂商固件运行实现。
 
-- [固件 SDK 分析](docs/dilink5-firmware-sdk-analysis.md)
-- [音频与后视实现说明](docs/autotark-audio-mirror-implementation.md)
-- [包名迁移说明](docs/app-identity-migration.md)
 
 ### 默认中文与捐赠开关
 
@@ -125,4 +121,4 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 ## GitHub 自动预发布
 
-推送与应用版本一致的 `v1.0.0` 等标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN.apk`，创建 **WIP 预发布版**并附 SHA-256 校验文件。须先配置发布签名 Secrets；见 [发布配置与操作说明](docs/github-release.md)。普通推送和 PR 不会发布。
+推送与应用版本一致的 `v1.0.0` 等标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN.apk`，创建 **WIP 预发布版**并附 SHA-256 校验文件。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。

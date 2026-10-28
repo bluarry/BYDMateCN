@@ -69,7 +69,7 @@ jobs:
           names = ['KEYSTORE_BASE64', 'STORE_PASSWORD', 'KEY_ALIAS', 'KEY_PASSWORD']
           missing = [name for name in names if not os.environ.get(name)]
           if missing:
-              raise SystemExit('缺少发布签名 Secrets，请阅读 docs/github-release.md：' + ', '.join(missing))
+              raise SystemExit('缺少发布签名 Secrets，请在仓库 Settings → Secrets and variables → Actions 中配置：' + ', '.join(missing))
           key = Path(os.environ['RUNNER_TEMP']) / 'bydmatecn-release.jks'
           key.write_bytes(base64.b64decode(os.environ['KEYSTORE_BASE64'], validate=True))
           key.chmod(0o600)
@@ -127,7 +127,7 @@ jobs:
 
           - 安装包：`BYDMateCN.apk`（固定发布密钥签名）
           - 校验文件：`BYDMateCN.apk.sha256`
-          - 安装权限、功能边界和实车验证步骤请阅读仓库 README 与 docs。
+          - 安装权限、功能边界和实车验证步骤请阅读仓库 README。
           - 若已安装版本使用不同签名，无法直接覆盖升级；请先导出备份，确认卸载会清除数据后再处理。后续版本须持续使用同一发布密钥并提高 versionCode。
           NOTES
           # 已有同名 Release 时失败，不覆盖已发布安装包。

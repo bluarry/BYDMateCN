@@ -64,3 +64,6 @@ docs/superpowers/**/handoff-*
 # Owner's private notes, kept out of the public repo.
 PHILOSOPHY.md
 CONTEXT.md
+
+# 本地非公开文档，不提交至远程仓库。
+/.docs/
