@@ -47,7 +47,7 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "MainActivity"
         private const val PERMISSION_REQUEST_CODE = 1001
         private const val BACKGROUND_LOCATION_REQUEST_CODE = 1002
-        private const val DEFAULT_LANG = "ru"
+        private const val DEFAULT_LANG = LocalePreferences.DEFAULT_LANGUAGE
     }
 
     override fun attachBaseContext(newBase: Context) {

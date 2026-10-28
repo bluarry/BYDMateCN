@@ -85,7 +85,7 @@ class TelegramReportBuilderTest {
         val report = build(inputs = inputs(live = LiveTrip(23.4, 3.79, now - 34 * 60_000L), trip1 = counter1, trip2 = counter2))
         assertEquals(
             listOf(
-                "<b>BYDMate: Где машина</b>",
+                "<b>BYDMateCN: Где машина</b>",
                 "",
                 "🔋 Заряд <b>64%</b>, запас <b>312 км</b>",
                 "🧭 Пробег 23\u00A0456 км",
@@ -121,7 +121,7 @@ class TelegramReportBuilderTest {
         val stamp = TelegramReportBuilder.formatDateTime(start).split(' ')
         assertEquals(
             listOf(
-                "<b>BYDMate: Где машина</b>",
+                "<b>BYDMateCN: Где машина</b>",
                 "",
                 "🚗 <b>Последняя поездка</b> ${stamp[0]} в ${stamp[1]}",
                 "${em}42 км за 1 ч 20 мин",
@@ -151,7 +151,7 @@ class TelegramReportBuilderTest {
     @Test fun `an item the car does not report is left out, never faked, and no block is left empty`() {
         val data = diParsData(soc = 51)
         val report = build(inputs = inputs(data = data, rangeKm = null, location = null))
-        assertEquals(listOf("<b>BYDMate: Где машина</b>", "", "🔋 Заряд <b>51%</b>"), report.text.lines())
+        assertEquals(listOf("<b>BYDMateCN: Где машина</b>", "", "🔋 Заряд <b>51%</b>"), report.text.lines())
         assertEquals(listOf(ReportField.SOC), report.taken)
         assertEquals(
             listOf(
@@ -177,16 +177,16 @@ class TelegramReportBuilderTest {
         }
         val text = build(fields = setOf(ReportField.OPENINGS, ReportField.LOCATION)).text
         assertEquals(
-            listOf("<b>BYDMate: Где машина</b>", "", "⚠️ <b>Открыто: окно водителя</b>", ""),
+            listOf("<b>BYDMateCN: Где машина</b>", "", "⚠️ <b>Открыто: окно водителя</b>", ""),
             text.lines().dropLast(1),
         )
-        assertEquals(listOf("<b>BYDMate: Где машина</b>"), build(fields = emptySet()).text.lines())
+        assertEquals(listOf("<b>BYDMateCN: Где машина</b>"), build(fields = emptySet()).text.lines())
     }
 
     @Test fun `only the checked items go in, and all closed sits with the car`() {
         val closed = fullData.copy(windowFL = 0)
         val report = build(fields = setOf(ReportField.OPENINGS, ReportField.RANGE), inputs = inputs(data = closed))
-        assertEquals(listOf("<b>BYDMate: Где машина</b>", "", "🔋 Запас <b>312 км</b>", "🔒 Всё закрыто"), report.text.lines())
+        assertEquals(listOf("<b>BYDMateCN: Где машина</b>", "", "🔋 Запас <b>312 км</b>", "🔒 Всё закрыто"), report.text.lines())
     }
 
     @Test fun `a trunk mid-motion counts as open, not closed`() {
@@ -237,7 +237,7 @@ class TelegramReportBuilderTest {
         )
         assertEquals(
             listOf(
-                "<b>BYDMate: A &amp; &lt;b&gt;B&lt;/b&gt;</b>",
+                "<b>BYDMateCN: A &amp; &lt;b&gt;B&lt;/b&gt;</b>",
                 "",
                 "ключ у Лены &lt;3 &amp; &gt;_&lt;",
                 "",
@@ -294,7 +294,7 @@ class TelegramReportBuilderTest {
         assertWellFormed(withMap)
 
         val noMap = TelegramReportBuilder.withLateMark(build(fields = setOf(ReportField.SOC)).text, mark)
-        assertEquals(listOf("<b>BYDMate: Где машина</b>", "", "🔋 Заряд <b>64%</b>", "", mark), noMap.lines())
+        assertEquals(listOf("<b>BYDMateCN: Где машина</b>", "", "🔋 Заряд <b>64%</b>", "", mark), noMap.lines())
     }
 
     @Test fun `own text that looks like a map line never moves the late mark`() {
@@ -324,7 +324,7 @@ class TelegramReportBuilderTest {
         val fields = setOf(ReportField.SOC, ReportField.RANGE, odometer, ReportField.TEMPS)
         assertEquals(
             listOf(
-                "<b>BYDMate: Где машина</b>",
+                "<b>BYDMateCN: Где машина</b>",
                 "",
                 "🔋 Заряд <b>64%</b>, запас <b>312 км</b>",
                 "🧭 Пробег 23\u00A0456 км",
@@ -341,7 +341,7 @@ class TelegramReportBuilderTest {
         val data = fullData.copy(mileage = 23_456.7)
         val report = build(fields = setOf(odometer, ReportField.TIRES), inputs = inputs(data = data))
         assertEquals(
-            listOf("<b>BYDMate: Где машина</b>", "", "🧭 Пробег 23\u00A0456 км", "🛞 Шины: ПЛ 2,4 · ПП 2,4 · ЗЛ 2,3 · ЗП 2,4 бар"),
+            listOf("<b>BYDMateCN: Где машина</b>", "", "🧭 Пробег 23\u00A0456 км", "🛞 Шины: ПЛ 2,4 · ПП 2,4 · ЗЛ 2,3 · ЗП 2,4 бар"),
             report.text.lines(),
         )
     }
@@ -350,7 +350,7 @@ class TelegramReportBuilderTest {
         val sentinel = ParamDecoder.decodeScaled(SentinelDecoder.FEATURE_LINK_ERROR, 0.1)
         for (km in listOf(null, sentinel, 0.0, 0.4, -12.0)) {
             val report = build(fields = setOf(ReportField.SOC, odometer), inputs = inputs(data = fullData.copy(mileage = km)))
-            assertEquals("$km", listOf("<b>BYDMate: Где машина</b>", "", "🔋 Заряд <b>64%</b>"), report.text.lines())
+            assertEquals("$km", listOf("<b>BYDMateCN: Где машина</b>", "", "🔋 Заряд <b>64%</b>"), report.text.lines())
             assertEquals("$km", listOf(odometer), report.skipped)
         }
     }
@@ -377,8 +377,8 @@ class TelegramReportBuilderTest {
         assertFalse(ReportField.TRIP1 in ReportField.DEFAULT)
         assertFalse(ReportField.TRIP2 in ReportField.DEFAULT)
         assertFalse(ReportField.TRIP1 in newTelegramReportAction(ctx).reportFields())
-        assertEquals("TRIP 1", ctx.getString(ReportField.TRIP1.labelRes))
-        assertEquals("TRIP 2", ctx.getString(ReportField.TRIP2.labelRes))
+        assertEquals("行程 1", ctx.getString(ReportField.TRIP1.labelRes))
+        assertEquals("行程 2", ctx.getString(ReportField.TRIP2.labelRes))
         val langs = listOf("ru", "be", "en", "pl", "pt", "zh")
         for (field in listOf(ReportField.TRIP1, ReportField.TRIP2)) {
             val descs = langs.map { ctx.localizedContext(it).getString(field.descRes) }
@@ -413,7 +413,7 @@ class TelegramReportBuilderTest {
         val report = build(fields = setOf(ReportField.TRIP2), inputs = inputs(trip2 = counter2))
         assertEquals(
             listOf(
-                "<b>BYDMate: Где машина</b>",
+                "<b>BYDMateCN: Где машина</b>",
                 "",
                 "🔁 <b>TRIP 2</b> с ${dayOf(counter2.resetTs)}",
                 "${em}32 км за 47 мин",
@@ -438,7 +438,7 @@ class TelegramReportBuilderTest {
         )
         for (c in cases) {
             val report = build(fields = setOf(ReportField.SOC, ReportField.TRIP1, ReportField.TRIP2), inputs = inputs(trip1 = c))
-            assertEquals("$c", listOf("<b>BYDMate: Где машина</b>", "", "🔋 Заряд <b>64%</b>"), report.text.lines())
+            assertEquals("$c", listOf("<b>BYDMateCN: Где машина</b>", "", "🔋 Заряд <b>64%</b>"), report.text.lines())
             assertEquals("$c", listOf(ReportField.TRIP1, ReportField.TRIP2), report.skipped)
         }
     }
@@ -479,10 +479,10 @@ class TelegramReportBuilderTest {
 
     @Test fun `power-off header carries the time placeholder the daemon fills`() {
         val header = TelegramReportBuilder.powerOffHeader(strings("ru"))
-        assertEquals("BYDMate: машина выключена в ${TelegramReportBuilder.TIME_PLACEHOLDER}", header)
+        assertEquals("BYDMateCN: машина выключена в ${TelegramReportBuilder.TIME_PLACEHOLDER}", header)
         val text = build(fields = setOf(ReportField.SOC), header = header).text
         val filled = TelegramReportBuilder.fillTime(text, now)
-        assertTrue(filled, filled.startsWith("<b>BYDMate: машина выключена в ${TelegramReportBuilder.formatTime(now)}</b>"))
+        assertTrue(filled, filled.startsWith("<b>BYDMateCN: машина выключена в ${TelegramReportBuilder.formatTime(now)}</b>"))
         assertFalse(filled.contains(TelegramReportBuilder.TIME_PLACEHOLDER))
     }
 }

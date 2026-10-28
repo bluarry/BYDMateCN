@@ -157,6 +157,7 @@ import com.bydmatecn.app.ui.components.MultiAppPickerDialog
 import com.bydmatecn.app.ui.components.bydSwitchColors
 import com.bydmatecn.app.ui.theme.*
 import com.bydmatecn.app.util.APP_LANGUAGES
+import com.bydmatecn.app.util.appLanguageLabels
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
@@ -3330,6 +3331,7 @@ private fun AppSection(state: SettingsUiState, viewModel: SettingsViewModel) {
         }
     }
 
+    if (DonationReminder.enabled) {
     SectionHeader(text = stringResource(R.string.settings_donate_header))
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -3350,6 +3352,8 @@ private fun AppSection(state: SettingsUiState, viewModel: SettingsViewModel) {
                 Text(stringResource(R.string.settings_donate_button), fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
+    }
+
     }
 
     SectionHeader(text = stringResource(R.string.settings_about_header))
@@ -4114,7 +4118,7 @@ private fun LanguageBlock(
     // mutates Resources.configuration in place, and re-provides
     // LocalConfiguration so every stringResource recomposes on next frame.
     val langCodes = APP_LANGUAGES.map { it.first }
-    val langLabels = APP_LANGUAGES.map { it.second }
+    val langLabels = appLanguageLabels(currentLang)
     SectionHeader(text = stringResource(R.string.settings_language_title))
     Card(
         shape = RoundedCornerShape(12.dp),

@@ -11,9 +11,9 @@ import com.bydmatecn.app.ui.widget.WidgetController
 
 /** App UI languages as (code, native name); shared by the Settings picker and the first-run wizard. */
 val APP_LANGUAGES: List<Pair<String, String>> = listOf(
-    "ru" to "Русский",
-    "en" to "English",
     "zh" to "简体中文",
+    "en" to "English",
+    "ru" to "Русский",
     "pt" to "Português",
     "pl" to "Polski",
     "be" to "Беларуская",
@@ -37,3 +37,8 @@ fun applyAppLanguage(appContext: Context, localePreferences: LocalePreferences, 
     TrackingService.NotificationChannels.create(appContext, strings)
     AutomationEngine.createConfirmChannel(appContext, strings)
 }
+
+/** Picker names stay Chinese until the user explicitly chooses another UI language. */
+fun appLanguageLabels(current: String): List<String> = if (current.startsWith("zh"))
+    listOf("简体中文", "英语", "俄语", "葡萄牙语", "波兰语", "白俄罗斯语")
+else APP_LANGUAGES.map { it.second }

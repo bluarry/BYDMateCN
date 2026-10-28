@@ -64,6 +64,7 @@ import com.bydmatecn.app.data.repository.SettingsRepository
 import com.bydmatecn.app.ui.components.AdbEnableSteps
 import com.bydmatecn.app.ui.theme.*
 import com.bydmatecn.app.util.APP_LANGUAGES
+import com.bydmatecn.app.util.appLanguageLabels
 
 @Composable
 fun WelcomeScreen(
@@ -117,7 +118,8 @@ private fun LanguageStep(state: WelcomeUiState, viewModel: WelcomeViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
-                APP_LANGUAGES.forEach { (code, label) ->
+                APP_LANGUAGES.zip(appLanguageLabels(state.language)).forEach { (language, label) ->
+                    val code = language.first
                     WelcomeChip(
                         label = label,
                         selected = state.language == code,

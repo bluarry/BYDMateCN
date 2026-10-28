@@ -2159,4 +2159,5 @@
     <string name="tech_card_fuel">Паліва</string>
     <string name="settings_fuel_price_label">Цана літра</string>
     <string name="settings_fuel_price_hint">за літр, на паездкі з гэтай даты</string>
+    <string name="automation_learned_key_label">Клавіша %1$d</string>
 </resources>

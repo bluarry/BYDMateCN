@@ -35,6 +35,8 @@ android {
         versionName = "4.0.1"
         // Independent fork: no donor APKs may be offered as this application's updates.
         buildConfigField("String", "APP_UPDATE_URL", "\"\"")
+        // Retain donor donation UI/resources, but hide every entry in this fork.
+        buildConfigField("boolean", "DONATIONS_ENABLED", "false")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

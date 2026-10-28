@@ -7,7 +7,7 @@ import java.util.Locale
 
 /**
  * Returns a [Context] configured with the app's user-selected language
- * ([LocalePreferences]), falling back to Russian — matching
+ * ([LocalePreferences]), falling back to Simplified Chinese — matching
  * `MainActivity.attachBaseContext` / `MainActivity.DEFAULT_LANG`.
  *
  * Use for any locale-sensitive formatting or `getString` performed OFF the
@@ -19,8 +19,8 @@ import java.util.Locale
  */
 fun Context.appLocalizedContext(): Context = localizedContext(appLanguageTag())
 
-/** The app's chosen language tag; Russian when nothing is stored yet. */
-internal fun Context.appLanguageTag(): String = LocalePreferences(this).getLanguage() ?: "ru"
+/** The app's chosen language tag; Simplified Chinese when nothing is stored yet. */
+internal fun Context.appLanguageTag(): String = LocalePreferences(this).getLanguage() ?: LocalePreferences.DEFAULT_LANGUAGE
 
 internal fun Context.localizedContext(lang: String): Context {
     val config = Configuration(resources.configuration).apply {

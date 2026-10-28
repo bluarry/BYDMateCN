@@ -2444,7 +2444,7 @@ private fun SteeringKeyTriggerControls(
     if (learning) {
         LearnButtonDialog(
             onSave = { learned ->
-                onUpdate(trigger.copy(value = learned.toString(), displayName = "Клавиша $learned"))
+                onUpdate(trigger.copy(value = learned.toString(), displayName = context.getString(R.string.automation_learned_key_label, learned)))
                 learning = false
             },
             onDismiss = { learning = false },

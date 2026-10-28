@@ -74,6 +74,7 @@ enum class DonateEntry { AUTO, SETTINGS }
  *  version" so the auto prompt appears at most once per app version, plus a permanent
  *  opt-out set when the user taps "I already supported". */
 object DonationReminder {
+    val enabled: Boolean get() = com.bydmatecn.app.BuildConfig.DONATIONS_ENABLED
     private const val PREFS = "donation_prefs"
     private const val KEY_SEEN_VERSION = "donation_seen_version"
     private const val KEY_OPTOUT = "donation_optout"
@@ -81,6 +82,7 @@ object DonationReminder {
     /** True when the auto prompt should show for [currentVersion]: the user has not opted
      *  out and has not already seen it on this version. */
     fun shouldShow(context: Context, currentVersion: String): Boolean {
+        if (!enabled) return false
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (p.getBoolean(KEY_OPTOUT, false)) return false
         return p.getString(KEY_SEEN_VERSION, null) != currentVersion
@@ -111,6 +113,7 @@ fun DonateDialog(
     onDismiss: () -> Unit,
     onAlreadySupported: () -> Unit = {},
 ) {
+    if (!DonationReminder.enabled) return
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val copiedToast = stringResource(R.string.donate_copied_toast)

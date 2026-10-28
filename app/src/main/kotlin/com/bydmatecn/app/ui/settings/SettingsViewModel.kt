@@ -394,7 +394,7 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
 
     fun enableAdbRestore() = adbVerdictMonitor.enableRestoreAndRecheck()
 
-    private val _appLanguage = MutableStateFlow(localePreferences.getLanguage() ?: "ru")
+    private val _appLanguage = MutableStateFlow(localePreferences.getLanguage() ?: LocalePreferences.DEFAULT_LANGUAGE)
     val appLanguage: StateFlow<String> = _appLanguage.asStateFlow()
 
     private val _fontScale = MutableStateFlow(localePreferences.getFontScale())

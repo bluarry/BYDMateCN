@@ -30,6 +30,7 @@ class LocalePreferences(context: Context) {
     }
 
     companion object {
+        const val DEFAULT_LANGUAGE = "zh"
         const val FILE = "bydmate_locale"
         const val KEY_LANG = "app_language"
         const val KEY_SETUP_MIRROR = "setup_completed_mirror"

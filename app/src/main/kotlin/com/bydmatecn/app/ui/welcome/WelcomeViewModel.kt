@@ -24,7 +24,7 @@ import javax.inject.Inject
 
 data class WelcomeUiState(
     val step: Int = 1,
-    val language: String = "ru",
+    val language: String = LocalePreferences.DEFAULT_LANGUAGE,
     val batteryCapacity: String = SettingsRepository.DEFAULT_BATTERY_CAPACITY,
     val currency: String = SettingsRepository.DEFAULT_CURRENCY,
     val currencySymbol: String = "BYN",
@@ -52,7 +52,7 @@ class WelcomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        (localePreferences.getLanguage() ?: "ru").let { lang ->
+        (localePreferences.getLanguage() ?: LocalePreferences.DEFAULT_LANGUAGE).let { lang ->
             val currency = findCurrency(currencyForLanguage(lang))
             WelcomeUiState(language = lang, currency = currency.code, currencySymbol = currency.symbol)
         }
