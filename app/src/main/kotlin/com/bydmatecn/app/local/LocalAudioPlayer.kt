@@ -11,19 +11,19 @@ import android.os.Looper
 import java.io.File
 
 /** Main-thread local playback. Never force-routes AVAS or suppresses OEM audio. */
-class LocalAudioPlayer(context: Context, private val report: (String) -> Unit) {
-    private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private var player: MediaPlayer? = null
-    private var prepared = false
-    private var focus: AudioFocusRequest? = null
-    private val policy = AudioPlaybackPolicy()
-    private var volume = 50
-    private var looping = false
-    private var generation = 0
-    private val handler = Handler(Looper.getMainLooper())
-    private var timeout: Runnable? = null
-    private var boundedPlayback = false
-    private val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) {
+    internal val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    internal var player: MediaPlayer? = null
+    internal var prepared = false
+    internal var focus: AudioFocusRequest? = null
+    internal val policy = AudioPlaybackPolicy()
+    internal var volume = 50
+    internal var looping = false
+    internal var generation = 0
+    internal val handler = Handler(Looper.getMainLooper())
+    internal var timeout: Runnable? = null
+    internal var boundedPlayback = false
+    internal val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
 
     fun play(file: File, device: AudioDeviceInfo?, playbackAttributes: AudioAttributes = attributes,
@@ -34,23 +34,7 @@ class LocalAudioPlayer(context: Context, private val report: (String) -> Unit) {
         val requestGeneration = generation
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(playbackAttributes).setOnAudioFocusChangeListener({ change ->
-                if (requestGeneration != generation) return@setOnAudioFocusChangeListener
-                if (boundedPlayback && change != AudioManager.AUDIOFOCUS_GAIN) {
-                    stop(); report("专用音频让出焦点，已停止"); return@setOnAudioFocusChangeListener
-                }
-                when (change) {
-                    AudioManager.AUDIOFOCUS_LOSS -> { stop(); report("音频焦点丢失，已停止") }
-                    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                        policy.transientLoss()
-                        if (prepared) player?.pause()
-                        report("临时让出音频焦点")
-                    }
-                    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> { policy.duck(); applyVolume() }
-                    AudioManager.AUDIOFOCUS_GAIN -> {
-                        policy.gain(); applyVolume()
-                        if (prepared && policy.mayPlay) player?.start()
-                    }
-                }
+                onFocusChanged(change, requestGeneration)
             }, Handler(Looper.getMainLooper())).build()
         focus = request
         if (audio.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
@@ -66,21 +50,7 @@ class LocalAudioPlayer(context: Context, private val report: (String) -> Unit) {
             candidate.setDataSource(file.absolutePath)
             if (device != null && !candidate.setPreferredDevice(device)) error("输出设备被拒绝")
             applyVolume()
-            candidate.setOnPreparedListener { ready ->
-                if (player === ready) {
-                    timeout?.let { handler.removeCallbacks(it) }; timeout = null
-                    prepared = true
-                    ready.isLooping = looping && !boundedPlayback
-                    applyVolume()
-                    if (policy.mayPlay) ready.start()
-                    if (maximumDurationMs != null) {
-                        timeout = Runnable {
-                            if (requestGeneration == generation) { stop(); report("专用试听到时，已停止") }
-                        }.also { handler.postDelayed(it, maximumDurationMs) }
-                    }
-                    report(if (policy.mayPlay) "播放中：${file.name}；$routeLabel（扬声器需实车确认）" else "已准备，等待音频焦点或继续播放")
-                }
-            }
+            candidate.setOnPreparedListener { ready -> onPrepared(ready, file, routeLabel, maximumDurationMs, requestGeneration) }
             candidate.setOnCompletionListener { completed ->
                 if (player === completed) { stop(); report("播放结束") }
             }
@@ -89,8 +59,9 @@ class LocalAudioPlayer(context: Context, private val report: (String) -> Unit) {
                 true
             }
             candidate.prepareAsync()
-        } catch (error: Exception) { stop(); report("播放失败：${error.message}") }
+        } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) { stop(); report("播放失败：${error.message}") } catch (error: IllegalStateException) { stop(); report("播放失败：${error.message}") } catch (error: IllegalArgumentException) { stop(); report("播放失败：${error.message}") } catch (error: SecurityException) { stop(); report("播放失败：${error.message}") }
     }
+
     fun togglePause() {
         val current = player
         if (!prepared || current == null) { report("音频尚未准备好"); return }
@@ -101,7 +72,7 @@ class LocalAudioPlayer(context: Context, private val report: (String) -> Unit) {
             else report("等待系统归还音频焦点")
         }
     }
-    private fun applyVolume() {
+    internal fun applyVolume() {
         val level = policy.effectiveVolume(volume)
         player?.setVolume(level, level)
     }

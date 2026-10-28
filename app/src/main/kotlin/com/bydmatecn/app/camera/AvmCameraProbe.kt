@@ -329,11 +329,7 @@ class AvmCameraProbe(
         return if (open.invoke(cam) == true) cam else null
     }
 
-    private fun rootMessage(e: Throwable): String {
-        var cur = e
-        while (cur.cause != null && cur.cause !== cur) cur = cur.cause!!
-        return "${cur.javaClass.simpleName}: ${cur.message}"
-    }
+
 
     private fun releaseOwnership() {
         synchronized(ownershipLock) { if (owner === this) owner = null }
@@ -432,3 +428,9 @@ private val AVM_EVENT_NAMES = mapOf(
     1009 to "device-free",
     1010 to "hal-died",
 )
+
+private fun rootMessage(e: Throwable): String {
+        var cur = e
+        while (cur.cause != null && cur.cause !== cur) cur = cur.cause!!
+        return "${cur.javaClass.simpleName}: ${cur.message}"
+    }

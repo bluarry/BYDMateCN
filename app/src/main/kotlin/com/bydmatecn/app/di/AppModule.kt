@@ -629,12 +629,19 @@ object AppModule {
         seatChannelStore: com.bydmatecn.app.data.vehicle.SeatChannelStore,
         windowChannelStore: com.bydmatecn.app.data.vehicle.WindowChannelStore,
         seatCommandJournal: com.bydmatecn.app.data.vehicle.SeatCommandJournal,
-        rearMirrorReader: com.bydmatecn.app.data.vehicle.reflection.RearMirrorStateReader,
-    ): com.bydmatecn.app.data.vehicle.VehicleApi =
+    ): com.bydmatecn.app.data.vehicle.VehicleApiImpl =
         com.bydmatecn.app.data.vehicle.VehicleApiImpl(
             parsReader, autoservice, helper, allowlist, writeLogDao, seatChannelStore, windowChannelStore,
-            seatCommandJournal, rearMirrorReader,
+            seatCommandJournal,
         )
+
+    @Provides
+    @Singleton
+    fun provideRearMirrorVehicleApi(
+        delegate: com.bydmatecn.app.data.vehicle.VehicleApiImpl,
+        reader: com.bydmatecn.app.data.vehicle.reflection.RearMirrorStateReader,
+    ): com.bydmatecn.app.data.vehicle.VehicleApi =
+        com.bydmatecn.app.data.vehicle.RearMirrorVehicleApi(delegate, reader)
 
     @Provides
     @Singleton

@@ -1,7 +1,12 @@
 package com.bydmatecn.app.local
-import com.bydmatecn.app.data.automation.*
-import com.bydmatecn.app.data.local.entity.*
-import org.junit.Assert.*
+import com.bydmatecn.app.data.automation.RuleParseResult
+import com.bydmatecn.app.data.automation.RuleShare
+import com.bydmatecn.app.data.automation.SharedRule
+import com.bydmatecn.app.data.local.entity.ActionDef
+import com.bydmatecn.app.data.local.entity.TriggerDef
+import com.bydmatecn.app.data.local.entity.RuleEntity
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 class LocalMediaRuleRoundTripTest {
     @Test fun localActionsSurviveRuleExchange() {

@@ -1,5 +1,5 @@
 package com.bydmatecn.app.local
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 class MirrorViewConfigTest {
     @Test fun defaultIsIdentity() { val c = MirrorViewConfig(); assertEquals(1f, c.scaleX(), 0f); assertEquals(1f, c.scaleY(), 0f) }

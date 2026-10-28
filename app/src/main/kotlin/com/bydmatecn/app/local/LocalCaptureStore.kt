@@ -32,7 +32,6 @@ class LocalCaptureStore(private val root: File, private val quotaBytes: Long = 5
         captures().firstOrNull { it.canonicalFile == file.canonicalFile }?.delete() ?: false
     }
 
-
     private fun trimTo(budget: Long) {
         val files = captures()
         var total = files.sumOf { it.length() }

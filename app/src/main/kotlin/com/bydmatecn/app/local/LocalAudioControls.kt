@@ -1,0 +1,240 @@
+package com.bydmatecn.app.local
+
+import android.app.AlertDialog
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.EditText
+import android.content.Context
+import android.content.Intent
+import android.media.AudioManager
+import android.widget.SeekBar
+import android.widget.Switch
+import android.provider.Settings
+import android.widget.Button
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import java.io.File
+
+/** Activity-scoped controls; the activity owns state and lifecycle cleanup. */
+internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.SharedPreferences) {
+        micRelay = LocalMicRelay(this) { status.text = it }
+        label("实时车外喊话 · 按住说话，松手停止 · 最长15秒")
+        val pushToTalk = Button(this).apply {
+            this.text = "按住喊话（需要先确认车外路由，音量≤50%）"
+            setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        LocalFileLog.get(this@microphoneControls).record("mic", "touch down")
+                        view.isPressed = true
+                        val talkRequest = ++talkRequestGeneration
+                        if (!audioPrefs.getBoolean("exterior_verified", false)) {
+                            status.text = "请先完成车外试听并勾选实际出声确认"
+                        } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                        } else lifecycleScope.launch {
+                            val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
+                            if (talkRequest != talkRequestGeneration || !view.isPressed || !firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) return@launch
+                            runCatching {
+                                recorder?.finish(false); speech?.stop(); stopAudio()
+                                micRelay?.start(firmwareAudio.attributes(FirmwareAudioRoute.EXTERIOR_VOICE), audioPrefs.getInt("volume", 25))
+                            }.onFailure { micRelay?.stop(); status.text = "喊话启动失败：${it.message}" }
+                        }
+                    }
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                        LocalFileLog.get(this@microphoneControls).record("mic", "touch released/cancelled")
+                        talkRequestGeneration++; view.isPressed = false; micRelay?.stop(); view.performClick()
+                    }
+                }
+                true
+            }
+        }
+        layout.addView(Switch(this).apply {
+            text = "已实际确认11002从车外扬声器出声，理解啸叫风险"
+            setTextColor(0xFFE3EDFF.toInt()); isChecked = audioPrefs.getBoolean("exterior_verified", false)
+            setOnCheckedChangeListener { _, checked ->
+                audioPrefs.edit().putBoolean("exterior_verified", checked).apply()
+                if (!checked) micRelay?.stop()
+            }
+        })
+        layout.addView(pushToTalk)
+
+        speechControls(audioPrefs)
+    }
+
+internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.SharedPreferences) {
+        label("录制语音（仅本地保存，不是实时外放）")
+        recorder = LocalAudioRecorder(File(cacheDir, "local-voice"), resources,
+            { status.text = it }, { selectAudio(it) })
+        button("开始录音 · 最长 60 秒") {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            } else {
+                stopAudio(); speech?.stop()
+                runCatching { recorder?.start() }.onFailure { status.text = "录音启动失败：${it.message}" }
+            }
+        }
+        button("停止录音并保存") { recorder?.finish(true) }
+        button("放弃录音") { recorder?.finish(false); status.text = "录音已取消" }
+        label("离线中文语音（使用已安装离线音色）")
+        speech = LocalSpeechPlayer(this) { status.text = it }
+        val text = EditText(this).apply {
+            hint = "输入语音文本，最多 500 字"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(500))
+            setTextColor(0xFFE3EDFF.toInt()); setHintTextColor(0xFF8090AA.toInt())
+            setText(audioPrefs.getString("speech_text", ""))
+        }
+        layout.addView(text)
+        label("语速 0.5～2.0")
+        val rate = SeekBar(this).apply { max = 150; progress = audioPrefs.getInt("speech_rate", 50).coerceIn(0, 150) }
+        layout.addView(rate)
+        label("音调 0.5～2.0")
+        val pitch = SeekBar(this).apply { max = 150; progress = audioPrefs.getInt("speech_pitch", 50).coerceIn(0, 150) }
+        layout.addView(pitch)
+        button("朗读（系统默认音频输出）") {
+            recorder?.finish(false); stopAudio()
+            audioPrefs.edit().putString("speech_text", text.text.toString())
+                .putInt("speech_rate", rate.progress).putInt("speech_pitch", pitch.progress).apply()
+            speech?.speak(text.text.toString(), .5f + rate.progress / 100f, .5f + pitch.progress / 100f)
+        }
+        button("生成本地语音文件（WAV，不播放）") {
+            recorder?.finish(false); stopAudio()
+            speech?.synthesize(text.text.toString(), .5f + rate.progress / 100f, .5f + pitch.progress / 100f, resources) { selectAudio(it) }
+        }
+        button("停止朗读 / 合成") { speech?.stop() }
+
+        firmwareControls(audioPrefs)
+    }
+
+internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.SharedPreferences) {
+        label("固件专用路由：仅驻车手动试听，最多 15 秒；不代表已实现自动锁车播放。")
+        button("检测车外 / 锁车试听接口（不播放）") { status.text = firmwareAudio.probe() }
+        FirmwareAudioRoute.entries.filter { it != FirmwareAudioRoute.LOCK_EVENT }.forEach { route ->
+            button("${route.title}：试听选中音频") {
+                AlertDialog.Builder(this).setTitle(route.title)
+                    .setMessage("可能在车外发声，请确认环境安全。最多播放 15 秒，离开页面即停止。不覆盖原厂音效。")
+                    .setNegativeButton("取消", null).setPositiveButton("驻车试听") { _, _ -> playFirmwareAudio(route) }.show()
+            }
+        }
+
+        label("自动锁 / 解锁音效 · 手动布防 · 不修改原厂资源")
+        val lockPrefs = getSharedPreferences("local-lock-sound", Context.MODE_PRIVATE)
+        layout.addView(Switch(this).apply {
+            this.text = "已实车确认11001事件路由与LockFL门锁原始码"
+            setTextColor(0xFFE3EDFF.toInt()); isChecked = lockPrefs.getBoolean("verified", false)
+            setOnCheckedChangeListener { _, checked ->
+                lockPrefs.edit().putBoolean("verified", checked).apply()
+                if (!checked) stopService(Intent(this@firmwareControls, LocalLockSoundService::class.java))
+            }
+        })
+        button("选中音频设为锁车音效") { selectedAudio?.let { lockPrefs.edit().putString("lock_file", it.name).apply(); status.text = "锁车音效：${it.name}" } }
+        button("选中音频设为解锁音效") { selectedAudio?.let { lockPrefs.edit().putString("unlock_file", it.name).apply(); status.text = "解锁音效：${it.name}" } }
+        button("手动布防锁车音效（最多2小时）") {
+            if (!lockPrefs.getBoolean("verified", false)) status.text = "需要先完成实车路由与门锁验证"
+            else {
+                lockPrefs.edit().putInt("volume", audioPrefs.getInt("volume", 25).coerceIn(0, 50)).apply()
+                runCatching { androidx.core.content.ContextCompat.startForegroundService(this,
+                    Intent(this, LocalLockSoundService::class.java).setAction(LocalLockSoundService.ARM)) }
+                    .onFailure { status.text = "布防启动失败：${it.message}" }
+            }
+        }
+        button("停止锁车布防") { stopService(Intent(this, LocalLockSoundService::class.java)); status.text = "已请求停止布防" }
+        button("读取布防状态") { status.text = lockPrefs.getString("last_status", "未布防") }
+
+    }
+
+internal fun LocalToolsActivity.selectAudio(file: File) {
+        if (selectedAudio != file) { lyricLines = emptyList(); lyricLabel?.text = "" }
+        selectedAudio = file
+        getSharedPreferences("local-audio", Context.MODE_PRIVATE).edit().putString("selected", file.name).apply()
+    }
+
+internal fun LocalToolsActivity.playSelected() {
+        val file = selectedAudio ?: run { status.text = "请先选择音频"; return }
+        recorder?.finish(false); speech?.stop()
+        stopAudio()
+        localPlayer.play(file, selectedOutput)
+    }
+
+internal fun LocalToolsActivity.playFirmwareAudio(route: FirmwareAudioRoute) {
+        if (busy) return
+        val file = selectedAudio ?: run { status.text = "请先选择本地音频"; return }
+        lifecycleScope.launch {
+            busy = true
+            try {
+                stopAudio(); recorder?.finish(false); speech?.stop()
+                val request = audioRequestGeneration
+                val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
+                check(request == audioRequestGeneration && firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) { "非驻车、车辆状态未知或页面不可见" }
+                val attrs = firmwareAudio.attributes(route)
+                firmwarePlayback = true
+                localPlayer.play(file, null, attrs, route.title, 15_000L)
+            } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) {
+                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+            } catch (error: IllegalStateException) {
+                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+            } catch (error: IllegalArgumentException) {
+                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+            } catch (error: SecurityException) {
+                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+            } catch (error: ReflectiveOperationException) {
+                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+            } finally { busy = false }
+        }
+    }
+
+internal fun LocalToolsActivity.stopAudio() { audioRequestGeneration++; talkRequestGeneration++; micRelay?.stop(); firmwarePlayback = false; localPlayer.stop() }
+
+internal fun LocalToolsActivity.diagnosticControls() {
+        label("本地日志自动保存，最多两份各1MiB；不含音频内容。卸载/清除数据会删除日志。")
+        button("导出本地问题日志 TXT") { exportLocalLog.launch("BYDMateCN-local-log-${System.currentTimeMillis()}.txt") }
+        label("固件包用于确认接口；实车还必须提供运行时类、Binder 服务、HAL 路由和权限。此检测只读，不自动授权，不改系统设置。")
+        button("相机权限") { permissionForCamera() }
+        button("使用情况访问权限") { openSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS) }
+        button("悬浮窗权限") {
+            runCatching { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:$packageName"))) }
+                .onFailure { status.text = "固件没有悬浮窗设置页：${it.message}" }
+        }
+        button("应用详情 / 权限管理") {
+            runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))) }
+                .onFailure { status.text = "无法打开应用详情：${it.message}" }
+        }
+        button("刷新只读适配报告") {
+            if (busy) return@button
+            lifecycleScope.launch {
+                busy = true
+                try {
+                    val report = org.json.JSONObject()
+                        .put("schema", "bydmate.local-capabilities.v1")
+                        .put("android_sdk", android.os.Build.VERSION.SDK_INT)
+                        .put("build_display", android.os.Build.DISPLAY)
+                        .put("model", android.os.Build.MODEL)
+                        .put("camera_permission", checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+                        .put("microphone_permission", checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+                        .put("overlay_permission", Settings.canDrawOverlays(this@diagnosticControls))
+                    val ops = getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+                    report.put("usage_access", ops.checkOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+                        android.os.Process.myUid(), packageName) == android.app.AppOpsManager.MODE_ALLOWED)
+                    val types = org.json.JSONObject()
+                    listOf("android.media.BydAudioManager", "android.hardware.BmmCameraInfo", "android.hardware.AVMCamera").forEach { name ->
+                        types.put(name, runCatching { Class.forName(name); "present" }.getOrElse { "${it.javaClass.simpleName}: ${it.message}" })
+                    }
+                    report.put("runtime_classes", types)
+                    report.put("audio_attribute_probe", firmwareAudio.probe())
+                    report.put("output_devices", org.json.JSONArray(audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map {
+                        org.json.JSONObject().put("id", it.id).put("type", it.type).put("name", it.productName.toString())
+                    }))
+                    val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { runCatching { vehicle.readSnapshot() }.getOrNull() }
+                    report.put("vehicle_readable", snapshot != null)
+                    report.put("parked_now", snapshot?.gear == 1 && snapshot.speed == 0)
+                    report.put("displays", runCatching { helper.listDisplays()?.joinToString("\n") }.getOrNull() ?: "helper unavailable")
+                    report.put("limitations", "Class presence and AudioAttributes do not verify HAL output or Binder authorization. No playback/camera open performed.")
+                    diagnosticReport = report.toString(2)
+                    status.text = diagnosticReport
+                } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) { status.text = "检测失败：${error.message}" } catch (error: IllegalStateException) { status.text = "检测失败：${error.message}" } catch (error: IllegalArgumentException) { status.text = "检测失败：${error.message}" } catch (error: SecurityException) { status.text = "检测失败：${error.message}" } catch (error: ReflectiveOperationException) { status.text = "检测失败：${error.message}" }
+                finally { busy = false }
+            }
+        }
+        button("导出 JSON 适配报告") {
+            if (diagnosticReport.isBlank()) status.text = "请先刷新报告" else exportDiagnostics.launch("BYDMate-capabilities.json")
+        }
+    }

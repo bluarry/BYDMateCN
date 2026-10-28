@@ -1,7 +1,11 @@
 package com.bydmatecn.app.local
 
-import java.io.*
-import java.util.zip.*
+import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 /** Media-only transactional restore. No accounts, databases, permissions or activation data. */
 class LocalMediaBackup(private val filesRoot: File, private val cacheRoot: File) {
@@ -28,48 +32,78 @@ class LocalMediaBackup(private val filesRoot: File, private val cacheRoot: File)
     private fun restoreLocked(input: InputStream): Int {
         check(cacheRoot.isDirectory || cacheRoot.mkdirs())
         val stage = java.nio.file.Files.createTempDirectory(cacheRoot.toPath(), "media-restore-").toFile()
+        try {
+            val staged = readArchive(input, stage)
+            validateStaged(staged)
+            return publishStaged(staged)
+        } finally {
+            stage.listFiles().orEmpty().forEach { it.delete() }
+            stage.delete()
+        }
+    }
+
+    private fun readArchive(input: InputStream, stage: File): List<Pair<File, File>> {
         val staged = mutableListOf<Pair<File, File>>()
         var total = 0L
-        try {
-            ZipInputStream(input).use { zip ->
-                val names = mutableSetOf<String>()
-                while (true) {
-                    val entry = zip.nextEntry ?: break
-                    require(!entry.isDirectory && names.add(entry.name)) { "目录或重复条目不支持" }
-                    require(staged.size < 5000) { "备份条目过多" }
-                    val pieces = entry.name.split('/')
-                    require(pieces.size == 2 && pieces[1].matches(Regex("[A-Za-z0-9._-]+"))) { "非法备份路径" }
-                    val folder = folders[pieces[0]] ?: error("未知备份类型")
-                    val name = pieces[1]
-                    val extension = name.substringAfterLast('.', "")
-                    require(when (pieces[0]) {
-                        "audio" -> name.startsWith("audio-") && extension in LocalResourceStore.AUDIO_TYPES
-                        "captures" -> name.startsWith("capture-") && extension == "jpg"
-                        "videos" -> name.startsWith("video-") && (extension == "mp4" || name.endsWith(".mp4.event"))
-                        else -> false
-                    }) { "备份文件不是本应用媒体" }
-                    val destDir = File(filesRoot, folder)
-                    check(destDir.isDirectory || destDir.mkdirs())
-                    require(!java.nio.file.Files.isSymbolicLink(destDir.toPath()))
-                    val dest = File(destDir, name)
-                    require(!dest.exists()) { "同名文件已存在，请不要覆盖现有媒体" }
-                    val temp = File(stage, "entry-${staged.size}")
-                    val limit = if (name.endsWith(".event")) 1024L else if (pieces[0] == "audio") LocalResourceStore.MAX_FILE_BYTES else 512L*1024*1024
-                    var bytes = 0L
-                    temp.outputStream().use { output ->
-                        val buffer = ByteArray(8192)
-                        while (true) {
-                            val n = zip.read(buffer); if (n < 0) break
-                            bytes += n; total += n
-                            require(bytes <= limit && total <= 1152L*1024*1024) { "备份解压超过限额" }
-                            output.write(buffer, 0, n)
-                        }
-                    }
-                    require(bytes > 0) { "空媒体条目" }
-                    staged += temp to dest
-                    zip.closeEntry()
-                }
+        val names = mutableSetOf<String>()
+        ZipInputStream(input).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                require(!entry.isDirectory && names.add(entry.name)) { "Duplicate or directory entry" }
+                require(staged.size < 5000) { "Too many backup entries" }
+                val destination = destination(entry.name)
+                val temporary = File(stage, "entry-${staged.size}")
+                val bytes = copyEntry(zip, temporary, entryLimit(entry.name), total)
+                total += bytes
+                staged += temporary to destination
+                zip.closeEntry()
             }
+        }
+        return staged
+    }
+
+    private fun destination(path: String): File {
+        val pieces = path.split('/')
+        require(pieces.size == 2 && pieces[1].matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid backup path" }
+        val folder = folders[pieces[0]] ?: error("Unknown backup type")
+        val name = pieces[1]
+        val extension = name.substringAfterLast('.', "")
+        val valid = when (pieces[0]) {
+            "audio" -> name.startsWith("audio-") && extension in LocalResourceStore.AUDIO_TYPES
+            "captures" -> name.startsWith("capture-") && extension == "jpg"
+            "videos" -> name.startsWith("video-") && (extension == "mp4" || name.endsWith(".mp4.event"))
+            else -> false
+        }
+        require(valid) { "Not application media" }
+        val directory = File(filesRoot, folder)
+        check(directory.isDirectory || directory.mkdirs())
+        require(!java.nio.file.Files.isSymbolicLink(directory.toPath()))
+        return File(directory, name).also { require(!it.exists()) { "Existing media must not be overwritten" } }
+    }
+
+    private fun entryLimit(path: String): Long = when {
+        path.endsWith(".event") -> 1024L
+        path.startsWith("audio/") -> LocalResourceStore.MAX_FILE_BYTES
+        else -> 512L * 1024 * 1024
+    }
+
+    private fun copyEntry(input: InputStream, file: File, limit: Long, previous: Long): Long {
+        var bytes = 0L
+        file.outputStream().use { output ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                bytes += count
+                require(bytes <= limit && previous + bytes <= 1152L * 1024 * 1024) { "Backup exceeds extraction limit" }
+                output.write(buffer, 0, count)
+            }
+        }
+        require(bytes > 0) { "Empty media entry" }
+        return bytes
+    }
+
+    private fun validateStaged(staged: List<Pair<File, File>>) {
             staged.filter { it.second.name.endsWith(".event") }.forEach { (_, marker) ->
                 require(staged.any { it.second == File(marker.parentFile, marker.name.removeSuffix(".event")) }) {
                     "事件标记缺少对应视频"
@@ -80,7 +114,12 @@ class LocalMediaBackup(private val filesRoot: File, private val cacheRoot: File)
                 val existing = File(filesRoot, folder).listFiles().orEmpty().filter { it.isFile }.sumOf { it.length() }
                 require(existing + staged.filter { it.second.parentFile?.name == folder }.sumOf { it.first.length() } <= quota) { "${folder}超出配额" }
             }
+
+    }
+
+    private fun publishStaged(staged: List<Pair<File, File>>): Int {
             val published = mutableListOf<File>()
+            var committed = false
             try {
                 staged.forEach { (temp, dest) ->
                     // Same-volume app cache -> private files: move completed bytes, never expose a partial media file.
@@ -88,8 +127,9 @@ class LocalMediaBackup(private val filesRoot: File, private val cacheRoot: File)
                     java.nio.file.Files.move(temp.toPath(), dest.toPath())
                     published += dest
                 }
-            } catch (error: Exception) { published.forEach { it.delete() }; throw error }
+
+                committed = true
+        } finally { if (!committed) { published.forEach { it.delete() } } }
             return published.size
-        } finally { stage.listFiles().orEmpty().forEach { it.delete() }; stage.delete() }
     }
 }

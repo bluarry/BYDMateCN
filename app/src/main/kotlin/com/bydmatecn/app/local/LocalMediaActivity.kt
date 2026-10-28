@@ -2,9 +2,14 @@ package com.bydmatecn.app.local
 
 import android.app.AlertDialog
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Bundle
-import android.widget.*
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.MediaController
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
@@ -88,17 +93,7 @@ class LocalMediaActivity : ComponentActivity() {
                 button("${if (file.extension == "mp4" && videos.isProtected(file)) "[事件保护] " else ""}${file.name} · ${file.length() / 1024} KiB") {
                     selected = file
                     AlertDialog.Builder(this).setTitle(file.name).setItems(arrayOf("回看", "导出", "删除", "保护 / 解除事件保护")) { _, which ->
-                        when (which) {
-                            3 -> { if (file.extension == "mp4") { if (videos.isProtected(file)) videos.unprotect(file) else videos.protect(file, "用户保护"); refresh() } }
-                            0 -> preview(file)
-                            1 -> export.launch(file.name)
-                            2 -> AlertDialog.Builder(this).setMessage("删除私有副本？导出副本不受影响。")
-                                .setNegativeButton("取消", null).setPositiveButton("删除") { _, _ ->
-                                    clearPreview()
-                                    val deleted = if (file.extension == "mp4") videos.delete(file) else captures.delete(file)
-                                    refresh(); if (!deleted) message.text = "文件已被循环存储清理或删除失败"
-                                }.show()
-                        }
+                        performMediaAction(file, which)
                     }.show()
                 }
             }
@@ -122,12 +117,7 @@ class LocalMediaActivity : ComponentActivity() {
             }
         } else lifecycleScope.launch {
             val decoded = withContext(Dispatchers.IO) { runCatching { withOwned(file) {
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(file.absolutePath, bounds)
-                var sample = 1
-                while (bounds.outWidth / sample > 1280 || bounds.outHeight / sample > 720) sample *= 2
-                BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
-                    ?: error("无法解码截图")
+                decodeCapture(file)
             } } }
             decoded.onSuccess { bitmap ->
                 if (request != previewGeneration || isFinishing) bitmap.recycle()
@@ -147,4 +137,19 @@ class LocalMediaActivity : ComponentActivity() {
     override fun onResume() { super.onResume(); resumed = true }
     override fun onPause() { LocalFileLog.get(this).record("media", "page paused; releasing preview"); resumed = false; parked = false; clearPreview(); super.onPause() }
     override fun onDestroy() { clearPreview(); super.onDestroy() }
+
+    private fun performMediaAction(file: File, which: Int) {
+        when (which) {
+                            3 -> { if (file.extension == "mp4") { if (videos.isProtected(file)) videos.unprotect(file) else videos.protect(file, "用户保护"); refresh() } }
+                            0 -> preview(file)
+                            1 -> export.launch(file.name)
+                            2 -> AlertDialog.Builder(this).setMessage("删除私有副本？导出副本不受影响。")
+                                .setNegativeButton("取消", null).setPositiveButton("删除") { _, _ ->
+                                    clearPreview()
+                                    val deleted = if (file.extension == "mp4") videos.delete(file) else captures.delete(file)
+                                    refresh(); if (!deleted) message.text = "文件已被循环存储清理或删除失败"
+                                }.show()
+
+        }
+    }
 }

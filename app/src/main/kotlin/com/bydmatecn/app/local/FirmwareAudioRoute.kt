@@ -25,7 +25,7 @@ class FirmwareAudioBridge(private val context: Context) {
                 .invoke(manager, actual) as? AudioAttributes
                 ?: error("固件未返回专用属性；不降级为普通媒体")
         } catch (error: InvocationTargetException) {
-            throw IllegalStateException("固件接口拒绝：${error.targetException}", error.targetException)
+            throw IllegalStateException("固件接口拒绝：${error.targetException}", error)
         }
     }
     fun probe(): String = FirmwareAudioRoute.entries.joinToString("\n") { route ->

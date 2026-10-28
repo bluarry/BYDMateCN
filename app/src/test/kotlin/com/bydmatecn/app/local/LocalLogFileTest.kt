@@ -2,7 +2,9 @@ package com.bydmatecn.app.local
 
 import java.io.ByteArrayOutputStream
 import java.io.File
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder

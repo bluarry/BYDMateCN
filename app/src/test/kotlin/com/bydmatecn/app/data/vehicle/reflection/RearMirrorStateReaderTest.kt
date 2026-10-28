@@ -15,11 +15,11 @@ class RearMirrorStateReaderTest {
             var state: Any? = 1
             var failure: RuntimeException? = null
             var returnNull = false
-            @JvmStatic fun getInstance(context: FakeContext): FakeDevice? = if (returnNull) null else FakeDevice()
+            @JvmStatic fun getInstance(context: FakeContext): FakeDevice? = if (returnNull) null else context.let { FakeDevice() }
         }
     }
-    class WrongSignature {
-        companion object { @JvmStatic fun getInstance(): WrongSignature = WrongSignature() }
+    object WrongSignature {
+        @JvmStatic fun getInstance(): WrongSignature = this
     }
 
     private fun reader(reflection: BydReflection = BydReflection { FakeDevice::class.java }): RearMirrorStateReader {

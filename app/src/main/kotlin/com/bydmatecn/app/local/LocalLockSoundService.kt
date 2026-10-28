@@ -1,12 +1,25 @@
 package com.bydmatecn.app.local
 
-import android.app.*
-import android.content.*
-import android.os.*
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.bydmatecn.app.data.vehicle.VehicleApi
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.*
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CancellationException
 import java.io.File
 import javax.inject.Inject
 
@@ -38,27 +51,16 @@ class LocalLockSoundService : Service() {
                 // 11001, not the preview context: availability checked before arming.
                 FirmwareAudioBridge(this@LocalLockSoundService).attributes(FirmwareAudioRoute.LOCK_EVENT)
                 note("已布防：等待有效门锁基线，不在启动时播放")
-                while (isActive && SystemClock.elapsedRealtime() < deadline) {
-                    val data = withTimeoutOrNull(2500) { vehicle.readSnapshot() }
-                    val safe = data?.gear == 1 && data.speed == 0 && data.voltage12v != null && data.voltage12v >= 12.0
-                    if (data?.voltage12v != null && data.voltage12v < 12.0) { note("12V低于12.0V，停止布防"); break }
-                    if (!safe) player.stop()
-                    val event = edges.sample(data?.lockFL, safe, SystemClock.elapsedRealtime())
-                    if (event != null) {
-                        val name = prefs.getString(if (event == 2) "lock_file" else "unlock_file", null)
-                        val file = LocalResourceStore(File(filesDir, "local-audio")).files().firstOrNull { it.name == name }
-                        if (file != null) {
-                            player.setVolume(prefs.getInt("volume", 25).coerceIn(0, 50))
-                            player.play(file, null, FirmwareAudioBridge(this@LocalLockSoundService).attributes(FirmwareAudioRoute.LOCK_EVENT),
-                                if (event == 2) "本地锁车事件" else "本地解锁事件", 5000)
-                        } else note("事件$event：未配置或音频已删除")
-                    }
-                    delay(500)
-                }
-            } catch (error: Exception) {
-                if (error is CancellationException) throw error
+                observeEdges(edges, deadline)
+            } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) {
                 note("布防失败：${error.message}")
-            } finally { stopSelf(startId) }
+            } catch (error: IllegalStateException) {
+                note("布防失败：${error.message}")
+            } catch (error: IllegalArgumentException) {
+                note("布防失败：${error.message}")
+            } catch (error: SecurityException) {
+                note("布防失败：${error.message}")
+            }  finally { stopSelf(startId) }
         }
         return START_NOT_STICKY
     }
@@ -68,4 +70,27 @@ class LocalLockSoundService : Service() {
     }
     override fun onDestroy() { note("布防服务停止"); job?.cancel(); scope.cancel(); player.stop(); stopForeground(true); super.onDestroy() }
     companion object { const val ARM = "com.bydmatecn.app.LOCK_ARM"; const val STOP = "com.bydmatecn.app.LOCK_STOP"; private const val CHANNEL = "local_lock_sound" }
+    private suspend fun observeEdges(edges: LockSoundEdge, deadline: Long) {
+        while (currentCoroutineContext().isActive && SystemClock.elapsedRealtime() < deadline) {
+                    val data = withTimeoutOrNull(2500) { vehicle.readSnapshot() }
+                    val safe = data?.gear == 1 && data.speed == 0 && data.voltage12v != null && data.voltage12v >= 12.0
+                    if (data?.voltage12v != null && data.voltage12v < 12.0) { note("12V低于12.0V，停止布防"); break }
+                    if (!safe) player.stop()
+                    val event = edges.sample(data?.lockFL, safe, SystemClock.elapsedRealtime())
+                    if (event != null) playEvent(event)
+                    delay(500)
+
+        }
+    }
+
+    private fun playEvent(event: Int) {
+                        val name = prefs.getString(if (event == 2) "lock_file" else "unlock_file", null)
+                        val file = LocalResourceStore(File(filesDir, "local-audio")).files().firstOrNull { it.name == name }
+                        if (file != null) {
+                            player.setVolume(prefs.getInt("volume", 25).coerceIn(0, 50))
+                            player.play(file, null, FirmwareAudioBridge(this@LocalLockSoundService).attributes(FirmwareAudioRoute.LOCK_EVENT),
+                                if (event == 2) "本地锁车事件" else "本地解锁事件", 5000)
+                        } else note("事件$event：未配置或音频已删除")
+
+    }
 }

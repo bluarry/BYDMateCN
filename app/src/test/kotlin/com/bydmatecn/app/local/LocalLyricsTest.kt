@@ -1,5 +1,5 @@
 package com.bydmatecn.app.local
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 class LocalLyricsTest {
     @Test fun multipleTimestampsAndFraction() {

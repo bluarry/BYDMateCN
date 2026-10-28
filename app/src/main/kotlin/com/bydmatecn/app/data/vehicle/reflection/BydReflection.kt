@@ -22,21 +22,35 @@ class BydReflection(private val loadClass: (String) -> Class<*> = { Class.forNam
 
     fun invoke(owner: Class<*>, receiver: Any?, name: String, parameters: List<Class<*>>, vararg args: Any?): Any? {
         val key = MethodKey(owner, name, parameters.toList())
-        val method = methods.computeIfAbsent(key) { owner.getMethod(name, *parameters.toTypedArray()) }
+        val method = methods.computeIfAbsent(key) { owner.methods.firstOrNull { it.name == name && it.parameterTypes.toList() == parameters }
+            ?: throw NoSuchMethodException("${owner.name}.$name$parameters") }
         return method.invoke(receiver, *args)
     }
 
     fun <T> read(block: () -> ReflectionRead<T>): ReflectionRead<T> = try {
         block()
-    } catch (error: Exception) {
-        val cause = if (error is InvocationTargetException) error.targetException else error
-        // Never turn VM failure or coroutine cancellation from a target into a normal read failure.
+    } catch (error: InvocationTargetException) {
+        targetFailure(error.targetException)
+    } catch (error: ReflectiveOperationException) {
+        unavailable(error)
+    } catch (error: SecurityException) {
+        unavailable(error)
+    } catch (error: IllegalArgumentException) {
+        unavailable(error)
+    } catch (error: IllegalStateException) {
+        unavailable(error)
+    } catch (error: LinkageError) {
+        unavailable(error)
+    }
+
+    private fun targetFailure(cause: Throwable): ReflectionRead.Unavailable {
         if (cause is java.util.concurrent.CancellationException) throw cause
         if (cause is Error && cause !is LinkageError) throw cause
-        ReflectionRead.Unavailable(reason(cause), cause.javaClass.name + ": " + (cause.message ?: ""))
-    } catch (error: LinkageError) {
-        ReflectionRead.Unavailable(ReflectionFailure.LINKAGE_FAILED, error.javaClass.name + ": " + (error.message ?: ""))
+        return unavailable(cause)
     }
+
+    private fun unavailable(error: Throwable): ReflectionRead.Unavailable =
+        ReflectionRead.Unavailable(reason(error), error.javaClass.name + ": " + (error.message ?: ""))
 
     private fun reason(error: Throwable): ReflectionFailure = when (error) {
         is ClassNotFoundException -> ReflectionFailure.CLASS_MISSING

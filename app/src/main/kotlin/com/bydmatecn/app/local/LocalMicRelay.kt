@@ -3,7 +3,13 @@ package com.bydmatecn.app.local
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.media.*
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioRecord
+import android.media.AudioTrack
+import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
 import java.util.concurrent.Executors
@@ -34,7 +40,43 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
         running.set(true)
         watchdog = Runnable { if (generation == session) { stop(); report("喊话15秒到时停止") } }
             .also { handler.postDelayed(it, 15_000) }
-        worker.execute {
+        worker.execute { runRelay(attributes, volume, session) }
+    }
+    fun stop() {
+        running.set(false); generation++
+        watchdog?.let { handler.removeCallbacks(it) }; watchdog = null
+        focus?.let { audio.abandonAudioFocusRequest(it) }; focus = null
+    }
+    fun close() {
+        if (closed) return
+        closed = true
+        stop()
+        worker.shutdown()
+    }
+
+    private fun relayPcm(input: AudioRecord, output: AudioTrack, session: Int) {
+                val buffer = ShortArray(320)
+                handler.post { if (generation == session) report("喊话中：最多15秒，音量上限50%；外部出声位置待实车确认") }
+                while (running.get() && generation == session) {
+                    val count = input.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
+                    check(count >= 0) { "麦克风读取失败：$count" }
+                    if (count == 0) { Thread.sleep(5); continue }
+                    writePcm(output, buffer, count, session)
+                }
+    }
+    private fun writePcm(output: AudioTrack, buffer: ShortArray, count: Int, session: Int) {
+                    var offset = 0
+                    val deadline = System.nanoTime() + 500_000_000
+                    while (offset < count && running.get() && generation == session) {
+                        val written = output.write(buffer, offset, count-offset, AudioTrack.WRITE_NON_BLOCKING)
+                        check(written >= 0) { "外放写入失败：$written" }
+                        offset += written
+                        check(System.nanoTime() < deadline) { "音频输出阻塞" }
+                        if (written == 0) Thread.sleep(5)
+                    }
+    }
+
+    private fun runRelay(attributes: AudioAttributes, volume: Int, session: Int) {
             var input: AudioRecord? = null
             var output: AudioTrack? = null
             try {
@@ -51,37 +93,20 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
                     .setBufferSizeInBytes(maxOf(outputSize * 2, 4096)).setTransferMode(AudioTrack.MODE_STREAM).build()
                 check(input.state == AudioRecord.STATE_INITIALIZED && output.state == AudioTrack.STATE_INITIALIZED)
                 check(output.setVolume(volume.coerceIn(0, 50) / 100f) == AudioTrack.SUCCESS)
-                if (generation != session || !running.get()) return@execute
+                if (generation != session || !running.get()) return
                 input.startRecording(); output.play()
                 check(input.recordingState == AudioRecord.RECORDSTATE_RECORDING)
-                val buffer = ShortArray(320)
-                handler.post { if (generation == session) report("喊话中：最多15秒，音量上限50%；外部出声位置待实车确认") }
-                while (running.get() && generation == session) {
-                    val count = input.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
-                    check(count >= 0) { "麦克风读取失败：$count" }
-                    if (count == 0) { Thread.sleep(5); continue }
-                    var offset = 0
-                    val deadline = System.nanoTime() + 500_000_000
-                    while (offset < count && running.get() && generation == session) {
-                        val written = output.write(buffer, offset, count-offset, AudioTrack.WRITE_NON_BLOCKING)
-                        check(written >= 0) { "外放写入失败：$written" }
-                        offset += written
-                        check(System.nanoTime() < deadline) { "音频输出阻塞" }
-                        if (written == 0) Thread.sleep(5)
-                    }
-                }
-            } catch (error: Exception) {
+                relayPcm(input, output, session)
+            } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: IllegalStateException) {
+                handler.post { if (generation == session) { stop(); report("喊话失败：${error.message}") } }
+            } catch (error: SecurityException) {
+                handler.post { if (generation == session) { stop(); report("喊话失败：${error.message}") } }
+            } catch (error: InterruptedException) {
                 handler.post { if (generation == session) { stop(); report("喊话失败：${error.message}") } }
             } finally {
                 runCatching { input?.stop() }; runCatching { input?.release() }
                 runCatching { output?.pause() }; runCatching { output?.flush() }; runCatching { output?.release() }
             }
-        }
+
     }
-    fun stop() {
-        running.set(false); generation++
-        watchdog?.let { handler.removeCallbacks(it) }; watchdog = null
-        focus?.let { audio.abandonAudioFocusRequest(it) }; focus = null
-    }
-    fun close() { if (closed) return; closed = true; stop(); worker.shutdown() }
 }

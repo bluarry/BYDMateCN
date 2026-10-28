@@ -22,6 +22,7 @@ class LocalVideoRecorder(private val store: LocalVideoStore) {
     fun start() {
         check(!active)
         val file = store.pending(); pending = file
+        var committed = false
         try {
             val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
             codec = encoder
@@ -34,7 +35,9 @@ class LocalVideoRecorder(private val store: LocalVideoStore) {
             encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             encoder.start(); frames = 0; originUs = android.os.SystemClock.elapsedRealtimeNanos() / 1000; lastPtsUs = -1; track = -1; started = false
-        } catch (error: Exception) { abort(); throw error }
+
+            committed = true
+        } finally { if (!committed) { abort() } }
     }
     fun frame(bitmap: Bitmap) {
         val encoder = checkNotNull(codec)
@@ -51,7 +54,12 @@ class LocalVideoRecorder(private val store: LocalVideoStore) {
             drawBitmap(bitmap, null, android.graphics.RectF((WIDTH-width)/2, (HEIGHT-height)/2,
                 (WIDTH+width)/2, (HEIGHT+height)/2), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
         }
-        try { writeImage(image, scaled) } finally { if (scaled !== bitmap) scaled.recycle(); image.close() }
+        try {
+            writeImage(image, scaled)
+        } finally {
+            if (scaled !== bitmap) scaled.recycle()
+            image.close()
+        }
         val pts = maxOf(lastPtsUs + 1, android.os.SystemClock.elapsedRealtimeNanos() / 1000 - originUs)
         encoder.queueInputBuffer(index, 0, WIDTH * HEIGHT * 3 / 2, pts, 0)
         lastPtsUs = pts
@@ -59,6 +67,7 @@ class LocalVideoRecorder(private val store: LocalVideoStore) {
     }
     fun finish(eventReason: String? = null): File? {
         if (!active) return null
+        var committed = false
         try {
             val encoder = checkNotNull(codec)
             val index = encoder.dequeueInputBuffer(1_000_000)
@@ -69,8 +78,9 @@ class LocalVideoRecorder(private val store: LocalVideoStore) {
             muxer?.stop(); muxer?.release(); muxer = null
             codec?.stop(); codec?.release(); codec = null
             val file = store.publish(checkNotNull(pending), eventReason); pending = null
+            committed = true
             return file
-        } catch (error: Exception) { abort(); throw error }
+                } finally { if (!committed) { abort() } }
     }
     fun abort() {
         runCatching { codec?.stop() }; runCatching { codec?.release() }; codec = null
@@ -89,14 +99,7 @@ class LocalVideoRecorder(private val store: LocalVideoStore) {
                     muxer?.start(); started = true
                 }
                 index >= 0 -> {
-                    try {
-                        if (info.size > 0 && info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
-                            check(started)
-                            val buffer = checkNotNull(encoder.getOutputBuffer(index))
-                            buffer.position(info.offset); buffer.limit(info.offset + info.size)
-                            muxer?.writeSampleData(track, buffer, info)
-                        }
-                    } finally { encoder.releaseOutputBuffer(index, false) }
+                    writeOutput(encoder, index, info)
                     if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) return
                 }
                 index == MediaCodec.INFO_TRY_AGAIN_LATER && !end -> return
@@ -127,4 +130,15 @@ class LocalVideoRecorder(private val store: LocalVideoStore) {
         }
     }
     companion object { const val WIDTH = 640; const val HEIGHT = 360; const val FPS = 5 }
+    private fun writeOutput(encoder: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
+        try {
+                        if (info.size > 0 && info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
+                            check(started)
+                            val buffer = checkNotNull(encoder.getOutputBuffer(index))
+                            buffer.position(info.offset); buffer.limit(info.offset + info.size)
+                            muxer?.writeSampleData(track, buffer, info)
+                        }
+
+        } finally { encoder.releaseOutputBuffer(index, false) }
+    }
 }

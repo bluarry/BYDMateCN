@@ -3,7 +3,7 @@ package com.bydmatecn.app.local
 import java.io.File
 
 /** Only app-created video names are eligible for quota cleanup. Pending files are never published. */
-class LocalVideoStore(private val root: File, private val quotaBytes: Long = 512L * 1024 * 1024) {
+class LocalVideoStore(private val root: File, private val quotaBytes: Long = 512L * 1024 * 1024) : IncompleteVideoStore(root) {
     init { require(quotaBytes > 0) }
     private val lock = LocalMediaLocks.forDirectory(root)
     fun <T> withFiles(action: (List<File>) -> T): T = synchronized(lock) { action(files()) }
@@ -31,8 +31,17 @@ class LocalVideoStore(private val root: File, private val quotaBytes: Long = 512
         check(!target.exists()) { "Video destination already exists" }
         check(file.renameTo(target))
         if (eventReason != null) {
-            try { File(root, target.name + ".event").writeText(eventReason.take(200), Charsets.UTF_8) }
-            catch (error: Exception) { target.delete(); File(root, target.name + ".event").delete(); throw error }
+            val marker = File(root, target.name + ".event")
+            var marked = false
+            try {
+                marker.writeText(eventReason.take(200), Charsets.UTF_8)
+                marked = true
+            } finally {
+                if (!marked) {
+                    target.delete()
+                    marker.delete()
+                }
+            }
         }
         target
     }
@@ -50,19 +59,4 @@ class LocalVideoStore(private val root: File, private val quotaBytes: Long = 512
         if (file !in files()) return false
         File(root, file.name + ".event").delete()
     }
-    /** Quarantine stale incomplete segments instead of deleting or claiming recovery. */
-    fun quarantineStale(now: Long, ageMs: Long = 24*60*60*1000L): Int = synchronized(lock) {
-        require(ageMs > 0)
-        var moved = 0
-        root.listFiles().orEmpty().filter { it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) &&
-            it.name.startsWith("video-") && it.extension == "pending" && now-it.lastModified() >= ageMs }.forEach {
-                val target = File(root, it.name.removeSuffix(".pending") + ".incomplete")
-                if (!target.exists() && it.renameTo(target)) moved++
-            }
-        moved
-    }
-    fun incomplete(): List<File> = synchronized(lock) { root.listFiles().orEmpty().filter {
-        it.isFile && !java.nio.file.Files.isSymbolicLink(it.toPath()) && it.name.startsWith("video-") && it.extension == "incomplete"
-    } }
-    fun deleteIncomplete(file: File): Boolean = synchronized(lock) { incomplete().firstOrNull { it == file }?.delete() ?: false }
 }

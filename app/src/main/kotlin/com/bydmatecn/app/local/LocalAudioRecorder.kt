@@ -33,7 +33,7 @@ class LocalAudioRecorder(private val root: File, private val store: LocalResourc
             }
             candidate.prepare(); candidate.start()
             report("正在本地录音，最长 60 秒；停止后保存，不上传")
-        } catch (error: Exception) { finish(false); report("无法录音：${error.message}") }
+        } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) { finish(false); report("无法录音：${error.message}") } catch (error: IllegalStateException) { finish(false); report("无法录音：${error.message}") } catch (error: IllegalArgumentException) { finish(false); report("无法录音：${error.message}") } catch (error: SecurityException) { finish(false); report("无法录音：${error.message}") }
     }
     fun finish(save: Boolean) {
         val current = recorder ?: return
@@ -46,7 +46,7 @@ class LocalAudioRecorder(private val root: File, private val store: LocalResourc
                 val result = file.inputStream().use { store.importAudio(it, "m4a") }
                 saved(result); report("录音已保存：${result.name}")
             } else if (save) report("录音太短或停止失败，未保存")
-        } catch (error: Exception) { report("录音保存失败：${error.message}") }
+        } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) { report("录音保存失败：${error.message}") } catch (error: IllegalStateException) { report("录音保存失败：${error.message}") } catch (error: IllegalArgumentException) { report("录音保存失败：${error.message}") } catch (error: SecurityException) { report("录音保存失败：${error.message}") }
         finally { file?.delete() }
     }
 }

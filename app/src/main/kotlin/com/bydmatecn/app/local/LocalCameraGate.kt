@@ -4,7 +4,6 @@ package com.bydmatecn.app.local
 internal fun localCameraAllowed(gear: Int?, speed: Int?, usageAllowed: Boolean, factoryActive: Boolean): Boolean =
     gear == 1 && speed == 0 && usageAllowed && !factoryActive
 
-
 /** Driving capture is an explicit opt-in; reverse/unknown/negative speed always releases AVM. */
 internal fun localRecordingAllowed(gear: Int?, speed: Int?, usage: Boolean, factory: Boolean, driving: Boolean): Boolean =
     usage && !factory && speed != null && speed >= 0 &&

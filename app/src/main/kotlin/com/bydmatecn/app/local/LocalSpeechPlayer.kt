@@ -74,10 +74,7 @@ class LocalSpeechPlayer(context: Context, private val report: (String) -> Unit) 
         if (text.isBlank() || text.length > 500) { report("请输入 1～500 字"); return }
         stop()
         if (tts.setVoice(voice) != TextToSpeech.SUCCESS) { report("无法设置离线音色"); return }
-        val file = try {
-            check(cache.isDirectory || cache.mkdirs())
-            java.io.File.createTempFile("speech-", ".wav", cache)
-        } catch (error: Exception) { report("创建语音文件失败：${error.message}"); return }
+        val file = createSpeechFile() ?: return
         pending = file
         val current = generation
         val utterance = "bydmate-local-file-$current"
@@ -127,4 +124,9 @@ class LocalSpeechPlayer(context: Context, private val report: (String) -> Unit) 
         request?.let { audio.abandonAudioFocusRequest(it) }
     }
     fun close() { ready = false; stop(); engine?.shutdown(); engine = null; worker.shutdown() }
+
+    private fun createSpeechFile(): java.io.File? = try {
+            check(cache.isDirectory || cache.mkdirs())
+            java.io.File.createTempFile("speech-", ".wav", cache)
+        } catch (error: java.io.IOException) { report("创建语音文件失败：${error.message}"); null } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: IllegalStateException) { report("创建语音文件失败：${error.message}"); null } catch (error: SecurityException) { report("创建语音文件失败：${error.message}"); null }
 }

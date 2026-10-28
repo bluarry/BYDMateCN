@@ -129,7 +129,8 @@ fun AppNavigation(
     // before the update dialog — support first, then offer the update once it is dismissed.
     var showDonation by remember { mutableStateOf(false) }
     LaunchedEffect(startDestination) {
-        if (DonationReminder.enabled && startDestination == "dashboard" &&
+        val donationEligible = DonationReminder.enabled && startDestination == "dashboard"
+        if (donationEligible &&
             UpdateChecker.getLastSeenVersion(autoCheckContext) == currentAppVersion &&
             DonationReminder.shouldShow(autoCheckContext, currentAppVersion)
         ) {

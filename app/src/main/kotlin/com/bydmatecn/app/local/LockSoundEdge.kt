@@ -8,7 +8,8 @@ class LockSoundEdge(private val debounceMs: Long = 500, private val cooldownMs: 
     private var lastSample = -1L
     private var lastEvent = Long.MIN_VALUE / 2
     fun sample(lock: Int?, safe: Boolean, now: Long): Int? {
-        if (!safe || lock !in 1..2 || (lastSample >= 0 && (now < lastSample || now-lastSample > 5000))) {
+        val stale = lastSample >= 0 && (now < lastSample || now-lastSample > 5000)
+        if (!safe || lock !in 1..2 || stale) {
             stable = null; candidate = null; lastSample = now
             return null
         }

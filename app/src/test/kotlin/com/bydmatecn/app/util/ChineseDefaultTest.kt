@@ -6,7 +6,9 @@ import com.bydmatecn.app.BuildConfig
 import com.bydmatecn.app.R
 import com.bydmatecn.app.data.local.LocalePreferences
 import com.bydmatecn.app.ui.settings.DonationReminder
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith

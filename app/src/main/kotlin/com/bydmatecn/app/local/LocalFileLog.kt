@@ -35,7 +35,7 @@ class LocalFileLog private constructor(context: Context) {
                 val lost = dropped.getAndSet(0)
                 if (lost > 0) store.append("journal", "dropped=$lost (queue full)", at)
                 store.append(module, safe, at)
-            } catch (error: Exception) { Log.w("BYDMateCNLog", "write failed: ${error.javaClass.simpleName}") }
+            } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) { Log.w("BYDMateCNLog", "write failed: ${error.javaClass.simpleName}") } catch (error: IllegalStateException) { Log.w("BYDMateCNLog", "write failed: ${error.javaClass.simpleName}") } catch (error: IllegalArgumentException) { Log.w("BYDMateCNLog", "write failed: ${error.javaClass.simpleName}") } catch (error: SecurityException) { Log.w("BYDMateCNLog", "write failed: ${error.javaClass.simpleName}") }
         } } catch (_: java.util.concurrent.RejectedExecutionException) { dropped.incrementAndGet() }
     }
     /** Call on IO dispatcher: FIFO barrier includes all earlier admitted events. Caller owns stream. */

@@ -92,19 +92,7 @@ class UpdateChecker @Inject constructor(
             return@withContext null // genuinely up to date
         }
 
-        val assets = json.optJSONArray("assets")
-            ?: throw Exception("Нет assets в релизе $tagName")
-        var apkUrl: String? = null
-        for (i in 0 until assets.length()) {
-            val asset = assets.getJSONObject(i)
-            val name = asset.optString("name", "")
-            if (name.endsWith(".apk")) {
-                apkUrl = asset.optString("browser_download_url")
-                break
-            }
-        }
-
-        if (apkUrl == null) throw Exception("Нет APK в релизе $tagName")
+        val apkUrl = releaseApkUrl(json, tagName)
 
         UpdateInfo(
             version = tagName,
@@ -240,5 +228,23 @@ class UpdateChecker @Inject constructor(
             if (rv < lv) return false
         }
         return false
+    }
+
+    private fun releaseApkUrl(json: JSONObject, tagName: String): String {
+        val assets = json.optJSONArray("assets")
+            ?: throw Exception("Нет assets в релизе $tagName")
+        var apkUrl: String? = null
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            val name = asset.optString("name", "")
+            if (name.endsWith(".apk")) {
+                apkUrl = asset.optString("browser_download_url")
+                break
+            }
+        }
+
+        if (apkUrl == null) throw Exception("Нет APK в релизе $tagName")
+
+        return apkUrl
     }
 }

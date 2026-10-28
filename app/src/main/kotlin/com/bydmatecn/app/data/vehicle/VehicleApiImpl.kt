@@ -40,7 +40,6 @@ class VehicleApiImpl @Inject constructor(
     private val windowStore: WindowChannelStore,
     // Null in unit tests (no SharedPreferences); production gets the singleton from AppModule.
     private val seatJournal: SeatCommandJournal? = null,
-    private val rearMirrorReader: com.bydmatecn.app.data.vehicle.reflection.RearMirrorStateReader? = null,
 ) : VehicleApi {
 
     private val seatChannel = AdaptiveSeatChannel(
@@ -92,13 +91,7 @@ class VehicleApiImpl @Inject constructor(
     override suspend fun readBatterySnapshot(): BatteryReading? = autoservice.readBatterySnapshot()
     override suspend fun readSnapshot(): DiParsData? = parsReader.fetch()
 
-    override suspend fun readRearMirrorState(): com.bydmatecn.app.data.vehicle.reflection.ReflectionRead<Int> =
-        withContext(Dispatchers.IO) {
-            rearMirrorReader?.read() ?: com.bydmatecn.app.data.vehicle.reflection.ReflectionRead.Unavailable(
-                com.bydmatecn.app.data.vehicle.reflection.ReflectionFailure.CLASS_MISSING,
-                "Rear mirror reflection reader is not configured",
-            )
-        }
+
 
     // Individual readers — direct autoservice fid hits.
     override suspend fun readSoc(): Float? = autoservice.getFloat(1014, 1246777400)
