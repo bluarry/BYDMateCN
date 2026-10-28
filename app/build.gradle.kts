@@ -302,3 +302,8 @@ detekt {
     baseline = file("$rootDir/config/detekt/baseline.xml")
     autoCorrect = false
 }
+
+// 分析目标与 Android Java/Kotlin 字节码一致，不跟随 Gradle 运行时 JDK 24。
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = "17"
+}
