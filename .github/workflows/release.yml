@@ -40,11 +40,11 @@ jobs:
               raise SystemExit('标签版本与 app/build.gradle.kts 中 versionName 不一致')
           PY
 
-      - name: 配置 Java 17
+      - name: 配置 JDK 24.0.2+12
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '24.0.2+12'
 
       - name: 配置 Android SDK
         uses: android-actions/setup-android@v3
