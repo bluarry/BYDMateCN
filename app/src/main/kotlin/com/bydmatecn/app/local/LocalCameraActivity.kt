@@ -1,12 +1,12 @@
 package com.bydmatecn.app.local
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.content.Context
 import android.graphics.SurfaceTexture
-import android.widget.ScrollView
 import android.os.Bundle
 import android.view.Surface
 import android.view.TextureView
-import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
@@ -23,7 +23,9 @@ import javax.inject.Inject
 
 /** Manual parked-only preview. No boot start, microphone, cloud or guessed vehicle writes. */
 @AndroidEntryPoint
-class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListener {
+class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListener, LocalComposeHost {
+    override val ui = LocalUiState()
+    internal var panelVisible by androidx.compose.runtime.mutableStateOf(true)
     @Inject lateinit var vehicle: VehicleApi
     @Inject lateinit var factoryCamera: CameraStateMonitor
     internal val probe = AvmCameraProbe(eventSink = { LocalFileLog.get(this).record("avm", it) })
@@ -36,10 +38,9 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
     internal var lastFrameMs = 0L
     internal lateinit var videos: LocalVideoStore
     internal var driving = false
-    internal var dual = false
+    internal var dual by androidx.compose.runtime.mutableStateOf(false)
     internal var viewConfig = MirrorViewConfig()
-    internal lateinit var controls: ScrollView
-    internal lateinit var status: TextView
+    internal val status = LocalText("固件确认 AVM 通道 1～4；通道方位需实车标定。仅驻车预览，不作为驾驶后视镜。") { LocalFileLog.get(this).record("camera", it) }
     internal lateinit var store: LocalCaptureStore
     internal var surface: Surface? = null
     internal var open = false
@@ -81,6 +82,7 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LocalFileLog.get(this).record("LocalCamera", "page opened")
         store = LocalCaptureStore(java.io.File(filesDir, "local-captures"))
         videos = LocalVideoStore(java.io.File(filesDir, "local-videos"))
         videoRecorder = LocalVideoRecorder(videos)

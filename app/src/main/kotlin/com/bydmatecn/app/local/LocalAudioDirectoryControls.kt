@@ -1,9 +1,7 @@
 package com.bydmatecn.app.local
 
 import android.Manifest
-import android.app.AlertDialog
 import android.content.pm.PackageManager
-import android.widget.EditText
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,14 +20,14 @@ internal fun LocalToolsActivity.audioDirectoryControls() {
             storagePermission.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
             return@button
         }
-        val input = EditText(this).apply { hint = "/storage/emulated/0/Music 或 U盘目录" }
-        AlertDialog.Builder(this).setTitle("添加音频目录").setView(input).setNegativeButton("取消", null)
+        val input = LocalInput("/storage/emulated/0/Music 或 U盘目录")
+        LocalDialogBuilder(this).setTitle("添加音频目录").setView(input).setNegativeButton("取消", null)
             .setPositiveButton("添加") { _, _ -> addAudioDirectory(input.text.toString().trim()) }.show()
     }
     button("查看 / 移除音频目录") {
         val directories = audioLibrary.directories()
         if (directories.isEmpty()) { status.text = "尚未选择音频目录"; return@button }
-        AlertDialog.Builder(this).setTitle("选择要移除的目录（不删除文件）")
+        LocalDialogBuilder(this).setTitle("选择要移除的目录（不删除文件）")
             .setItems(directories.map { it.path }.toTypedArray()) { _, index ->
                 stopAudio()
                 stopService(android.content.Intent(this@audioDirectoryControls, LocalLockSoundService::class.java))
@@ -60,7 +58,7 @@ internal fun LocalToolsActivity.showAudioDirectoryPicker(directory: File) {
         val parent = directory.parentFile
         val names = listOf("选择此目录", "输入其他路径") +
             (if (parent != null) listOf("上一级") else emptyList()) + children.map { it.name + "/" }
-        AlertDialog.Builder(this@showAudioDirectoryPicker).setTitle(directory.path)
+        LocalDialogBuilder(this@showAudioDirectoryPicker).setTitle(directory.path)
             .setItems(names.toTypedArray()) { _, index ->
                 when {
                     index == 0 -> addAudioDirectory(directory.path)
@@ -73,8 +71,8 @@ internal fun LocalToolsActivity.showAudioDirectoryPicker(directory: File) {
 }
 
 private fun LocalToolsActivity.promptAudioDirectory() {
-    val input = EditText(this).apply { hint = "请输入绝对目录路径" }
-    AlertDialog.Builder(this).setTitle("音频目录路径").setView(input).setNegativeButton("取消", null)
+    val input = LocalInput("请输入绝对目录路径")
+    LocalDialogBuilder(this).setTitle("音频目录路径").setView(input).setNegativeButton("取消", null)
         .setPositiveButton("浏览") { _, _ -> showAudioDirectoryPicker(File(input.text.toString().trim())) }.show()
 }
 
@@ -86,7 +84,7 @@ private fun LocalToolsActivity.scanAudioDirectories() {
                 audioLibrary.directories().count { !it.isDirectory || !it.canRead() || it.listFiles() == null }
             }
             status.text = "扫描完成：${files.size}个音频，${unavailable}个目录不可读；旧配置不自动替换"
-            if (files.isNotEmpty()) AlertDialog.Builder(this@scanAudioDirectories).setTitle("选择音频（完整路径）")
+            if (files.isNotEmpty()) LocalDialogBuilder(this@scanAudioDirectories).setTitle("选择音频（完整路径）")
                 .setItems(files.map { it.path }.toTypedArray()) { _, index ->
                     stopAudio(); selectAudio(files[index]); status.text = "已选中：${files[index].path}"
                 }.show()

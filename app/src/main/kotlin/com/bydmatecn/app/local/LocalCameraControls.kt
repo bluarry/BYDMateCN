@@ -1,24 +1,33 @@
 package com.bydmatecn.app.local
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import android.graphics.SurfaceTexture
 import android.view.View
-import android.widget.SeekBar
-import android.widget.ScrollView
 import android.view.Surface
 import android.view.TextureView
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 internal fun LocalCameraActivity.createCameraViews() {
-        status = TextView(this).apply { text = "固件确认 AVM 通道 1～4；通道对应哪侧需实车标定。仅驻车预览，不作为驾驶后视镜。" }
         texture = TextureView(this).apply {
             surfaceTextureListener = this@createCameraViews
-            setOnClickListener { controls.visibility = if (controls.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
+            setOnClickListener { panelVisible = !panelVisible }
         }
         secondTexture = TextureView(this).apply {
             visibility = if (dual) View.VISIBLE else View.GONE
@@ -35,105 +44,113 @@ internal fun LocalCameraActivity.createCameraViews() {
                 }
             }
         }
-        val wide = resources.configuration.screenWidthDp >= 650
-        val layout = LinearLayout(this).apply { orientation = if (wide) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL; setBackgroundColor(0xFF101A2D.toInt()) }
-        val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        status.setTextColor(0xFFE3EDFF.toInt())
-        panel.addView(status)
+        ui.label("本地相机", 24f)
+        ui.controls.add { androidx.compose.material3.Text(status.text) }
+        ui.button("返回") { finish() }
 
-        cameraButton(panel, "打开使用情况访问设置") {
+        cameraButton("打开使用情况访问设置") {
             runCatching { startActivity(android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 .onFailure { status.text = "固件没有使用情况访问设置：${it.message}" }
         }
-        cameraButton(panel, "读取后视镜状态（原始码）") {
+        cameraButton("读取后视镜状态（原始码）") {
             lifecycleScope.launch { status.text = vehicle.readRearMirrorState().toString() }
         }
-        cameraButton(panel, "启用 / 关闭行驶录像模式（需已验证原厂相机优先）") {
+        cameraButton("启用 / 关闭行驶录像模式（需已验证原厂相机优先）") {
             if (driving) { closePreview("关闭行驶模式"); driving = false }
-            else android.app.AlertDialog.Builder(this).setTitle("行驶录像测试模式")
+            else LocalDialogBuilder(this).setTitle("行驶录像测试模式")
                 .setMessage("必须先完成驻车通道标定及倒车/原厂360抢占测试。仅D挡允许录像；不保证熄屏/后台持续录制，不能作为安全后视镜。启用后隐藏预览并自动开始MP4。")
                 .setNegativeButton("取消", null).setPositiveButton("已验证，启用") { _, _ ->
                     closePreview("切换行驶模式"); driving = true; status.text = "行驶录像已启用，请打开预览（画面隐藏）"
                 }.show()
         }
 
-        addMirrorControls(panel, layout, wide)
+        addMirrorControls()
     }
 
-internal fun LocalCameraActivity.addMirrorControls(panel: LinearLayout, layout: LinearLayout, wide: Boolean) {
-        cameraButton(panel, "打开预览") { startPreview() }
-        cameraButton(panel, "选择固件 AVM 通道 1～4（需标定方位）") {
-            android.app.AlertDialog.Builder(this).setTitle("通道号不等于左/右方位")
+internal fun LocalCameraActivity.addMirrorControls() {
+        cameraButton("打开预览") { startPreview() }
+        cameraButton("选择固件 AVM 通道 1～4（需标定方位）") {
+            LocalDialogBuilder(this).setTitle("通道号不等于左/右方位")
                 .setItems(arrayOf("VIEW_CHANNEL_1", "VIEW_CHANNEL_2", "VIEW_CHANNEL_3", "VIEW_CHANNEL_4")) { _, which ->
                     closePreview("切换通道"); index = which + 1; saveViewConfig()
                     status.text = "通道：$index，请重新打开；单路模式生效"
                 }.show()
         }
-        cameraButton(panel, "单路 / 双路（索引 2 + 3）") {
+        cameraButton("单路 / 双路（索引 2 + 3）") {
             closePreview("切换布局")
             dual = !dual
             secondTexture.visibility = if (dual) View.VISIBLE else View.GONE
             saveViewConfig()
             status.text = if (dual) "双路模式，请重新打开" else "单路模式，请重新打开"
         }
-        cameraButton(panel, "全屏预览（点击主画面恢复面板）") { controls.visibility = View.GONE }
-        cameraButton(panel, "水平镜像") {
+        cameraButton("全屏预览（点击主画面恢复面板）") { panelVisible = false }
+        cameraButton("水平镜像") {
             viewConfig = viewConfig.copy(horizontalFlip = !viewConfig.horizontalFlip)
             applyViewConfig(); saveViewConfig()
         }
-        cameraButton(panel, "旋转 90°") {
+        cameraButton("旋转 90°") {
             viewConfig = viewConfig.copy(rotation = (viewConfig.rotation + 90) % 360)
             applyViewConfig(); saveViewConfig()
         }
-        panel.addView(TextView(this).apply { text = "画面缩放 100%～200%"; setTextColor(0xFFE3EDFF.toInt()) })
-        panel.addView(SeekBar(this).apply {
-            max = 100; progress = viewConfig.zoomPercent - 100
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    if (fromUser) { viewConfig = viewConfig.copy(zoomPercent = 100 + progress); applyViewConfig(); saveViewConfig() }
-                }
-                override fun onStartTrackingTouch(bar: SeekBar?) = Unit
-                override fun onStopTrackingTouch(bar: SeekBar?) = Unit
-            })
+        ui.label("画面缩放 100%～200%")
+        ui.slider(LocalSlider(viewConfig.zoomPercent - 100), changed = { progress ->
+            viewConfig = viewConfig.copy(zoomPercent = 100 + progress); applyViewConfig(); saveViewConfig()
         })
 
-        addCaptureControls(panel, layout, wide)
+        addCaptureControls()
 
     }
 
-internal fun LocalCameraActivity.addCaptureControls(panel: LinearLayout, layout: LinearLayout, wide: Boolean) {
-        cameraButton(panel, "截图（原始帧，双路并排）") { capture() }
-        cameraButton(panel, "开始 / 停止帧录像（1 FPS）") {
+internal fun LocalCameraActivity.addCaptureControls() {
+        cameraButton("截图（原始帧，双路并排）") { capture() }
+        cameraButton("开始 / 停止帧录像（1 FPS）") {
             if (open && !videoRecording) { recording = !recording; status.text = if (recording) "帧录像中（无音频）" else "帧录像已停止" }
             else status.text = "请先打开预览并停止 MP4 录像"
         }
-        cameraButton(panel, "开始 / 停止 MP4 录像（5 FPS / 每分钟分段）") {
+        cameraButton("开始 / 停止 MP4 录像（5 FPS / 每分钟分段）") {
             if (videoRecording) stopVideo() else startVideo()
         }
-        cameraButton(panel, "驻车事件记录：开门触发 / 关闭") {
+        cameraButton("驻车事件记录：开门触发 / 关闭") {
             if (!open || driving) { status.text = "先打开驻车预览，行驶模式不启用开门事件"; return@cameraButton }
             eventMode = !eventMode; previousDoors = null
             if (eventMode && !videoRecording) startVideo()
             status.text = if (eventMode) "驻车事件记录开启：有效开门变化保存前后录像，不保持熄火供电" else "开门事件触发关闭"
         }
-        cameraButton(panel, "标记录像事件（保护上一段与当前段）") { bookmarkEvent("用户标记") }
-        cameraButton(panel, "截图与录像相册") { startActivity(android.content.Intent(this, LocalMediaActivity::class.java)) }
-        cameraButton(panel, "导出全部帧 ZIP") { export.launch("BYDMate-local-frames.zip") }
-        cameraButton(panel, "关闭") { closePreview("用户关闭") }
-        controls = ScrollView(this).apply { addView(panel) }
-        layout.addView(controls, if (wide) LinearLayout.LayoutParams((300 * resources.displayMetrics.density).toInt(), -1)
-            else LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
-        val previews = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        previews.addView(texture, LinearLayout.LayoutParams(0, -1, 1f))
-        previews.addView(secondTexture, LinearLayout.LayoutParams(0, -1, 1f))
-        layout.addView(previews, if (wide) LinearLayout.LayoutParams(0, -1, 1f) else LinearLayout.LayoutParams(-1, 0, 1f))
-
-        observeCamera(layout)
+        cameraButton("标记录像事件（保护上一段与当前段）") { bookmarkEvent("用户标记") }
+        cameraButton("截图与录像相册") { startActivity(android.content.Intent(this, LocalMediaActivity::class.java)) }
+        cameraButton("导出全部帧 ZIP") { export.launch("BYDMate-local-frames.zip") }
+        cameraButton("关闭") { closePreview("用户关闭") }
+        installLocalContent(ui) { CameraLayout() }
+        observeCamera()
     }
 
-internal fun LocalCameraActivity.observeCamera(layout: LinearLayout) {
-        LocalFileLog.get(this).watch(status, "camera")
-        setContentView(layout)
+@Composable
+private fun LocalCameraActivity.CameraLayout() {
+    val wide = LocalConfiguration.current.screenWidthDp >= 650
+    if (wide) {
+        Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            LocalPanel(ui, Modifier.width(if (panelVisible) 340.dp else 0.dp).fillMaxHeight())
+            CameraPreviews(Modifier.weight(1f).fillMaxHeight())
+        }
+    } else {
+        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            LocalPanel(ui, if (panelVisible) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(0.dp))
+            CameraPreviews(Modifier.fillMaxWidth().weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun LocalCameraActivity.CameraPreviews(modifier: Modifier) {
+    Row(modifier) {
+        AndroidView(factory = { texture }, modifier = Modifier.weight(1f).fillMaxHeight())
+        // Keep the second surface mounted so a UI layout change never silently destroys a live vendor target.
+        AndroidView(factory = { secondTexture }, modifier = Modifier.weight(if (dual) 1f else .001f).fillMaxHeight(),
+            update = { it.visibility = if (dual) View.VISIBLE else View.GONE })
+    }
+}
+
+internal fun LocalCameraActivity.observeCamera() {
         lifecycleScope.launch {
             factoryCamera.active.collect { active ->
                 if (active && open) closePreview("原厂相机启动，释放 AVM")
@@ -154,9 +171,9 @@ internal fun LocalCameraActivity.observeCamera(layout: LinearLayout) {
 
     }
 
-        private fun LocalCameraActivity.cameraButton(panel: LinearLayout, label: String, action: () -> Unit) {
-            panel.addView(Button(this).apply { text = label; setOnClickListener { LocalFileLog.get(this@cameraButton).record("camera/action", label); action() } })
-        }
+private fun LocalCameraActivity.cameraButton(label: String, action: () -> Unit) {
+    ui.button(label) { LocalFileLog.get(this).record("camera/action", label); action() }
+}
 
 private suspend fun LocalCameraActivity.pollCameraState() {
                     val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { runCatching { vehicle.readSnapshot() }.getOrNull() }

@@ -2,10 +2,7 @@ package com.bydmatecn.app.local
 
 import android.content.Context
 import android.os.Process
-import android.text.Editable
-import android.text.TextWatcher
 import android.util.Log
-import android.widget.TextView
 import java.io.File
 import java.io.OutputStream
 import java.util.concurrent.ArrayBlockingQueue
@@ -51,18 +48,6 @@ class LocalFileLog private constructor(context: Context) {
         finally { barrier.cancel(false) }
     }
 
-    fun watch(view: TextView, module: String) {
-        var last: String? = null
-        view.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val value = s?.toString().orEmpty()
-                if (value.isNotBlank() && value != last) { last = value; record(module, value) }
-            }
-            override fun afterTextChanged(s: Editable?) = Unit
-        })
-        record(module, "page opened")
-    }
     companion object {
         @Volatile private var instance: LocalFileLog? = null
         fun get(context: Context): LocalFileLog = instance ?: synchronized(this) {

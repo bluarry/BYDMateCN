@@ -1,6 +1,5 @@
 package com.bydmatecn.app.local
 
-import android.app.AlertDialog
 import android.content.Intent
 import android.provider.Settings
 import androidx.lifecycle.lifecycleScope
@@ -19,7 +18,7 @@ internal fun LocalToolsActivity.sentryControls() {
         button("读取原厂哨兵状态") { lifecycleScope.launch { status.text = "原始值：${helper.getGlobalSetting("sentrymode_enabled_switch") ?: "不可读"}" } }
         fun confirm(value: Int) {
             if (busy) return
-            AlertDialog.Builder(this).setMessage(if (value == 1) "启用原厂哨兵可能增加驻车耗电，继续？" else "关闭原厂哨兵？")
+            LocalDialogBuilder(this).setMessage(if (value == 1) "启用原厂哨兵可能增加驻车耗电，继续？" else "关闭原厂哨兵？")
                 .setNegativeButton("取消", null).setPositiveButton("确认") { _, _ ->
                     lifecycleScope.launch {
                         busy = true

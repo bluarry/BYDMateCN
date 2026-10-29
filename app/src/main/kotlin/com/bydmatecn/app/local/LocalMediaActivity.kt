@@ -1,14 +1,18 @@
 package com.bydmatecn.app.local
 
-import android.app.AlertDialog
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.MediaController
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,17 +24,17 @@ import java.io.File
 
 /** Private, offline gallery. SAF exports one selected file; no public storage permission. */
 @dagger.hilt.android.AndroidEntryPoint
-class LocalMediaActivity : ComponentActivity() {
+class LocalMediaActivity : ComponentActivity(), LocalComposeHost {
+    override val ui = LocalUiState()
     @javax.inject.Inject lateinit var vehicle: com.bydmatecn.app.data.vehicle.VehicleApi
     private var resumed = false
     private var parked = false
     private lateinit var captures: LocalCaptureStore
     private lateinit var videos: LocalVideoStore
-    private lateinit var list: LinearLayout
-    private lateinit var message: TextView
+    private val message = LocalText() { LocalFileLog.get(this).record("media", it) }
     private var selected: File? = null
-    private var player: VideoView? = null
-    private var image: Bitmap? = null
+    private var player: VideoView? by androidx.compose.runtime.mutableStateOf(null)
+    private var image: Bitmap? by androidx.compose.runtime.mutableStateOf(null)
     private var previewGeneration = 0
     private val export = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val file = selected
@@ -46,12 +50,10 @@ class LocalMediaActivity : ComponentActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LocalFileLog.get(this).record("LocalMedia", "page opened")
         captures = LocalCaptureStore(File(filesDir, "local-captures"))
         videos = LocalVideoStore(File(filesDir, "local-videos"))
-        list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24); setBackgroundColor(0xFF101A2D.toInt()) }
-        message = TextView(this).apply { setTextColor(0xFFE3EDFF.toInt()); textSize = 18f }
-        LocalFileLog.get(this).watch(message, "media-gallery")
-        setContentView(ScrollView(this).apply { addView(list) })
+        installLocalContent(ui)
         videos.quarantineStale(System.currentTimeMillis())
         refresh()
         lifecycleScope.launch {
@@ -63,17 +65,26 @@ class LocalMediaActivity : ComponentActivity() {
             }
         }
     }
-    private fun button(text: String, action: () -> Unit) {
-        list.addView(Button(this).apply { this.text = text; setOnClickListener { action() } })
+    @androidx.compose.runtime.Composable
+    private fun GalleryPreview() {
+        player?.let { view -> androidx.compose.runtime.key(view) { AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().height(300.dp)) } }
+        image?.let { bitmap -> Image(bitmap.asImageBitmap(), contentDescription = "本地截图", modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) }
     }
     private fun refresh() {
+        fun galleryHeader() {
+        ui.controls.clear()
+        ui.label("本地相册", 24f)
+        ui.controls.add { androidx.compose.material3.Text(message.text) }
+        ui.controls.add { GalleryPreview() }
+    }
+
         clearPreview()
-        list.removeAllViews(); list.addView(message)
-        button("返回") { finish() }
+        galleryHeader()
+        mediaButton("返回") { finish() }
         val damaged = videos.incomplete()
-        if (damaged.isNotEmpty()) button("隔离的未完成录像：${damaged.size}个（不作为正常MP4）") {
-            AlertDialog.Builder(this).setItems(damaged.map { it.name }.toTypedArray()) { _, which ->
-                AlertDialog.Builder(this).setMessage("此段录像未正常收尾。删除隔离文件？")
+        if (damaged.isNotEmpty()) mediaButton("隔离的未完成录像：${damaged.size}个（不作为正常MP4）") {
+            LocalDialogBuilder(this).setItems(damaged.map { it.name }.toTypedArray()) { _, which ->
+                LocalDialogBuilder(this).setMessage("此段录像未正常收尾。删除隔离文件？")
                     .setNegativeButton("保留", null).setPositiveButton("删除") { _, _ -> videos.deleteIncomplete(damaged[which]); refresh() }.show()
             }.show()
         }
@@ -82,22 +93,22 @@ class LocalMediaActivity : ComponentActivity() {
         // Bound initial UI allocation; older files remain available through page selection.
         val pages = files.chunked(50)
         fun page(index: Int) {
-            clearPreview(); list.removeAllViews(); list.addView(message)
-            button("返回") { finish() }
-            if (damaged.isNotEmpty()) button("清理未完成录像（${damaged.size}段，保留前请自行取证）") {
-                AlertDialog.Builder(this).setMessage("删除已隔离的不完整录像？不删除正常MP4。")
+            clearPreview(); galleryHeader()
+            mediaButton("返回") { finish() }
+            if (damaged.isNotEmpty()) mediaButton("清理未完成录像（${damaged.size}段，保留前请自行取证）") {
+                LocalDialogBuilder(this).setMessage("删除已隔离的不完整录像？不删除正常MP4。")
                     .setNegativeButton("保留", null).setPositiveButton("删除") { _, _ -> damaged.forEach { videos.deleteIncomplete(it) }; refresh() }.show()
             }
-            if (index > 0) button("上一页") { page(index - 1) }
+            if (index > 0) mediaButton("上一页") { page(index - 1) }
             pages.getOrNull(index).orEmpty().forEach { file ->
-                button("${if (file.extension == "mp4" && videos.isProtected(file)) "[事件保护] " else ""}${file.name} · ${file.length() / 1024} KiB") {
+                mediaButton("${if (file.extension == "mp4" && videos.isProtected(file)) "[事件保护] " else ""}${file.name} · ${file.length() / 1024} KiB") {
                     selected = file
-                    AlertDialog.Builder(this).setTitle(file.name).setItems(arrayOf("回看", "导出", "删除", "保护 / 解除事件保护")) { _, which ->
+                    LocalDialogBuilder(this).setTitle(file.name).setItems(arrayOf("回看", "导出", "删除", "保护 / 解除事件保护")) { _, which ->
                         performMediaAction(file, which)
                     }.show()
                 }
             }
-            if (index + 1 < pages.size) button("下一页") { page(index + 1) }
+            if (index + 1 < pages.size) mediaButton("下一页") { page(index + 1) }
         }
         page(0)
     }
@@ -110,7 +121,6 @@ class LocalMediaActivity : ComponentActivity() {
             player = VideoView(this).also { view ->
                 val controls = MediaController(this); controls.setAnchorView(view)
                 view.setMediaController(controls)
-                list.addView(view, 0, LinearLayout.LayoutParams(-1, (300 * resources.displayMetrics.density).toInt()))
                 view.setOnErrorListener { _, what, extra -> message.text = "视频解码失败：$what / $extra"; true }
                 view.setVideoPath(file.absolutePath)
                 view.setOnPreparedListener { if (previewGeneration == request && parked && resumed) view.start() else view.stopPlayback() }
@@ -121,7 +131,7 @@ class LocalMediaActivity : ComponentActivity() {
             } } }
             decoded.onSuccess { bitmap ->
                 if (request != previewGeneration || isFinishing) bitmap.recycle()
-                else { image = bitmap; list.addView(ImageView(this@LocalMediaActivity).apply { setImageBitmap(bitmap); adjustViewBounds = true }, 0) }
+                else { image = bitmap }
             }.onFailure { message.text = "截图读取失败：${it.message}" }
         }
     }
@@ -130,9 +140,9 @@ class LocalMediaActivity : ComponentActivity() {
         else captures.withCaptures { require(file in it); action() }
     private fun clearPreview() {
         previewGeneration++
-        player?.let { it.stopPlayback(); list.removeView(it) }; player = null
-        for (i in list.childCount - 1 downTo 0) if (list.getChildAt(i) is ImageView) list.removeViewAt(i)
-        image?.recycle(); image = null
+        player?.stopPlayback(); player = null
+        // Compose may still draw the previous frame until recomposition. Let GC release this bitmap.
+        image = null
     }
     override fun onResume() { super.onResume(); resumed = true }
     override fun onPause() { LocalFileLog.get(this).record("media", "page paused; releasing preview"); resumed = false; parked = false; clearPreview(); super.onPause() }
@@ -143,7 +153,7 @@ class LocalMediaActivity : ComponentActivity() {
                             3 -> { if (file.extension == "mp4") { if (videos.isProtected(file)) videos.unprotect(file) else videos.protect(file, "用户保护"); refresh() } }
                             0 -> preview(file)
                             1 -> export.launch(file.name)
-                            2 -> AlertDialog.Builder(this).setMessage("删除私有副本？导出副本不受影响。")
+                            2 -> LocalDialogBuilder(this).setMessage("删除私有副本？导出副本不受影响。")
                                 .setNegativeButton("取消", null).setPositiveButton("删除") { _, _ ->
                                     clearPreview()
                                     val deleted = if (file.extension == "mp4") videos.delete(file) else captures.delete(file)

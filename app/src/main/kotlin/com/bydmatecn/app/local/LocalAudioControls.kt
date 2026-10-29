@@ -1,16 +1,11 @@
 package com.bydmatecn.app.local
 
-import android.app.AlertDialog
 import android.Manifest
 import android.content.pm.PackageManager
-import android.widget.EditText
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
-import android.widget.SeekBar
-import android.widget.Switch
 import android.provider.Settings
-import android.widget.Button
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import java.io.File
@@ -19,44 +14,31 @@ import java.io.File
 internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.SharedPreferences) {
         micRelay = LocalMicRelay(this) { status.text = it }
         label("实时车外喊话 · 按住说话，松手停止 · 最长15秒")
-        val pushToTalk = Button(this).apply {
-            this.text = "按住喊话（需要先确认车外路由，音量≤50%）"
-            setOnTouchListener { view, event ->
-                when (event.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        LocalFileLog.get(this@microphoneControls).record("mic", "touch down")
-                        view.isPressed = true
-                        val talkRequest = ++talkRequestGeneration
-                        if (!audioPrefs.getBoolean("exterior_verified", false)) {
-                            status.text = "请先完成车外试听并勾选实际出声确认"
-                        } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
-                        } else lifecycleScope.launch {
-                            val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
-                            if (talkRequest != talkRequestGeneration || !view.isPressed || !firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) return@launch
-                            runCatching {
-                                recorder?.finish(false); speech?.stop(); stopAudio()
-                                micRelay?.start(firmwareAudio.attributes(FirmwareAudioRoute.EXTERIOR_VOICE), audioPrefs.getInt("volume", 25))
-                            }.onFailure { micRelay?.stop(); status.text = "喊话启动失败：${it.message}" }
-                        }
-                    }
-                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                        LocalFileLog.get(this@microphoneControls).record("mic", "touch released/cancelled")
-                        talkRequestGeneration++; view.isPressed = false; micRelay?.stop(); view.performClick()
-                    }
-                }
-                true
-            }
+        ui.toggle("已实际确认11002从车外扬声器出声，理解啸叫风险", audioPrefs.getBoolean("exterior_verified", false)) { checked ->
+            audioPrefs.edit().putBoolean("exterior_verified", checked).apply()
+            if (!checked) { talkRequestGeneration++; micRelay?.stop() }
         }
-        layout.addView(Switch(this).apply {
-            text = "已实际确认11002从车外扬声器出声，理解啸叫风险"
-            setTextColor(0xFFE3EDFF.toInt()); isChecked = audioPrefs.getBoolean("exterior_verified", false)
-            setOnCheckedChangeListener { _, checked ->
-                audioPrefs.edit().putBoolean("exterior_verified", checked).apply()
-                if (!checked) micRelay?.stop()
+        var held = false
+        ui.holdButton("按住喊话（需要先确认车外路由，音量≤50%）", pressed = {
+            held = true
+            val talkRequest = ++talkRequestGeneration
+            LocalFileLog.get(this).record("mic", "touch down")
+            if (!audioPrefs.getBoolean("exterior_verified", false)) {
+                status.text = "请先完成车外试听并勾选实际出声确认"
+            } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            } else lifecycleScope.launch {
+                val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
+                if (talkRequest != talkRequestGeneration || !held || !firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) return@launch
+                runCatching {
+                    recorder?.finish(false); speech?.stop(); stopAudio()
+                    micRelay?.start(firmwareAudio.attributes(FirmwareAudioRoute.EXTERIOR_VOICE), audioPrefs.getInt("volume", 25))
+                }.onFailure { micRelay?.stop(); status.text = "喊话启动失败：${it.message}" }
             }
+        }, released = {
+            held = false; talkRequestGeneration++; micRelay?.stop()
+            LocalFileLog.get(this).record("mic", "touch released/cancelled")
         })
-        layout.addView(pushToTalk)
 
         speechControls(audioPrefs)
     }
@@ -77,19 +59,14 @@ internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.Share
         button("放弃录音") { recorder?.finish(false); status.text = "录音已取消" }
         label("离线中文语音（使用已安装离线音色）")
         speech = LocalSpeechPlayer(this) { status.text = it }
-        val text = EditText(this).apply {
-            hint = "输入语音文本，最多 500 字"
-            filters = arrayOf(android.text.InputFilter.LengthFilter(500))
-            setTextColor(0xFFE3EDFF.toInt()); setHintTextColor(0xFF8090AA.toInt())
-            setText(audioPrefs.getString("speech_text", ""))
-        }
-        layout.addView(text)
+        val text = LocalInput("输入语音文本，最多 500 字", audioPrefs.getString("speech_text", "") ?: "", 500)
+        ui.input(text)
         label("语速 0.5～2.0")
-        val rate = SeekBar(this).apply { max = 150; progress = audioPrefs.getInt("speech_rate", 50).coerceIn(0, 150) }
-        layout.addView(rate)
+        val rate = LocalSlider(audioPrefs.getInt("speech_rate", 50).coerceIn(0, 150), 150)
+        ui.slider(rate)
         label("音调 0.5～2.0")
-        val pitch = SeekBar(this).apply { max = 150; progress = audioPrefs.getInt("speech_pitch", 50).coerceIn(0, 150) }
-        layout.addView(pitch)
+        val pitch = LocalSlider(audioPrefs.getInt("speech_pitch", 50).coerceIn(0, 150), 150)
+        ui.slider(pitch)
         button("朗读（系统默认音频输出）") {
             recorder?.finish(false); stopAudio()
             audioPrefs.edit().putString("speech_text", text.text.toString())
@@ -110,7 +87,7 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
         button("检测车外 / 锁车试听接口（不播放）") { status.text = firmwareAudio.probe() }
         FirmwareAudioRoute.entries.filter { it != FirmwareAudioRoute.LOCK_EVENT }.forEach { route ->
             button("${route.title}：试听选中音频") {
-                AlertDialog.Builder(this).setTitle(route.title)
+                LocalDialogBuilder(this).setTitle(route.title)
                     .setMessage("可能在车外发声，请确认环境安全。最多播放 15 秒，离开页面即停止。不覆盖原厂音效。")
                     .setNegativeButton("取消", null).setPositiveButton("驻车试听") { _, _ -> playFirmwareAudio(route) }.show()
             }
@@ -118,14 +95,10 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
 
         label("自动锁 / 解锁音效 · 手动布防 · 不修改原厂资源")
         val lockPrefs = getSharedPreferences("local-lock-sound", Context.MODE_PRIVATE)
-        layout.addView(Switch(this).apply {
-            this.text = "已实车确认11001事件路由与LockFL门锁原始码"
-            setTextColor(0xFFE3EDFF.toInt()); isChecked = lockPrefs.getBoolean("verified", false)
-            setOnCheckedChangeListener { _, checked ->
-                lockPrefs.edit().putBoolean("verified", checked).apply()
-                if (!checked) stopService(Intent(this@firmwareControls, LocalLockSoundService::class.java))
-            }
-        })
+        ui.toggle("已实车确认11001事件路由与LockFL门锁原始码", lockPrefs.getBoolean("verified", false)) { checked ->
+            lockPrefs.edit().putBoolean("verified", checked).apply()
+            if (!checked) stopService(Intent(this, LocalLockSoundService::class.java))
+        }
         button("选中音频设为锁车音效") { selectedAudio?.let { lockPrefs.edit().putString("lock_file", it.path).apply(); status.text = "锁车音效：${it.name}" } }
         button("选中音频设为解锁音效") { selectedAudio?.let { lockPrefs.edit().putString("unlock_file", it.path).apply(); status.text = "解锁音效：${it.name}" } }
         button("手动布防锁车音效（最多2小时）") {
@@ -138,7 +111,7 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
             }
         }
         button("停止锁车布防") { stopService(Intent(this, LocalLockSoundService::class.java)); status.text = "已请求停止布防" }
-        button("读取布防状态") { status.text = lockPrefs.getString("last_status", "未布防") }
+        button("读取布防状态") { status.text = lockPrefs.getString("last_status", "未布防") ?: "未布防" }
 
     }
 

@@ -123,3 +123,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 ## GitHub 自动预发布
 
 推送与应用版本一致的 `v1.0.0` 等标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN.apk`，创建 **WIP 预发布版**并附 SHA-256 校验文件。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
+
+## 界面实现
+
+主界面与本地工具、音频、相机控制、相册、备份页面统一使用 **Jetpack Compose + Material 3**，复用应用主题和字体缩放。按钮、输入框、开关、滑块和确认/文件选择弹窗均由 Compose 渲染，不使用 XML 或动态拼接传统布局。相机 `TextureView` 与视频播放器 `VideoView` 仅作为底层显示组件通过 `AndroidView` 接入；权限申请仍使用系统界面。

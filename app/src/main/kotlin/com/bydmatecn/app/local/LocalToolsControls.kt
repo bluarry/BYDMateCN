@@ -1,18 +1,11 @@
 package com.bydmatecn.app.local
 
-import android.app.AlertDialog
-import android.widget.EditText
 import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.media.AudioManager
-import android.widget.SeekBar
-import android.widget.Switch
 import android.provider.Settings
-import android.widget.Button
-import android.widget.ScrollView
-import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -42,7 +35,7 @@ internal fun LocalToolsActivity.configureTool(tool: String) {
     }
 
 internal fun LocalToolsActivity.observeAudio() {
-        setContentView(ScrollView(this).apply { addView(layout) })
+        installLocalContent(ui)
         audioManager.registerAudioDeviceCallback(deviceCallback, Handler(Looper.getMainLooper()))
         lifecycleScope.launch {
             while (true) {
@@ -62,13 +55,11 @@ internal fun LocalToolsActivity.observeAudio() {
 
     }
 
-internal fun LocalToolsActivity.label(text: String, size: Float = 16f): TextView = TextView(this).also {
-        it.text = text; it.textSize = size; it.setTextColor(0xFFE3EDFF.toInt()); it.setPadding(0, 10, 0, 10); layout.addView(it)
-    }
+internal fun LocalToolsActivity.label(text: String, size: Float = 16f): LocalText = ui.label(text, size)
 
 internal fun LocalToolsActivity.button(text: String, action: () -> Unit) {
-        layout.addView(Button(this).apply { this.text = text; setOnClickListener { LocalFileLog.get(this@button).record("tools/action", text); action() } })
-    }
+    ui.button(text) { LocalFileLog.get(this).record("tools/action", text); action() }
+}
 
 internal fun LocalToolsActivity.openSettings(action: String) {
         runCatching { startActivity(Intent(action)) }.onFailure { status.text = "固件不提供此设置：${it.message}" }
@@ -91,12 +82,12 @@ internal fun LocalToolsActivity.fileControls() {
 
 internal fun LocalToolsActivity.mediaRuleControls() {
         val actions = arrayOf("截图", "开始MP4", "停止MP4", "选中音频播放", "停止音频", "车外试听", "锁车试听")
-        AlertDialog.Builder(this).setTitle("本地媒体动作（对应页面必须可见）").setItems(actions) { _, selected ->
+        LocalDialogBuilder(this).setTitle("本地媒体动作（对应页面必须可见）").setItems(actions) { _, selected ->
             val command = listOf("snapshot", "record_start", "record_stop", "play", "stop", "exterior", "lock_preview")[selected]
             val name = audioLibrary.resolve(selectedAudio?.path)?.path
             if (selected in setOf(3, 5, 6) && name == null) { status.text = "先在音频页选中本地文件"; return@setItems }
-            val key = EditText(this).apply { hint = "方控Android keyCode（留空=按钮触发）"; inputType = android.text.InputType.TYPE_CLASS_NUMBER }
-            AlertDialog.Builder(this).setTitle(actions[selected]).setView(key).setNegativeButton("取消", null)
+            val key = LocalInput("方控Android keyCode（留空=按钮触发）")
+            LocalDialogBuilder(this).setTitle(actions[selected]).setView(key).setNegativeButton("取消", null)
                 .setPositiveButton("创建停用规则") { _, _ ->
                     lifecycleScope.launch {
                         val code = key.text.toString().toIntOrNull()
@@ -122,7 +113,7 @@ internal fun LocalToolsActivity.audioControls() {
         button("选择系统输出设备") {
             val devices = (getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             val names = arrayOf("系统默认") + devices.map { "${it.productName} (type=${it.type}, id=${it.id})" }.toTypedArray()
-            AlertDialog.Builder(this).setTitle("输出设备（不等于外扬声器路由）").setItems(names) { _, which ->
+            LocalDialogBuilder(this).setTitle("输出设备（不等于外扬声器路由）").setItems(names) { _, which ->
                 selectedOutput = if (which == 0) null else devices[which - 1]
                 status.text = names[which]
             }.show()
@@ -140,32 +131,16 @@ private fun LocalToolsActivity.playbackPreferences(audioPrefs: android.content.S
         val volume = audioPrefs.getInt("volume", 50).coerceIn(0, 100)
         localPlayer.setVolume(volume)
         label("应用播放音量（不修改原车系统音量）")
-        layout.addView(SeekBar(this).apply {
-            max = 100; progress = volume
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                    if (fromUser) { localPlayer.setVolume(value); audioPrefs.edit().putInt("volume", value).apply() }
-                }
-                override fun onStartTrackingTouch(bar: SeekBar?) = Unit
-                override fun onStopTrackingTouch(bar: SeekBar?) = Unit
-            })
+        ui.slider(LocalSlider(volume), changed = { value ->
+            localPlayer.setVolume(value); audioPrefs.edit().putInt("volume", value).apply()
         })
         val repeat = audioPrefs.getBoolean("repeat", false)
         localPlayer.setLooping(repeat)
-        layout.addView(Switch(this).apply {
-            text = "循环播放"; setTextColor(0xFFE3EDFF.toInt()); isChecked = repeat
-            setOnCheckedChangeListener { _, checked -> localPlayer.setLooping(checked); audioPrefs.edit().putBoolean("repeat", checked).apply() }
-        })
+        ui.toggle("循环播放", repeat) { checked -> localPlayer.setLooping(checked); audioPrefs.edit().putBoolean("repeat", checked).apply() }
         label("播放位置（松手跳转）")
-        positionBar = SeekBar(this).apply {
-            max = 100
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) = Unit
-                override fun onStartTrackingTouch(bar: SeekBar?) { seeking = true }
-                override fun onStopTrackingTouch(bar: SeekBar?) { localPlayer.seekPercent(bar?.progress ?: 0); seeking = false }
-            })
-        }
-        layout.addView(positionBar)
+        val position = LocalSlider(0)
+        positionBar = position
+        ui.slider(position, { seeking = true }, { localPlayer.seekPercent(position.progress); seeking = false })
         button("导入本地LRC歌词（UTF-8，不联网）") { importLyrics.launch(arrayOf("text/*", "application/octet-stream")) }
         lyricLabel = label("", 22f)
         button("显示播放进度") { status.text = localPlayer.progress().ifEmpty { "未在播放" } }

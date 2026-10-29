@@ -4,10 +4,7 @@ import android.content.Context
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
-import android.widget.SeekBar
 import android.os.Bundle
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
@@ -24,12 +21,12 @@ import javax.inject.Inject
 
 /** User-initiated local tools only. Unsupported firmware operations remain explicit. */
 @AndroidEntryPoint
-class LocalToolsActivity : ComponentActivity() {
+class LocalToolsActivity : ComponentActivity(), LocalComposeHost {
+    override val ui = LocalUiState()
     @Inject lateinit var vehicle: VehicleApi
     @Inject lateinit var helper: HelperClient
     @Inject lateinit var rules: com.bydmatecn.app.data.local.dao.RuleDao
-    internal lateinit var layout: LinearLayout
-    internal lateinit var status: TextView
+    internal val status = LocalText("本地功能就绪") { LocalFileLog.get(this).record("tools/status", it) }
     internal lateinit var resources: LocalResourceStore
     internal lateinit var localPlayer: LocalAudioPlayer
     internal var recorder: LocalAudioRecorder? = null
@@ -47,7 +44,7 @@ class LocalToolsActivity : ComponentActivity() {
     internal var selectedOutput: AudioDeviceInfo? = null
     internal var resumed = false
     internal var busy = false
-    internal var positionBar: SeekBar? = null
+    internal var positionBar: LocalSlider? = null
     internal var seeking = false
     internal var firmwarePlayback = false
     internal var audioRequestGeneration = 0
@@ -64,7 +61,7 @@ class LocalToolsActivity : ComponentActivity() {
         }
     }
     internal var lyricLines: List<LocalLyrics.Line> = emptyList()
-    internal var lyricLabel: TextView? = null
+    internal var lyricLabel: LocalText? = null
     internal val importLyrics = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { runCatching {
@@ -133,18 +130,14 @@ class LocalToolsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LocalFileLog.get(this).record("LocalTools", "page opened")
         resources = LocalResourceStore(File(filesDir, "local-audio"))
         localPlayer = LocalAudioPlayer(this) { message -> status.text = message }
         val lastAudio = getSharedPreferences("local-audio", Context.MODE_PRIVATE).getString("selected", null)
         selectedAudio = audioLibrary.resolve(lastAudio)
         val tool = intent.getStringExtra("tool") ?: "status"
-        layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24)
-            setBackgroundColor(0xFF101A2D.toInt())
-        }
         label(localTools.firstOrNull { it.id == tool }?.title ?: "本地工具", 26f)
-        status = label("本地功能就绪", 17f)
-        LocalFileLog.get(this).watch(status, "tools/${intent.getStringExtra("tool")}")
+        ui.controls.add { androidx.compose.material3.Text(status.text) }
         button("返回") { finish() }
 
         configureTool(tool)
