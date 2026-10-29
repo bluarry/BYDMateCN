@@ -3324,7 +3324,7 @@ private fun AppSection(state: SettingsUiState, viewModel: SettingsViewModel) {
             )
             SettingActionRow(
                 title = stringResource(R.string.settings_update_check_button),
-                description = "BYDMateCN v${state.appVersion}",
+                description = "BYDMateCN v${state.appVersion} · GitHub WIP 预发布版",
                 buttonLabel = stringResource(R.string.settings_update_check_button),
                 onClick = { viewModel.showUpdateDialog() },
             )
@@ -3367,15 +3367,18 @@ private fun AppSection(state: SettingsUiState, viewModel: SettingsViewModel) {
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Text("BYDMateCN v${state.appVersion} · WIP", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.settings_fork_description), color = TextSecondary, fontSize = 14.sp)
+            Text("${com.bydmatecn.app.BuildConfig.APPLICATION_ID} · versionCode ${com.bydmatecn.app.BuildConfig.VERSION_CODE}", color = TextSecondary, fontSize = 13.sp)
             Text(stringResource(R.string.settings_copyright), color = TextSecondary, fontSize = 14.sp)
             Text(
-                text = "github.com/AndyShaman/BYDMate",
+                text = "github.com/bluarry/BYDMateCN",
                 color = AccentBlue,
                 fontSize = 14.sp,
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier.clickable {
                     context.startActivity(Intent(Intent.ACTION_VIEW,
-                        Uri.parse("https://github.com/AndyShaman/BYDMate")))
+                        Uri.parse("https://github.com/bluarry/BYDMateCN")))
                 }
             )
             Text(

@@ -2005,4 +2005,5 @@
     <string name="settings_fuel_price_hint">por litro, para viagens a partir desta data</string>
     <string name="automation_learned_key_label">Tecla %1$d</string>
     <string name="nav_tab_local">Ferramentas</string>
+    <string name="settings_fork_description">Fork comunitário independente do BYDMate. Testes voluntários apenas com o veículo estacionado; envie relatos de problemas com os logs. Não é um aplicativo oficial da BYD.</string>
 </resources>

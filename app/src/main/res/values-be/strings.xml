@@ -2161,4 +2161,5 @@
     <string name="settings_fuel_price_hint">за літр, на паездкі з гэтай даты</string>
     <string name="automation_learned_key_label">Клавіша %1$d</string>
     <string name="nav_tab_local">Інструменты</string>
+    <string name="settings_fork_description">Незалежны супольны форк BYDMate. Добраахвотнае тэставанне толькі на стаянцы; паведамляйце пра праблемы і дадавайце журналы. Неафіцыйная праграма BYD.</string>
 </resources>

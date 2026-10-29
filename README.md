@@ -114,7 +114,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 `app/build.gradle.kts` 中 `DONATIONS_ENABLED=false` 隐藏设置捐赠卡片、启动提醒和 DonateDialog，二维码/收款资源不删除。以后启用前必须核对收款信息和来源归属，不能直接沿用原作者收款信息作为本分支收款方式。
 
-原 BYDMate 更新源已禁用，独立更新 URL 未配置前请手动安装开发者提供的 APK，不会用原版 APK 更新 BYDMateCN。
+更新仅检查 `bluarry/BYDMateCN` 的 GitHub Releases（含 WIP 预发布版），只接受 `BYDMateCN.apk`。安装前校验应用 ID、版本及签名；覆盖更新必须使用同一签名且递增 versionCode，不会下载原项目的安装包。
 
 ## 开源来源与许可证
 

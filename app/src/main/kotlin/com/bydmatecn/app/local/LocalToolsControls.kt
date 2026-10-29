@@ -23,7 +23,7 @@ internal fun LocalToolsActivity.configureTool(tool: String) {
                 label("可进入系统蓝牙设置配对。米篓宝的专用数据协议尚未恢复，配对成功不等于插件可用。")
                 button("系统蓝牙设置") { openSettings(Settings.ACTION_BLUETOOTH_SETTINGS) }
             }
-            "front" -> label("AutoTark 此能力有 FrontCarReminderPluginState；目前未取得插件的完整输入和算法。不能用自车速度变化冒充前车起步判断。")
+            "front" -> label("前车起步判断尚缺有效输入与已验证算法，不使用自车速度变化冒充识别结果。")
             "traffic" -> label("实时红绿灯需要外部信号源；此前约定的本地版不移植此项，不显示虚假倒计时。")
             "touch" -> {
                 label("已有投屏并不自动提供触摸注入权限；当前 helper 尚未有经确认的仪表输入协议，不执行猜测的 input 命令。")
@@ -108,8 +108,10 @@ internal fun LocalToolsActivity.mediaRuleControls() {
     }
 
 internal fun LocalToolsActivity.audioControls() {
+        ui.section("音频库")
         label("普通播放使用 Android 输出设备；下方新增固件专用车外/锁车试听入口。专用标签已恢复，外功放授权和实际出声仍需真车验证。")
         audioDirectoryControls()
+        ui.section("播放控制")
         button("选择系统输出设备") {
             val devices = (getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             val names = arrayOf("系统默认") + devices.map { "${it.productName} (type=${it.type}, id=${it.id})" }.toTypedArray()

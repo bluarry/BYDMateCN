@@ -15,7 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
+import org.json.JSONArray
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -78,26 +78,18 @@ class UpdateChecker @Inject constructor(
             .build()
         val body = httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw Exception("GitHub API: HTTP ${response.code}")
+                throw java.io.IOException(if (response.code == 403 || response.code == 429) "GitHub 请求受限，请稍后重试" else "更新服务请求失败：HTTP ${response.code}")
             }
-            response.body?.string() ?: throw Exception("Пустой ответ от GitHub")
+            response.body?.string() ?: throw java.io.IOException("更新服务器返回空内容")
         }
 
-        val json = JSONObject(body)
-        val tagName = json.optString("tag_name", "").removePrefix("v")
-        val currentVersion = getAppVersion(context)
-
-        if (tagName.isEmpty()) throw Exception("Нет tag_name в ответе GitHub")
-        if (tagName == currentVersion || !isNewer(tagName, currentVersion)) {
-            return@withContext null // genuinely up to date
-        }
-
-        val apkUrl = releaseApkUrl(json, tagName)
-
+        val releases = JSONArray(body)
+        if (releases.length() == 0) error("仓库尚未发布可安装版本，请稍后重试")
+        val release = ForkReleasePolicy.select(releases, getAppVersion(context)) ?: return@withContext null
         UpdateInfo(
-            version = tagName,
-            downloadUrl = apkUrl,
-            releaseNotes = json.optString("body", "")
+            version = release.getString("tag_name").removePrefix("v"),
+            downloadUrl = ForkReleasePolicy.apkUrl(release),
+            releaseNotes = release.optString("body", "")
         )
     }
 
@@ -112,12 +104,13 @@ class UpdateChecker @Inject constructor(
         onProgress: (String) -> Unit = {}
     ) = withContext(Dispatchers.IO) {
         check(GITHUB_API.isNotBlank()) { "独立本地版未配置更新源，不能下载原BYDMate的APK" }
+        ForkReleasePolicy.requireDownloadUrl(update.downloadUrl)
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         // Delete old file if exists
         val destFile = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            "BYDMateCN-${update.version}.apk"
+            ForkReleasePolicy.downloadName(update.version)
         )
         if (destFile.exists()) destFile.delete()
 
@@ -126,7 +119,7 @@ class UpdateChecker @Inject constructor(
             .setDescription(appStrings.get(R.string.update_download_notification_description))
             .setDestinationInExternalPublicDir(
                 Environment.DIRECTORY_DOWNLOADS,
-                "BYDMateCN-${update.version}.apk"
+                ForkReleasePolicy.downloadName(update.version)
             )
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
 
@@ -184,7 +177,8 @@ class UpdateChecker @Inject constructor(
             }
         }
 
-        // Trigger install
+        // Parse and verify the archive off the UI thread before opening the installer.
+        verifyUpdateApk(context, destFile, update.version)
         withContext(Dispatchers.Main) {
             installApk(context, update.version)
         }
@@ -193,9 +187,13 @@ class UpdateChecker @Inject constructor(
     private fun installApk(context: Context, version: String) {
         val file = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            "BYDMate-$version.apk"
+            ForkReleasePolicy.downloadName(version)
         )
-        if (!file.exists()) return
+        check(file.isFile) { "下载的安装包不存在，请重新下载" }
+        check(context.packageManager.canRequestPackageInstalls()) {
+            context.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            "请允许此应用安装未知来源应用后重试"
+        }
 
         val uri = FileProvider.getUriForFile(
             context,
@@ -218,33 +216,4 @@ class UpdateChecker @Inject constructor(
         }
     }
 
-    private fun isNewer(remote: String, local: String): Boolean {
-        val r = remote.split(".").mapNotNull { it.toIntOrNull() }
-        val l = local.split(".").mapNotNull { it.toIntOrNull() }
-        for (i in 0 until maxOf(r.size, l.size)) {
-            val rv = r.getOrElse(i) { 0 }
-            val lv = l.getOrElse(i) { 0 }
-            if (rv > lv) return true
-            if (rv < lv) return false
-        }
-        return false
-    }
-
-    private fun releaseApkUrl(json: JSONObject, tagName: String): String {
-        val assets = json.optJSONArray("assets")
-            ?: throw Exception("Нет assets в релизе $tagName")
-        var apkUrl: String? = null
-        for (i in 0 until assets.length()) {
-            val asset = assets.getJSONObject(i)
-            val name = asset.optString("name", "")
-            if (name.endsWith(".apk")) {
-                apkUrl = asset.optString("browser_download_url")
-                break
-            }
-        }
-
-        if (apkUrl == null) throw Exception("Нет APK в релизе $tagName")
-
-        return apkUrl
-    }
 }

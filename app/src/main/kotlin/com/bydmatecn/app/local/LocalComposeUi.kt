@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -53,7 +52,14 @@ internal class LocalInput(val hint: String, initial: String = "", val limit: Int
 internal class LocalSlider(initial: Int, val max: Int = 100) {
     var progress by mutableIntStateOf(initial)
 }
+internal data class LocalSection(val title: String, val start: Int)
 class LocalUiState {
+    var title = "本地工具"
+    internal var status: LocalText? = null
+    var onBack: (() -> Unit)? = null
+    internal val sections = mutableStateListOf<LocalSection>()
+    internal val actionIndices = mutableSetOf<Int>()
+    internal fun section(title: String) { sections.add(LocalSection(title, controls.size)) }
     val controls = mutableStateListOf<@Composable () -> Unit>()
     internal var dialog: LocalDialogBuilder? by mutableStateOf(null)
 }
@@ -73,9 +79,7 @@ internal fun ComponentActivity.installLocalContent(ui: LocalUiState, content: (@
 
 @Composable
 internal fun LocalPanel(ui: LocalUiState, modifier: Modifier = Modifier) {
-    Column(modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ui.controls.forEach { it() }
-    }
+    LocalDashboard(ui, modifier)
 }
 internal fun LocalUiState.label(text: String, size: Float = 16f): LocalText {
     val value = LocalText(text)
@@ -83,7 +87,11 @@ internal fun LocalUiState.label(text: String, size: Float = 16f): LocalText {
     return value
 }
 internal fun LocalUiState.button(text: String, action: () -> Unit) {
-    controls.add { Button(onClick = action, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(text) } }
+    actionIndices.add(controls.size)
+    controls.add {
+        androidx.compose.material3.OutlinedButton(onClick = action, shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp)) { Text(text, fontSize = 17.sp) }
+    }
 }
 internal fun LocalUiState.input(value: LocalInput) {
     controls.add { LocalInputField(value) }
@@ -100,8 +108,9 @@ internal fun LocalUiState.slider(value: LocalSlider, changed: (Int) -> Unit = {}
     }
 }
 internal fun LocalUiState.toggle(text: String, initial: Boolean, changed: (Boolean) -> Unit) {
+    val checkedState = mutableStateOf(initial)
     controls.add {
-        var checked by remember { mutableStateOf(initial) }
+        var checked by checkedState
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(text, modifier = Modifier.weight(1f))
             Switch(checked = checked, onCheckedChange = { checked = it; changed(it) })

@@ -12,6 +12,7 @@ import java.io.File
 
 /** Activity-scoped controls; the activity owns state and lifecycle cleanup. */
 internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.SharedPreferences) {
+        ui.section("车外喊话")
         micRelay = LocalMicRelay(this) { status.text = it }
         label("实时车外喊话 · 按住说话，松手停止 · 最长15秒")
         ui.toggle("已实际确认11002从车外扬声器出声，理解啸叫风险", audioPrefs.getBoolean("exterior_verified", false)) { checked ->
@@ -44,6 +45,7 @@ internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.S
     }
 
 internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.SharedPreferences) {
+        ui.section("录音")
         label("录制语音（仅本地保存，不是实时外放）")
         recorder = LocalAudioRecorder(File(cacheDir, "local-voice"), resources,
             { status.text = it }, { status.text = "录音已保存：${it.name}；音频播放列表仅使用已选择目录" })
@@ -57,6 +59,7 @@ internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.Share
         }
         button("停止录音并保存") { recorder?.finish(true) }
         button("放弃录音") { recorder?.finish(false); status.text = "录音已取消" }
+        ui.section("语音合成")
         label("离线中文语音（使用已安装离线音色）")
         speech = LocalSpeechPlayer(this) { status.text = it }
         val text = LocalInput("输入语音文本，最多 500 字", audioPrefs.getString("speech_text", "") ?: "", 500)
@@ -83,6 +86,7 @@ internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.Share
     }
 
 internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.SharedPreferences) {
+        ui.section("车外试听")
         label("固件专用路由：仅驻车手动试听，最多 15 秒；不代表已实现自动锁车播放。")
         button("检测车外 / 锁车试听接口（不播放）") { status.text = firmwareAudio.probe() }
         FirmwareAudioRoute.entries.filter { it != FirmwareAudioRoute.LOCK_EVENT }.forEach { route ->
@@ -93,6 +97,7 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
             }
         }
 
+        ui.section("锁车与解锁")
         label("自动锁 / 解锁音效 · 手动布防 · 不修改原厂资源")
         val lockPrefs = getSharedPreferences("local-lock-sound", Context.MODE_PRIVATE)
         ui.toggle("已实车确认11001事件路由与LockFL门锁原始码", lockPrefs.getBoolean("verified", false)) { checked ->

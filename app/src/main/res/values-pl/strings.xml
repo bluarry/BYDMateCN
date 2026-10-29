@@ -2161,4 +2161,5 @@
     <string name="settings_fuel_price_hint">za litr, dla podróży od tej daty</string>
     <string name="automation_learned_key_label">Przycisk %1$d</string>
     <string name="nav_tab_local">Narzędzia</string>
+    <string name="settings_fork_description">Niezależny społecznościowy fork BYDMate. Dobrowolne testy wyłącznie na postoju; zgłaszaj problemy wraz z logami. Nie jest to oficjalna aplikacja BYD.</string>
 </resources>

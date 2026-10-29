@@ -2627,6 +2627,7 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
 
     fun showUpdateDialog() {
         _uiState.update { it.copy(showUpdateDialog = true, updateDialogState = UpdateState.Idle) }
+        checkForUpdate()
     }
 
     fun hideUpdateDialog() {

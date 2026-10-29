@@ -44,9 +44,10 @@ internal fun LocalCameraActivity.createCameraViews() {
                 }
             }
         }
-        ui.label("本地相机", 24f)
-        ui.controls.add { androidx.compose.material3.Text(status.text) }
-        ui.button("返回") { finish() }
+        ui.title = "本地相机"
+        ui.status = status
+        ui.onBack = { finish() }
+        ui.section("相机与权限")
 
         cameraButton("打开使用情况访问设置") {
             runCatching { startActivity(android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
@@ -68,6 +69,7 @@ internal fun LocalCameraActivity.createCameraViews() {
     }
 
 internal fun LocalCameraActivity.addMirrorControls() {
+        ui.section("预览与画面")
         cameraButton("打开预览") { startPreview() }
         cameraButton("选择固件 AVM 通道 1～4（需标定方位）") {
             LocalDialogBuilder(this).setTitle("通道号不等于左/右方位")
@@ -102,6 +104,7 @@ internal fun LocalCameraActivity.addMirrorControls() {
     }
 
 internal fun LocalCameraActivity.addCaptureControls() {
+        ui.section("录像与相册")
         cameraButton("截图（原始帧，双路并排）") { capture() }
         cameraButton("开始 / 停止帧录像（1 FPS）") {
             if (open && !videoRecording) { recording = !recording; status.text = if (recording) "帧录像中（无音频）" else "帧录像已停止" }
@@ -129,7 +132,7 @@ private fun LocalCameraActivity.CameraLayout() {
     val wide = LocalConfiguration.current.screenWidthDp >= 650
     if (wide) {
         Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            LocalPanel(ui, Modifier.width(if (panelVisible) 340.dp else 0.dp).fillMaxHeight())
+            LocalPanel(ui, Modifier.width(if (panelVisible) 440.dp else 0.dp).fillMaxHeight())
             CameraPreviews(Modifier.weight(1f).fillMaxHeight())
         }
     } else {

@@ -31,10 +31,10 @@ android {
         // on DiLink Android 12 (requestLegacyExternalStorage works).
         // targetSdk 30+ would break listFiles() on /storage/emulated/0/energydata/
         targetSdk = 29
-        versionCode = 508
-        versionName = "1.0.0"
+        versionCode = 509
+        versionName = "1.0.0.1"
         // Independent fork: no donor APKs may be offered as this application's updates.
-        buildConfigField("String", "APP_UPDATE_URL", "\"\"")
+        buildConfigField("String", "APP_UPDATE_URL", "\"https://api.github.com/repos/bluarry/BYDMateCN/releases?per_page=20\"")
         // Retain donor donation UI/resources, but hide every entry in this fork.
         buildConfigField("boolean", "DONATIONS_ENABLED", "false")
 

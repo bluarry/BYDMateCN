@@ -12,6 +12,17 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29])
 class LocalComposeUiTest {
+    @Test fun screenWidthAndSectionBoundaries() {
+        assertEquals(2, dashboardColumns(1020))
+        assertEquals(1, dashboardColumns(360))
+        val ui = LocalUiState()
+        ui.section("音频库")
+        ui.button("扫描") {}
+        ui.section("锁车与解锁")
+        ui.button("布防") {}
+        assertEquals(listOf(0, 1), ui.sections.map { it.start })
+        assertEquals(setOf(0, 1), ui.actionIndices)
+    }
     @Test fun statusUpdatesRetainJournalCallback() {
         val updates = mutableListOf<String>()
         val text = LocalText("就绪") { updates.add(it) }

@@ -25,11 +25,11 @@ class LocalBackupActivity : ComponentActivity(), LocalComposeHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LocalFileLog.get(this).record("LocalBackup", "page opened")
-        ui.label("本地媒体备份 / 恢复", 24f)
-        ui.controls.add { androidx.compose.material3.Text(status.text) }
+        ui.title = "媒体备份与恢复"
+        ui.status = status
+        ui.onBack = { finish() }
         button("导出音频、截图和MP4备份") { export.launch("BYDMate-local-media.zip") }
         button("从本地ZIP恢复") { restore.launch(arrayOf("application/zip", "application/octet-stream")) }
-        button("返回") { finish() }
         installLocalContent(ui)
     }
     private fun button(label: String, action: () -> Unit) {

@@ -72,15 +72,16 @@ class LocalMediaActivity : ComponentActivity(), LocalComposeHost {
     }
     private fun refresh() {
         fun galleryHeader() {
-        ui.controls.clear()
-        ui.label("本地相册", 24f)
-        ui.controls.add { androidx.compose.material3.Text(message.text) }
-        ui.controls.add { GalleryPreview() }
-    }
+            ui.controls.clear()
+            ui.actionIndices.clear()
+            ui.title = "本地相册"
+            ui.status = message
+            ui.onBack = { finish() }
+            ui.controls.add { GalleryPreview() }
+        }
 
         clearPreview()
         galleryHeader()
-        mediaButton("返回") { finish() }
         val damaged = videos.incomplete()
         if (damaged.isNotEmpty()) mediaButton("隔离的未完成录像：${damaged.size}个（不作为正常MP4）") {
             LocalDialogBuilder(this).setItems(damaged.map { it.name }.toTypedArray()) { _, which ->
@@ -94,7 +95,6 @@ class LocalMediaActivity : ComponentActivity(), LocalComposeHost {
         val pages = files.chunked(50)
         fun page(index: Int) {
             clearPreview(); galleryHeader()
-            mediaButton("返回") { finish() }
             if (damaged.isNotEmpty()) mediaButton("清理未完成录像（${damaged.size}段，保留前请自行取证）") {
                 LocalDialogBuilder(this).setMessage("删除已隔离的不完整录像？不删除正常MP4。")
                     .setNegativeButton("保留", null).setPositiveButton("删除") { _, _ -> damaged.forEach { videos.deleteIncomplete(it) }; refresh() }.show()
