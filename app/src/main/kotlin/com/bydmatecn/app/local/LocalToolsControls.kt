@@ -78,9 +78,9 @@ internal fun LocalToolsActivity.fileControls() {
         button("创建本地媒体自动化（按钮或方控触发）") { mediaRuleControls() }
         button("本地媒体备份 / 恢复") { startActivity(Intent(this, LocalBackupActivity::class.java)) }
         button("截图与录像相册 · 回看 / 导出 / 删除") { startActivity(Intent(this, LocalMediaActivity::class.java)) }
-        label("支持本地音频导入与 ZIP 导出。文件名生成于私有目录；单文件 32 MiB，总音频 128 MiB。不是局域网接收服务器。")
-        button("导入本地音频") { importAudio.launch(arrayOf("audio/*")) }
-        button("查看本地资源") {
+        label("播放列表仅扫描所选目录；此处 ZIP 仅导出旧导入副本、录音、合成语音及截图，不包含外部音频目录。")
+        button("管理音频目录") { startActivity(Intent(this, LocalToolsActivity::class.java).putExtra("tool", "audio")) }
+        button("查看应用内生成 / 保留资源") {
             val audio = resources.files()
             val captures = LocalCaptureStore(File(filesDir, "local-captures")).captures()
             status.text = "音频：${audio.size} 个；截图/帧：${captures.size} 个\n" + audio.joinToString("\n") { it.name }
@@ -93,7 +93,7 @@ internal fun LocalToolsActivity.mediaRuleControls() {
         val actions = arrayOf("截图", "开始MP4", "停止MP4", "选中音频播放", "停止音频", "车外试听", "锁车试听")
         AlertDialog.Builder(this).setTitle("本地媒体动作（对应页面必须可见）").setItems(actions) { _, selected ->
             val command = listOf("snapshot", "record_start", "record_stop", "play", "stop", "exterior", "lock_preview")[selected]
-            val name = resources.files().firstOrNull { it == selectedAudio }?.name
+            val name = audioLibrary.resolve(selectedAudio?.path)?.path
             if (selected in setOf(3, 5, 6) && name == null) { status.text = "先在音频页选中本地文件"; return@setItems }
             val key = EditText(this).apply { hint = "方控Android keyCode（留空=按钮触发）"; inputType = android.text.InputType.TYPE_CLASS_NUMBER }
             AlertDialog.Builder(this).setTitle(actions[selected]).setView(key).setNegativeButton("取消", null)
@@ -118,14 +118,7 @@ internal fun LocalToolsActivity.mediaRuleControls() {
 
 internal fun LocalToolsActivity.audioControls() {
         label("普通播放使用 Android 输出设备；下方新增固件专用车外/锁车试听入口。专用标签已恢复，外功放授权和实际出声仍需真车验证。")
-        button("导入音频") { importAudio.launch(arrayOf("audio/*")) }
-        button("选择已导入音频") {
-            val files = resources.files()
-            if (files.isEmpty()) status.text = "请先导入音频"
-            else AlertDialog.Builder(this).setTitle("本地音频").setItems(files.map { it.name }.toTypedArray()) { _, which ->
-                selectAudio(files[which]); status.text = "选择：${files[which].name}"
-            }.show()
-        }
+        audioDirectoryControls()
         button("选择系统输出设备") {
             val devices = (getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             val names = arrayOf("系统默认") + devices.map { "${it.productName} (type=${it.type}, id=${it.id})" }.toTypedArray()
@@ -176,19 +169,6 @@ private fun LocalToolsActivity.playbackPreferences(audioPrefs: android.content.S
         button("导入本地LRC歌词（UTF-8，不联网）") { importLyrics.launch(arrayOf("text/*", "application/octet-stream")) }
         lyricLabel = label("", 22f)
         button("显示播放进度") { status.text = localPlayer.progress().ifEmpty { "未在播放" } }
-        button("删除选中音频") {
-            val file = selectedAudio ?: return@button
-            AlertDialog.Builder(this).setMessage("删除 ${file.name}？仅删除本应用导入副本。")
-                .setNegativeButton("取消", null).setPositiveButton("删除") { _, _ ->
-                    stopAudio()
-                    if (resources.delete(file)) {
-                        selectedAudio = null
-                        audioPrefs.edit().remove("selected").apply()
-                        status.text = "已删除导入副本"
-                    } else status.text = "删除失败"
-                }.show()
-        }
-
         microphoneControls(audioPrefs)
 
 }

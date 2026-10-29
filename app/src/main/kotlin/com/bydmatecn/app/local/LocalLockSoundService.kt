@@ -20,7 +20,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CancellationException
-import java.io.File
 import javax.inject.Inject
 
 /** User-armed foreground lock/unlock observer. Never boots itself or holds a wake lock. */
@@ -85,7 +84,7 @@ class LocalLockSoundService : Service() {
 
     private fun playEvent(event: Int) {
                         val name = prefs.getString(if (event == 2) "lock_file" else "unlock_file", null)
-                        val file = LocalResourceStore(File(filesDir, "local-audio")).files().firstOrNull { it.name == name }
+                        val file = LocalAudioLibrary(this).resolve(name)
                         if (file != null) {
                             player.setVolume(prefs.getInt("volume", 25).coerceIn(0, 50))
                             player.play(file, null, FirmwareAudioBridge(this@LocalLockSoundService).attributes(FirmwareAudioRoute.LOCK_EVENT),

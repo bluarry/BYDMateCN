@@ -9,6 +9,10 @@ class LocalMediaActionSpecTest {
         assertTrue(LocalMediaActionSpec.valid("local_audio", "{\"command\":\"stop\"}"))
         assertTrue(LocalMediaActionSpec.valid("local_audio", "{\"command\":\"exterior\",\"file\":\"audio-test.wav\"}"))
     }
+    @Test fun absoluteDirectoryReferencesAreValidated() {
+        assertTrue(LocalMediaActionSpec.valid("local_audio", "{\"command\":\"play\",\"file\":\"/storage/emulated/0/Music/解锁.MP3\"}"))
+        assertFalse(LocalMediaActionSpec.valid("local_audio", "{\"command\":\"play\",\"file\":\"/Music/../secret.wav\"}"))
+    }
     @Test fun rejectsTraversalMissingFileAndBrokenJson() {
         for (value in listOf("", "{}", "{\"command\":\"play\"}",
             "{\"command\":\"play\",\"file\":\"../audio-test.wav\"}",

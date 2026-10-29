@@ -64,7 +64,7 @@ internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.S
 internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.SharedPreferences) {
         label("录制语音（仅本地保存，不是实时外放）")
         recorder = LocalAudioRecorder(File(cacheDir, "local-voice"), resources,
-            { status.text = it }, { selectAudio(it) })
+            { status.text = it }, { status.text = "录音已保存：${it.name}；音频播放列表仅使用已选择目录" })
         button("开始录音 · 最长 60 秒") {
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
@@ -98,7 +98,7 @@ internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.Share
         }
         button("生成本地语音文件（WAV，不播放）") {
             recorder?.finish(false); stopAudio()
-            speech?.synthesize(text.text.toString(), .5f + rate.progress / 100f, .5f + pitch.progress / 100f, resources) { selectAudio(it) }
+            speech?.synthesize(text.text.toString(), .5f + rate.progress / 100f, .5f + pitch.progress / 100f, resources) { status.text = "已生成：${it.name}；在文件工具中导出ZIP并解压到已选择的音频目录后扫描" }
         }
         button("停止朗读 / 合成") { speech?.stop() }
 
@@ -126,8 +126,8 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
                 if (!checked) stopService(Intent(this@firmwareControls, LocalLockSoundService::class.java))
             }
         })
-        button("选中音频设为锁车音效") { selectedAudio?.let { lockPrefs.edit().putString("lock_file", it.name).apply(); status.text = "锁车音效：${it.name}" } }
-        button("选中音频设为解锁音效") { selectedAudio?.let { lockPrefs.edit().putString("unlock_file", it.name).apply(); status.text = "解锁音效：${it.name}" } }
+        button("选中音频设为锁车音效") { selectedAudio?.let { lockPrefs.edit().putString("lock_file", it.path).apply(); status.text = "锁车音效：${it.name}" } }
+        button("选中音频设为解锁音效") { selectedAudio?.let { lockPrefs.edit().putString("unlock_file", it.path).apply(); status.text = "解锁音效：${it.name}" } }
         button("手动布防锁车音效（最多2小时）") {
             if (!lockPrefs.getBoolean("verified", false)) status.text = "需要先完成实车路由与门锁验证"
             else {
@@ -145,11 +145,11 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
 internal fun LocalToolsActivity.selectAudio(file: File) {
         if (selectedAudio != file) { lyricLines = emptyList(); lyricLabel?.text = "" }
         selectedAudio = file
-        getSharedPreferences("local-audio", Context.MODE_PRIVATE).edit().putString("selected", file.name).apply()
+        getSharedPreferences("local-audio", Context.MODE_PRIVATE).edit().putString("selected", file.path).apply()
     }
 
 internal fun LocalToolsActivity.playSelected() {
-        val file = selectedAudio ?: run { status.text = "请先选择音频"; return }
+        val file = audioLibrary.resolve(selectedAudio?.path) ?: run { status.text = "请先扫描并选择可读取的音频"; return }
         recorder?.finish(false); speech?.stop()
         stopAudio()
         localPlayer.play(file, selectedOutput)
@@ -157,7 +157,7 @@ internal fun LocalToolsActivity.playSelected() {
 
 internal fun LocalToolsActivity.playFirmwareAudio(route: FirmwareAudioRoute) {
         if (busy) return
-        val file = selectedAudio ?: run { status.text = "请先选择本地音频"; return }
+        val file = audioLibrary.resolve(selectedAudio?.path) ?: run { status.text = "音频目录未授权或文件已不可用，请重新扫描"; return }
         lifecycleScope.launch {
             busy = true
             try {

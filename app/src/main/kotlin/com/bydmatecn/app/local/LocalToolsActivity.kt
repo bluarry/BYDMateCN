@@ -6,7 +6,6 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.widget.SeekBar
 import android.os.Bundle
-import android.provider.OpenableColumns
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
@@ -38,6 +37,11 @@ class LocalToolsActivity : ComponentActivity() {
     internal var micRelay: LocalMicRelay? = null
     internal val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         status.text = if (granted) "麦克风权限已授予，请再点开始录音" else "麦克风权限被拒绝"
+    }
+    internal val audioLibrary by lazy { LocalAudioLibrary(this) }
+    internal val storagePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) showAudioDirectoryPicker(File("/storage/emulated/0"))
+        else status.text = "未授予存储读取权限，无法扫描音频目录"
     }
     internal var selectedAudio: File? = null
     internal var selectedOutput: AudioDeviceInfo? = null
@@ -98,21 +102,6 @@ class LocalToolsActivity : ComponentActivity() {
             status.text = result.fold({ "已导出适配报告，不含 VIN、账号或 token" }, { "报告导出失败：${it.message}" })
         }
     }
-    internal val importAudio = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                        if (cursor.moveToFirst()) cursor.getString(0) else null
-                    } ?: error("无法读取文件名")
-                    contentResolver.openInputStream(uri)?.use { resources.importAudio(it, name.substringAfterLast('.', "")) }
-                        ?: error("无法读取文件")
-                }
-            }
-            result.onSuccess { selectAudio(it) }
-            status.text = result.fold({ "已导入：${it.name}" }, { "导入失败：${it.message}" })
-        }
-    }
     internal val exportFiles = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) lifecycleScope.launch {
             busy = true
@@ -147,7 +136,7 @@ class LocalToolsActivity : ComponentActivity() {
         resources = LocalResourceStore(File(filesDir, "local-audio"))
         localPlayer = LocalAudioPlayer(this) { message -> status.text = message }
         val lastAudio = getSharedPreferences("local-audio", Context.MODE_PRIVATE).getString("selected", null)
-        selectedAudio = resources.files().firstOrNull { it.name == lastAudio }
+        selectedAudio = audioLibrary.resolve(lastAudio)
         val tool = intent.getStringExtra("tool") ?: "status"
         layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24)
@@ -164,7 +153,7 @@ class LocalToolsActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume(); resumed = true
         if (intent.getStringExtra("tool") == "audio") LocalMediaCommands.audio = { command, name ->
-            val file = resources.files().firstOrNull { it.name == name }
+            val file = audioLibrary.resolve(name)
             when {
                 command == "stop" -> { stopAudio(); true }
                 file == null -> false
