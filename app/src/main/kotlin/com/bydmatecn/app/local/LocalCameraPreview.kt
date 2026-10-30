@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package com.bydmatecn.app.local
 
 import android.Manifest
@@ -36,7 +38,9 @@ internal fun LocalCameraActivity.requestPreviewRestart() {
 }
 
 internal fun LocalCameraActivity.restartPreviewIfReady() {
-    if (!pendingPreviewRestart || surface == null || (dual && secondSurface == null)) return
+    if (!pendingPreviewRestart) return
+    if (surface == null) return
+    if (dual && secondSurface == null) return
     pendingPreviewRestart = false
     startPreview()
 }

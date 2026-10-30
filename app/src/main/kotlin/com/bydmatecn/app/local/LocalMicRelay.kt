@@ -34,6 +34,7 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
     private var watchdog: Runnable? = null
     val active: Boolean get() = running.get()
 
+    @Suppress("TooGenericExceptionCaught")
     fun start(attributes: AudioAttributes, volume: Int) {
         check(!closed)
         check(!relayPending.get()) { "上一段喊话正在停止，请稍后重试" }
@@ -68,6 +69,7 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
         closed = true; stop(); worker.shutdown()
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun runRelay(volumePercent: Int, session: Int) {
         var input: AudioRecord? = null
         var output: AudioTrack? = null

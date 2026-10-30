@@ -1043,6 +1043,8 @@ class TrackingService : Service(), LocationListener {
         return START_STICKY
     }
 
+    // Kept as one fail-closed transaction so no future edit can bypass a safety gate.
+    @Suppress("CyclomaticComplexMethod")
     private suspend fun handleTrustedBluetoothUnlock(address: String?) {
         val log = com.bydmatecn.app.local.LocalFileLog.get(this)
         fun finish(message: String) {

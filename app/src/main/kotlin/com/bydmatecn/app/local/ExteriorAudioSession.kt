@@ -5,6 +5,7 @@ import android.os.SystemClock
 import java.lang.reflect.InvocationTargetException
 
 /** Vehicle-specific exterior-audio routing observed in the working reference APK. */
+@Suppress("LongParameterList")
 enum class ExteriorControllerProfile(
     val preferenceValue: String,
     val title: String,

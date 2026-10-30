@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice
 import android.content.Context
 
 /** Persistent configuration and replay protection for trusted-Bluetooth vehicle unlock. */
+@Suppress("TooManyFunctions")
 internal object TrustedBluetoothUnlock {
     private const val PREFS = "trusted-bluetooth-unlock"
     private const val KEY_ENABLED = "enabled"
@@ -63,7 +64,7 @@ internal object TrustedBluetoothUnlock {
     fun lastEvent(context: Context): String = prefs(context).getString(KEY_LAST_EVENT, "尚未收到蓝牙连接事件") ?: "尚未收到蓝牙连接事件"
 
     @Suppress("MissingPermission")
-    fun bondedDevices(context: Context): List<BluetoothDevice> = runCatching {
+    fun bondedDevices(): List<BluetoothDevice> = runCatching {
         BluetoothAdapter.getDefaultAdapter()?.bondedDevices.orEmpty()
             .sortedWith(compareBy({ runCatching { it.name }.getOrNull().orEmpty() }, { it.address }))
     }.getOrDefault(emptyList())

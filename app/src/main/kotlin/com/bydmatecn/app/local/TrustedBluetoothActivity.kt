@@ -61,7 +61,7 @@ class TrustedBluetoothActivity : ComponentActivity(), LocalComposeHost {
             ui.button("授予蓝牙连接权限") { requestBluetoothPermission() }
             return
         }
-        val devices = TrustedBluetoothUnlock.bondedDevices(this)
+        val devices = TrustedBluetoothUnlock.bondedDevices()
         LocalFileLog.get(this).record("bluetooth-unlock", "configuration page bondedDevices=${devices.size} enabled=${TrustedBluetoothUnlock.enabled(this)}")
         if (devices.isEmpty()) {
             ui.label("未找到已配对设备。请先在车机系统蓝牙设置中完成配对，再返回此页面。")
