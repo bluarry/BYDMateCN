@@ -86,7 +86,7 @@
 
 ## 安装与实车验收
 
-1. 安装 `app/build/outputs/apk/debug/BYDMateCN.apk`，仅用于已获授权的车机测试。
+1. 安装 `app/build/outputs/apk/debug/BYDMateCN-<版本号>.apk`，仅用于已获授权的车机测试。
 2. 独立包名与原 BYDMate 可并存，但**不继承旧包数据或权限**。重新授权相机/麦克风、悬浮窗、通知访问、辅助功能等实际需要项。厂商包名白名单可能需合法固件配置。
 3. 停用旧应用的相机、自动化与常驻服务，避免竞争车辆硬件。先 P 挡驻车、低音量、单路相机标定，再逐项测试。
 4. 逐项记录实车测试结果。出现问题：导出 TXT，附发生时间、权限、车机版本、操作顺序和实际现象；必要时另附已授权采集的系统日志/视频。
@@ -101,7 +101,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 & "$env:JAVA_HOME\bin\java.exe" -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain :app:assembleDebug
 ```
 
-输出：`app/build/outputs/apk/debug/BYDMateCN.apk`。测试可按 `com.bydmatecn.app.*` 包选择运行。没有发布签名配置时不能把 debug 包当正式签名发布版本。
+输出：`app/build/outputs/apk/debug/BYDMateCN-<版本号>.apk`。测试可按 `com.bydmatecn.app.*` 包选择运行。没有发布签名配置时不能把 debug 包当正式签名发布版本。
 
 ### 车机 SDK 与权限
 
@@ -114,7 +114,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 `app/build.gradle.kts` 中 `DONATIONS_ENABLED=false` 隐藏设置捐赠卡片、启动提醒和 DonateDialog，二维码/收款资源不删除。以后启用前必须核对收款信息和来源归属，不能直接沿用原作者收款信息作为本分支收款方式。
 
-更新仅检查 `bluarry/BYDMateCN` 的 GitHub Releases（含 WIP 预发布版），只接受 `BYDMateCN.apk`。安装前校验应用 ID、版本及签名；覆盖更新必须使用同一签名且递增 versionCode，不会下载原项目的安装包。
+更新仅检查 `bluarry/BYDMateCN` 的三段版本正式 Release；四段版本 WIP 预发布版只供手动安装，不参与应用内自动更新，只接受与发布标签一致的 `BYDMateCN-<版本号>.apk`。安装前校验应用 ID、版本及签名；覆盖更新必须使用同一签名且递增 versionCode，不会下载原项目的安装包。
 
 ## 开源来源与许可证
 
@@ -122,7 +122,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 ## GitHub 自动发布
 
-推送与应用版本一致的标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN.apk`，并附 SHA-256 校验文件。三段数字标签（如 `v1.0.0`）创建 **正式 Release**；四段数字标签（如 `v1.0.0.1`）创建 **WIP Pre-release**，不会被设置为最新正式版。每个标签必须与 `app/build.gradle.kts` 的 `versionName` 一致，并提供 `release-notes/<标签>.md` 发布说明；覆盖安装必须保持原发布签名且递增 `versionCode`。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
+推送与应用版本一致的标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN-<版本号>.apk`，并附 SHA-256 校验文件。三段数字标签（如 `v1.0.0`）创建 **正式 Release**；四段数字标签（如 `v1.0.0.1`）创建 **WIP Pre-release**，不会被设置为最新正式版。每个标签必须与 `app/build.gradle.kts` 的 `versionName` 一致，并提供 `release-notes/<标签>.md` 发布说明；覆盖安装必须保持原发布签名且递增 `versionCode`。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
 
 ## 界面实现
 

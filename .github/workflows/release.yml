@@ -105,10 +105,12 @@ jobs:
       - name: 验证签名并生成 SHA-256
         run: |
           set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          apk="BYDMateCN-${version}.apk"
           mkdir -p release-assets
-          cp app/build/outputs/apk/release/BYDMateCN.apk release-assets/BYDMateCN.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose release-assets/BYDMateCN.apk
-          (cd release-assets && sha256sum BYDMateCN.apk > BYDMateCN.apk.sha256)
+          cp "app/build/outputs/apk/release/$apk" "release-assets/$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "release-assets/$apk"
+          (cd release-assets && sha256sum "$apk" > "$apk.sha256")
 
       - name: 上传构建产物留档
         uses: actions/upload-artifact@v4
@@ -136,7 +138,9 @@ jobs:
             echo "不支持的版本标签：$RELEASE_TAG" >&2
             exit 1
           fi
-          gh release create "$RELEASE_TAG" release-assets/BYDMateCN.apk release-assets/BYDMateCN.apk.sha256 \
+          version="${RELEASE_TAG#v}"
+          apk="BYDMateCN-${version}.apk"
+          gh release create "$RELEASE_TAG" "release-assets/$apk" "release-assets/$apk.sha256" \
             --verify-tag "${release_flags[@]}" --title "$title" \
             --notes-file "release-notes/$RELEASE_TAG.md"
 
