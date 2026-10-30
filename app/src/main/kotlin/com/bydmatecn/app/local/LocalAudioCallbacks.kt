@@ -49,7 +49,11 @@ internal fun LocalAudioPlayer.prepareMediaPlayer(file: File, device: android.med
         val candidate = MediaPlayer()
         player = candidate
         try {
-            candidate.setAudioAttributes(playbackAttributes)
+            val stream = exteriorStreamType
+            if (stream != null) {
+                @Suppress("DEPRECATION")
+                candidate.setAudioStreamType(stream)
+            } else candidate.setAudioAttributes(playbackAttributes)
             candidate.setDataSource(file.absolutePath)
             if (device != null && !candidate.setPreferredDevice(device)) error("输出设备被拒绝")
             applyVolume()
@@ -68,6 +72,7 @@ internal fun LocalAudioPlayer.prepareMediaPlayer(file: File, device: android.med
     @Suppress("TooGenericExceptionCaught")
     internal fun LocalAudioPlayer.startExteriorSession(): Boolean = try {
         exteriorSession.acquire()
+        exteriorStreamType = exteriorSession.streamType
         true
     } catch (error: Exception) {
         stop()

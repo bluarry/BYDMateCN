@@ -48,7 +48,7 @@ class LocalLockSoundService : Service() {
             try {
                 check(prefs.getBoolean("verified", false)) { "自动锁车路由未实车确认" }
                 // 11001, not the preview context: availability checked before arming.
-                FirmwareAudioBridge(this@LocalLockSoundService).attributes(FirmwareAudioRoute.LOCK_EVENT)
+                FirmwareAudioBridge(this@LocalLockSoundService).focusAttributes(FirmwareAudioRoute.LOCK_EVENT)
                 note("已布防：等待有效门锁基线，不在启动时播放")
                 observeEdges(edges, deadline)
             } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) {
@@ -87,7 +87,7 @@ class LocalLockSoundService : Service() {
                         val file = LocalAudioLibrary(this).resolve(name)
                         if (file != null) {
                             player.setVolume(prefs.getInt("volume", 25).coerceIn(0, 50))
-                            player.play(file, null, FirmwareAudioBridge(this@LocalLockSoundService).attributes(FirmwareAudioRoute.LOCK_EVENT),
+                            player.play(file, null, FirmwareAudioBridge(this@LocalLockSoundService).focusAttributes(FirmwareAudioRoute.LOCK_EVENT),
                                 if (event == 2) "本地锁车事件" else "本地解锁事件", 5000)
                         } else note("事件$event：未配置或音频已删除")
 

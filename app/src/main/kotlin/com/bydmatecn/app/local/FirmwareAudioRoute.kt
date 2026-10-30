@@ -4,7 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import java.lang.reflect.InvocationTargetException
 
-/** Contexts observed in the supplied DiLink 5.0 framework. No guessed FID or stream. */
+/** Audio contexts observed in the supplied DiLink 5.0 framework. */
 enum class FirmwareAudioRoute(val field: String, val contextId: Int, val title: String) {
     EXTERIOR_VOICE("AUDIO_CONTEXT_EXTERNAL_VOICE", 11002, "车外语音"),
     LOCK_EVENT("AUDIO_CONTEXT_CAR_LOCK_SOUND", 11001, "自动锁车事件路由"),
@@ -28,8 +28,18 @@ class FirmwareAudioBridge(private val context: Context) {
             throw IllegalStateException("固件接口拒绝：${error.targetException}", error)
         }
     }
-    fun probe(): String = FirmwareAudioRoute.entries.joinToString("\n") { route ->
+    fun focusAttributes(route: FirmwareAudioRoute): AudioAttributes = runCatching { attributes(route) }.getOrElse {
+        LocalFileLog.get(context).record("audio/attributes-fallback", "route=$route; ${it.javaClass.simpleName}: ${it.message}")
+        AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
+    }
+
+    fun probe(): String {
+        val profile = ExteriorControllerProfile.selected(context)
+        return "车外控制器：${profile.title}；open=${profile.openSequence}；stream=${profile.streamType}\n" +
+            FirmwareAudioRoute.entries.joinToString("\n") { route ->
         runCatching { "${route.title}：context=${route.contextId}；${attributes(route)}" }
             .getOrElse { "${route.title}不可用：${it.javaClass.simpleName}：${it.message}" }
-    } + "\n只读取属性；不代表 HAL 已允许外扬声器，没有执行播放。"
+            } + "\n只读取属性；未发送 setInt，也没有执行播放。"
+    }
 }

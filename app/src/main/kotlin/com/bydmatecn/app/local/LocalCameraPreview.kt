@@ -30,6 +30,17 @@ internal suspend fun LocalCameraActivity.factoryCameraClear(): Boolean = withCon
 internal fun LocalCameraActivity.usageAllowed(): Boolean = (getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager)
         .checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), packageName) == AppOpsManager.MODE_ALLOWED
 
+internal fun LocalCameraActivity.requestPreviewRestart() {
+    pendingPreviewRestart = true
+    texture.post { restartPreviewIfReady() }
+}
+
+internal fun LocalCameraActivity.restartPreviewIfReady() {
+    if (!pendingPreviewRestart || surface == null || (dual && secondSurface == null)) return
+    pendingPreviewRestart = false
+    startPreview()
+}
+
 internal fun LocalCameraActivity.startPreview() {
         if (!previewSurfacesReady()) return
         val target = surface ?: run { status.text = "预览 Surface 尚未就绪"; return }
@@ -110,7 +121,7 @@ private fun LocalCameraActivity.bindPreview(target: Surface) {
                     secondTexture.alpha = if (driving) 0f else 1f
                     if (driving) startVideo()
                 }
-                status.text = if (open) "已绑定通道 ${if (dual) "2 + 3" else index.toString()}（有效画面需真车确认）" else probe.log.value.takeLast(4).joinToString("\n")
+                status.text = if (open) "预览已启动：通道 ${if (dual) "2 + 3" else index.toString()}" else probe.log.value.takeLast(4).joinToString("\n")
 }
 
 private suspend fun LocalCameraActivity.previewAllowed(request: Int): Boolean {

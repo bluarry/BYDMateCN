@@ -1,89 +1,151 @@
 package com.bydmatecn.app.local
 
 import android.content.Context
-import android.net.Uri
-import android.os.IBinder
-import android.os.Parcel
-import android.os.Parcelable
-import com.byd.spi.ipc.cursor.BinderCursor
-import com.bydmatecn.app.cluster.decodeResult
-import com.bydmatecn.app.cluster.decodeStatus
+import android.os.SystemClock
+import java.lang.reflect.InvocationTargetException
 
-/** Firmware DiCarServer/CarSearch agree on transactions 23/24; never guess an amp FID.
- * A switch readback is not proof of audible output. ESS source/mode is deliberately untouched.
- */
-internal class ExteriorAudioSession(private val context: Context,
-    private val binderLookup: () -> IBinder? = { amplifierBinder(context) },
+/** Vehicle-specific exterior-audio routing observed in the working reference APK. */
+enum class ExteriorControllerProfile(
+    val preferenceValue: String,
+    val title: String,
+    val streamType: Int,
+    internal val openSequence: List<ExteriorAudioCommand>,
+    internal val closeSequence: List<ExteriorAudioCommand>,
+    internal val endingSequence: List<ExteriorAudioCommand> = emptyList(),
+    internal val closeDelayMs: Long = 0,
 ) {
-    private var restore: (() -> Unit)? = null
-    private val log get() = LocalFileLog.get(context)
+    CONTROLLER_23(
+        preferenceValue = "23",
+        title = "23 控制器（车外广播流 15）",
+        streamType = 15,
+        openSequence = listOf(ExteriorAudioCommand(1000, -1442839934, 1)),
+        closeSequence = listOf(ExteriorAudioCommand(1000, -1442839934, 0)),
+    ),
+    NON_23(
+        preferenceValue = "non23",
+        title = "非23控制器（锁车音效流 3）",
+        streamType = 3,
+        openSequence = listOf(ExteriorAudioCommand(1000, -1442839775, 1)),
+        closeSequence = listOf(ExteriorAudioCommand(1000, -1442839775, 0)),
+        endingSequence = listOf(ExteriorAudioCommand(1002, -1442839933, 1)),
+        closeDelayMs = 100,
+    );
 
-    @Suppress("TooGenericExceptionCaught") // Rollback must also cover unexpected vendor Parcel/provider failures.
-    fun acquire() = synchronized(ownershipLock) {
-        check(owner == null) { "其他车外音频会话尚未结束或功放恢复失败" }
-        check(restore == null) { "车外音频会话已占用" }
-        val binder = binderLookup() ?: error("车外功放服务未返回 Binder")
-        check(binder.interfaceDescriptor == DESCRIPTOR) { "车外功放 Binder 类型不匹配" }
-        val previous = read(binder)
-        log.record("exterior/session", "before=$previous descriptor=${binder.interfaceDescriptor}")
-        owner = this
-        // Arm rollback BEFORE the write: a failed acknowledgement may still have applied.
-        if (!previous) {
-            restore = { write(binder, previous); check(read(binder) == previous) { "功放恢复未确认" } }
-            try {
-                write(binder, true)
-                check(read(binder)) { "车外扬声器开关没有确认开启" }
-            } catch (error: Exception) { release(); throw error }
-        } else restore = { }
-        log.record("exterior/session", "switch confirmed; audible route still requires car test")
-    }
-
-    @Suppress("TooGenericExceptionCaught") // Restore failure is logged and retained; never masks playback failure.
-    fun release() = synchronized(ownershipLock) {
-        val rollback = restore ?: return@synchronized
-        try {
-            rollback()
-            restore = null
-            owner = null
-            log.record("exterior/session", "restored original switch")
-        } catch (error: Exception) {
-            // Retain the rollback so a later stop retries; do not mask the playback error.
-            log.record("exterior/restore-error", "${error.javaClass.simpleName}: ${error.message}")
-        }
-    }
-
-    private fun read(binder: IBinder): Boolean = transact(binder, 23, null) { reply ->
-        val result = decodeResult(reply) ?: error("功放状态为空")
-        check(result.code == 0 && result.value is Boolean) { "功放读取拒绝 code=${result.code}: ${result.message}" }
-        result.value as Boolean
-    }
-    private fun write(binder: IBinder, enabled: Boolean) = transact(binder, 24, enabled) { reply ->
-        val result = decodeStatus(reply) ?: error("功放写入状态为空")
-        check(result.code == 0) { "功放写入拒绝 code=${result.code}: ${result.message}" }
-    }
-    private fun <T> transact(binder: IBinder, transaction: Int, enabled: Boolean?, decode: (Parcel) -> T): T {
-        val data = Parcel.obtain()
-        val reply = Parcel.obtain()
-        return try {
-            data.writeInterfaceToken(DESCRIPTOR)
-            enabled?.let { data.writeInt(if (it) 1 else 0) }
-            check(binder.transact(transaction, data, reply, 0)) { "固件不支持功放 transaction=$transaction" }
-            decode(reply)
-        } finally { data.recycle(); reply.recycle() }
-    }
     companion object {
-        private const val DESCRIPTOR = "com.byd.car.feature.amplifier.ICarAmplifierService"
-        private val ownershipLock = Any()
-        private var owner: ExteriorAudioSession? = null
+        fun selected(context: Context): ExteriorControllerProfile {
+            val value = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_PROFILE, CONTROLLER_23.preferenceValue)
+            return entries.firstOrNull { it.preferenceValue == value } ?: CONTROLLER_23
+        }
+
+        fun select(context: Context, profile: ExteriorControllerProfile) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(KEY_PROFILE, profile.preferenceValue).apply()
+        }
+
+        private const val PREFS = "local-exterior-audio"
+        private const val KEY_PROFILE = "controller_profile"
     }
 }
 
-/** Kept separate so transaction and rollback tests do not depend on a real vehicle provider. */
-private fun amplifierBinder(context: Context): IBinder? = context.contentResolver.query(
-    Uri.parse("content://com.byd.car.server.provider.CarServiceProvider/sync_binder"),
-    null, null, arrayOf("com.byd.car.feature.amplifier.ICarAmplifierService"), null,
-)?.use { cursor ->
-    cursor.extras.classLoader = BinderCursor.BinderParcelable::class.java.classLoader
-    @Suppress("DEPRECATION")
-    (cursor.extras.getParcelable<Parcelable>("binder") as? BinderCursor.BinderParcelable)?.binder
+internal data class ExteriorAudioCommand(val device: Int, val featureId: Int, val value: Int)
+
+/**
+ * Opens the BYD exterior broadcast path through the boot-loaded `auto` service.
+ * Process-wide reference counting prevents one owner from closing a route still used by another.
+ */
+internal class ExteriorAudioSession(
+    private val context: Context,
+    private val commandWriter: ((ExteriorAudioCommand) -> Unit)? = null,
+) {
+    private val log get() = LocalFileLog.get(context)
+    private var acquired = false
+    private var acquiredProfile: ExteriorControllerProfile? = null
+
+    val profile: ExteriorControllerProfile
+        get() = acquiredProfile ?: ExteriorControllerProfile.selected(context)
+    val streamType: Int get() = profile.streamType
+
+    fun acquire() = synchronized(lock) {
+        check(!acquired) { "当前车外音频会话已经打开" }
+        val requested = ExteriorControllerProfile.selected(context)
+        val current = activeProfile
+        check(current == null || current == requested) { "车外音频正在使用另一种控制器配置" }
+        if (ownerCount == 0) {
+            requested.openSequence.forEach(::write)
+            activeProfile = requested
+            log.record("exterior/open", "profile=${requested.preferenceValue}; stream=${requested.streamType}")
+        }
+        ownerCount++
+        acquired = true
+        acquiredProfile = requested
+        log.record("exterior/owner", "acquire count=$ownerCount profile=${requested.preferenceValue}")
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    fun release() = synchronized(lock) {
+        if (!acquired) return@synchronized
+        acquired = false
+        val closing = acquiredProfile ?: activeProfile
+        acquiredProfile = null
+        ownerCount = (ownerCount - 1).coerceAtLeast(0)
+        log.record("exterior/owner", "release count=$ownerCount profile=${closing?.preferenceValue}")
+        if (ownerCount != 0 || closing == null) return@synchronized
+        try {
+            closing.closeSequence.forEach(::write)
+            if (closing.closeDelayMs > 0 && closing.endingSequence.isNotEmpty()) {
+                SystemClock.sleep(closing.closeDelayMs)
+            }
+            closing.endingSequence.forEach(::write)
+            activeProfile = null
+            log.record("exterior/close", "profile=${closing.preferenceValue}; ending=${closing.endingSequence.size}")
+        } catch (error: Exception) {
+            // Route ownership is cleared so the user can retry; every failed command is already logged.
+            activeProfile = null
+            log.record("exterior/close-error", "${error.javaClass.simpleName}: ${error.message}")
+        }
+    }
+
+    private fun write(command: ExteriorAudioCommand) {
+        log.record("exterior/setInt", "device=${command.device}; fid=${command.featureId}; value=${command.value}")
+        try {
+            val supplied = commandWriter
+            if (supplied != null) supplied(command) else AutoServiceWriter.write(context, command)
+            log.record("exterior/setInt-ok", "device=${command.device}; fid=${command.featureId}; value=${command.value}")
+        } catch (error: InvocationTargetException) {
+            val cause = error.targetException ?: error
+            log.record("exterior/setInt-error", "${cause.javaClass.simpleName}: ${cause.message}")
+            throw IllegalStateException("车外通道指令被固件拒绝：${cause.message}", cause)
+        } catch (error: ReflectiveOperationException) {
+            log.record("exterior/setInt-error", "${error.javaClass.simpleName}: ${error.message}")
+            throw IllegalStateException("固件没有可用的 auto.setInt 接口：${error.message}", error)
+        }
+    }
+
+    private object AutoServiceWriter {
+        @Volatile private var cachedType: Class<*>? = null
+        @Volatile private var cachedMethod: java.lang.reflect.Method? = null
+
+        fun write(context: Context, command: ExteriorAudioCommand) {
+            val manager = context.getSystemService("auto") ?: error("固件未注册 auto 系统服务")
+            var method = cachedMethod
+            if (method == null || cachedType != manager.javaClass) {
+                method = manager.javaClass.getMethod(
+                    "setInt",
+                    Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType,
+                ).apply { isAccessible = true }
+                cachedType = manager.javaClass
+                cachedMethod = method
+            }
+            method.invoke(manager, command.device, command.featureId, command.value)
+        }
+    }
+
+    companion object {
+        private val lock = Any()
+        private var ownerCount = 0
+        private var activeProfile: ExteriorControllerProfile? = null
+    }
 }

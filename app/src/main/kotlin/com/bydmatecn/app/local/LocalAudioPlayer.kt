@@ -10,7 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import java.io.File
 
-/** Main-thread local playback. Never force-routes AVAS or suppresses OEM audio. */
+/** Main-thread local playback; bounded exterior playback uses the selected controller profile. */
 class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) {
     internal val exteriorSession = ExteriorAudioSession(context)
     internal val fileLog = LocalFileLog.get(context)
@@ -25,6 +25,7 @@ class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) 
     internal val handler = Handler(Looper.getMainLooper())
     internal var timeout: Runnable? = null
     internal var boundedPlayback = false
+    internal var exteriorStreamType: Int? = null
     internal val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
 
@@ -46,7 +47,7 @@ class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) 
             if (requestGeneration == generation && !prepared) { stop(); report("音频准备超时") }
         }.also { handler.postDelayed(it, 10_000) }
         if (maximumDurationMs != null && !startExteriorSession()) return
-        fileLog.record("audio/start", "file=${file.name}; route=$routeLabel; attrs=$playbackAttributes; preferred=${device?.id}")
+        fileLog.record("audio/start", "file=${file.name}; route=$routeLabel; attrs=$playbackAttributes; preferred=${device?.id}; stream=$exteriorStreamType")
         prepareMediaPlayer(file, device, playbackAttributes, routeLabel, maximumDurationMs)
     }
 
@@ -82,6 +83,7 @@ class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) 
         timeout?.let { handler.removeCallbacks(it) }; timeout = null
         val old = player
         player = null; prepared = false; policy.stop()
+        exteriorStreamType = null
         val oldFocus = focus
         focus = null
         try {

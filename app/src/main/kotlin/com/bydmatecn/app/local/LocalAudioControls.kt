@@ -15,7 +15,8 @@ internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.S
         ui.section("车外喊话")
         micRelay = LocalMicRelay(this) { status.text = it }
         label("实时车外喊话 · 按住说话，松手停止 · 最长15秒")
-        ui.toggle("已实际确认11002从车外扬声器出声，理解啸叫风险", audioPrefs.getBoolean("exterior_verified", false)) { checked ->
+        exteriorControllerControls(audioPrefs)
+        ui.toggle("已实际确认所选控制器配置可从车外扬声器出声，理解啸叫风险", audioPrefs.getBoolean("exterior_verified", false)) { checked ->
             audioPrefs.edit().putBoolean("exterior_verified", checked).apply()
             if (!checked) { talkRequestGeneration++; micRelay?.stop() }
         }
@@ -25,7 +26,7 @@ internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.S
             val talkRequest = ++talkRequestGeneration
             LocalFileLog.get(this).record("mic", "touch down")
             if (!audioPrefs.getBoolean("exterior_verified", false)) {
-                status.text = "请先完成车外试听并勾选实际出声确认"
+                status.text = "请先选择控制器配置，完成车外试听并勾选实际出声确认"
             } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
             } else lifecycleScope.launch {
@@ -33,7 +34,7 @@ internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.S
                 if (talkRequest != talkRequestGeneration || !held || !firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) return@launch
                 runCatching {
                     recorder?.finish(false); speech?.stop(); stopAudio()
-                    micRelay?.start(firmwareAudio.attributes(FirmwareAudioRoute.EXTERIOR_VOICE), audioPrefs.getInt("volume", 25))
+                    micRelay?.start(firmwareAudio.focusAttributes(FirmwareAudioRoute.EXTERIOR_VOICE), audioPrefs.getInt("volume", 25))
                 }.onFailure { micRelay?.stop(); status.text = "喊话启动失败：${it.message}" }
             }
         }, released = {
@@ -44,6 +45,26 @@ internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.S
         speechControls(audioPrefs)
     }
 
+
+private fun LocalToolsActivity.exteriorControllerControls(audioPrefs: android.content.SharedPreferences) {
+    val selected = ExteriorControllerProfile.selected(this)
+    val profileLabel = label("当前控制器：${selected.title}")
+    button("选择车外音频控制器") {
+        val profiles = ExteriorControllerProfile.entries.toTypedArray()
+        LocalDialogBuilder(this).setTitle("选择控制器")
+            .setMessage("宋 L DM-i 先测试23控制器；若车外无声，再切换非23控制器。切换后请重新完成试听确认。")
+            .setItems(profiles.map { it.title }.toTypedArray()) { _, index ->
+                val profile = profiles[index]
+                stopAudio(); micRelay?.stop()
+                ExteriorControllerProfile.select(this, profile)
+                audioPrefs.edit().putBoolean("exterior_verified", false).apply()
+                getSharedPreferences("local-lock-sound", Context.MODE_PRIVATE).edit().putBoolean("verified", false).apply()
+                profileLabel.text = "当前控制器：${profile.title}"
+                status.text = "已切换为${profile.title}，正在刷新页面，请重新进行驻车试听"
+                recreate()
+            }.show()
+    }
+}
 internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.SharedPreferences) {
         ui.section("录音")
         label("录制语音（仅本地保存，不是实时外放）")
@@ -143,7 +164,7 @@ internal fun LocalToolsActivity.playFirmwareAudio(route: FirmwareAudioRoute) {
                 val request = audioRequestGeneration
                 val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
                 check(request == audioRequestGeneration && firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) { "非驻车、车辆状态未知或页面不可见" }
-                val attrs = firmwareAudio.attributes(route)
+                val attrs = firmwareAudio.focusAttributes(route)
                 LocalFileLog.get(this@playFirmwareAudio).record("audio/vehicle", "gear=${snapshot?.gear}; speed=${snapshot?.speed}; route=$route")
                 firmwarePlayback = true
                 localPlayer.play(file, null, attrs, route.title, 15_000L)

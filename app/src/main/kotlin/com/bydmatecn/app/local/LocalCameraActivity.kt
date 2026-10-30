@@ -40,7 +40,7 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
     internal var driving = false
     internal var dual by androidx.compose.runtime.mutableStateOf(false)
     internal var viewConfig = MirrorViewConfig()
-    internal val status = LocalText("固件确认 AVM 通道 1～4；通道方位需实车标定。仅驻车预览，不作为驾驶后视镜。") { LocalFileLog.get(this).record("camera", it) }
+    internal val status = LocalText("AVM 通道 1～4 已通过实车预览；可按画面标定通道方位。") { LocalFileLog.get(this).record("camera", it) }
     internal lateinit var store: LocalCaptureStore
     internal var surface: Surface? = null
     internal var open = false
@@ -54,6 +54,7 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
     internal var saving = false
     internal var resumed = false
     internal var opening = false
+    internal var pendingPreviewRestart = false
     internal var generation = 0
     internal var index = 2
     internal val permission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -112,7 +113,11 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
         }
     }
     override fun onPause() { LocalMediaCommands.camera = null; resumed = false; closePreview("页面不可见，释放相机"); super.onPause() }
-    override fun onSurfaceTextureAvailable(value: SurfaceTexture, width: Int, height: Int) { surface = Surface(value); applyViewConfig() }
+    override fun onSurfaceTextureAvailable(value: SurfaceTexture, width: Int, height: Int) {
+        surface = Surface(value)
+        applyViewConfig()
+        restartPreviewIfReady()
+    }
     override fun onSurfaceTextureSizeChanged(value: SurfaceTexture, width: Int, height: Int) { applyViewConfig() }
     override fun onSurfaceTextureUpdated(value: SurfaceTexture) { lastFrameMs = android.os.SystemClock.elapsedRealtime() }
     override fun onSurfaceTextureDestroyed(value: SurfaceTexture): Boolean {

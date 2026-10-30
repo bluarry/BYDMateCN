@@ -33,7 +33,9 @@ internal fun LocalCameraActivity.createCameraViews() {
             visibility = if (dual) View.VISIBLE else View.GONE
             surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                 override fun onSurfaceTextureAvailable(value: SurfaceTexture, width: Int, height: Int) {
-                    secondSurface = Surface(value); applyViewConfig()
+                    secondSurface = Surface(value)
+                    applyViewConfig()
+                    restartPreviewIfReady()
                 }
                 override fun onSurfaceTextureSizeChanged(value: SurfaceTexture, width: Int, height: Int) { applyViewConfig() }
                 override fun onSurfaceTextureUpdated(value: SurfaceTexture) = Unit
@@ -53,9 +55,6 @@ internal fun LocalCameraActivity.createCameraViews() {
             runCatching { startActivity(android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 .onFailure { status.text = "固件没有使用情况访问设置：${it.message}" }
         }
-        cameraButton("读取后视镜状态（原始码）") {
-            lifecycleScope.launch { status.text = vehicle.readRearMirrorState().toString() }
-        }
         cameraButton("启用 / 关闭行驶录像模式（需已验证原厂相机优先）") {
             if (driving) { closePreview("关闭行驶模式"); driving = false }
             else LocalDialogBuilder(this).setTitle("行驶录像测试模式")
@@ -74,16 +73,24 @@ internal fun LocalCameraActivity.addMirrorControls() {
         cameraButton("选择固件 AVM 通道 1～4（需标定方位）") {
             LocalDialogBuilder(this).setTitle("通道号不等于左/右方位")
                 .setItems(arrayOf("VIEW_CHANNEL_1", "VIEW_CHANNEL_2", "VIEW_CHANNEL_3", "VIEW_CHANNEL_4")) { _, which ->
-                    closePreview("切换通道"); index = which + 1; saveViewConfig()
-                    status.text = "通道：$index，请重新打开；单路模式生效"
+                    val reopen = open
+                    closePreview("切换通道")
+                    index = which + 1
+                    dual = false
+                    secondTexture.visibility = View.GONE
+                    saveViewConfig()
+                    if (reopen) requestPreviewRestart()
+                    else status.text = "已选择通道 $index"
                 }.show()
         }
         cameraButton("单路 / 双路（索引 2 + 3）") {
+            val reopen = open
             closePreview("切换布局")
             dual = !dual
             secondTexture.visibility = if (dual) View.VISIBLE else View.GONE
             saveViewConfig()
-            status.text = if (dual) "双路模式，请重新打开" else "单路模式，请重新打开"
+            if (reopen) requestPreviewRestart()
+            else status.text = if (dual) "已选择双路模式（通道 2 + 3）" else "已选择单路模式（通道 $index）"
         }
         cameraButton("全屏预览（点击主画面恢复面板）") { panelVisible = false }
         cameraButton("水平镜像") {
