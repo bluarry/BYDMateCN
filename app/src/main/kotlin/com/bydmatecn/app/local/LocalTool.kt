@@ -8,6 +8,7 @@ val localTools = listOf(
     LocalTool("recorder", "驻车录像", "MP4 分段 · 事件保护 · 本地相册", "camera", 1),
     LocalTool("diagnostics", "固件与权限", "只读检测 · 适配报告导出", "native:diagnostics", 2),
     LocalTool("automation", "自动", "场景联动", "automation", 1),
+    LocalTool("bluetooth_unlock", "蓝牙解锁", "受信任设备 · 靠近连接 · 安全检查", "bluetooth_unlock", 3),
     LocalTool("split", "分屏", "多窗口", "tool_settings/SPLIT", 2),
     LocalTool("mirror", "电子后视", "转向联动 · 显示位置", "blind_spot", 0),
     LocalTool("cast", "投屏", "仪表输出", "tool_settings/DISPLAY", 3),

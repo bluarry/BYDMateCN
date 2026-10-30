@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BluetoothConnected
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.DisplaySettings
 import androidx.compose.material.icons.outlined.Folder
@@ -62,6 +63,7 @@ private fun toolIcon(id: String): ImageVector = when (id) {
     "files" -> Icons.Outlined.Folder
     "diagnostics" -> Icons.Outlined.Info
     "automation" -> Icons.Outlined.AutoAwesome
+    "bluetooth_unlock" -> Icons.Outlined.BluetoothConnected
     "cast" -> Icons.Outlined.DisplaySettings
     "desktop" -> Icons.Outlined.Dashboard
     else -> Icons.Outlined.Settings
@@ -73,6 +75,7 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
     fun open(tool: LocalTool) {
         when {
             tool.route == "camera" -> context.startActivity(Intent(context, LocalCameraActivity::class.java))
+            tool.route == "bluetooth_unlock" -> context.startActivity(Intent(context, TrustedBluetoothActivity::class.java))
             tool.route.startsWith("native:") -> context.startActivity(
                 Intent(context, LocalToolsActivity::class.java).putExtra("tool", tool.id))
             else -> onNavigate(tool.route)

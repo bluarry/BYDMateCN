@@ -115,6 +115,7 @@ class TrackingService : Service(), LocationListener {
     @Inject lateinit var helperBootstrap: com.bydmatecn.app.data.vehicle.HelperBootstrap
     @Inject lateinit var fidCatalogManager: FidCatalogManager
     @Inject lateinit var helperClient: com.bydmatecn.app.data.vehicle.HelperClient
+    @Inject lateinit var vehicleApi: com.bydmatecn.app.data.vehicle.VehicleApi
     @Inject lateinit var continuousAsr: com.bydmatecn.app.voice.ContinuousAsr
     @Inject lateinit var asrLoadGuard: com.bydmatecn.app.voice.AsrLoadGuard
     @Inject lateinit var gigaAmModelManager: com.bydmatecn.app.voice.GigaAmModelManager
@@ -296,6 +297,8 @@ class TrackingService : Service(), LocationListener {
 
     companion object {
         private const val TAG = "TrackingService"
+        const val ACTION_TRUSTED_BLUETOOTH_UNLOCK = "com.bydmatecn.app.action.TRUSTED_BLUETOOTH_UNLOCK"
+        const val EXTRA_BLUETOOTH_ADDRESS = "bluetooth_address"
         private const val NOTIFICATION_ID = 1
         private const val A11Y_ATTEMPTS_ANDROID10 = 2
         private const val A11Y_RECOVERY_TRACE_FLUSH_MS = 500L
@@ -1033,7 +1036,66 @@ class TrackingService : Service(), LocationListener {
             "trigger" to AutostartTrace.startTrigger(intent != null, intent?.getStringExtra(AutostartTrace.EXTRA_TRIGGER)),
             "n" to ++startCommands)
         maybeAttachWidget()
+        if (intent?.action == ACTION_TRUSTED_BLUETOOTH_UNLOCK) {
+            val address = intent.getStringExtra(EXTRA_BLUETOOTH_ADDRESS)
+            serviceScope.launch { handleTrustedBluetoothUnlock(address) }
+        }
         return START_STICKY
+    }
+
+    private suspend fun handleTrustedBluetoothUnlock(address: String?) {
+        val log = com.bydmatecn.app.local.LocalFileLog.get(this)
+        fun finish(message: String) {
+            com.bydmatecn.app.local.TrustedBluetoothUnlock.setLastEvent(this, message)
+            log.record("bluetooth-unlock", message)
+            Trace.event(TraceArea.CAR, "bluetooth-unlock", "result" to message)
+        }
+        log.record("bluetooth-unlock", "service request received address=${address?.takeLast(5)?.let { "**:**:**:**:$it" } ?: "missing"}")
+        if (address == null || !com.bydmatecn.app.local.TrustedBluetoothUnlock.isTrusted(this, address)) {
+            finish("忽略：启动请求不是当前受信任设备")
+            return
+        }
+        log.record("bluetooth-unlock", "service awake; starting helper and vehicle checks")
+        val helperReady = runCatching { helperBootstrap.ensureRunning() }.getOrDefault(false)
+        if (!helperReady) {
+            finish("解锁取消：车辆写入服务未就绪")
+            return
+        }
+
+        // A Bluetooth wake can precede CAN/autoservice readiness. Wait a bounded time, but fail
+        // closed: no known P/zero-speed/closed-and-locked state means no unlock write.
+        var lastReason = "车辆状态尚未就绪"
+        repeat(8) { attempt ->
+            val snapshotResult = runCatching { vehicleApi.readSnapshot() }
+            val data = snapshotResult.getOrNull()
+            log.record(
+                "bluetooth-unlock",
+                if (data == null) "check ${attempt + 1}/8 snapshot unavailable error=${snapshotResult.exceptionOrNull()?.let { "${it.javaClass.simpleName}:${it.message}" } ?: "null"}"
+                else "check ${attempt + 1}/8 snapshot gear=${data.gear} speed=${data.speed} lockFL=${data.lockFL} doors=${data.doorFL},${data.doorFR},${data.doorRL},${data.doorRR}",
+            )
+            lastReason = when {
+                data == null -> "车辆状态尚未就绪"
+                data.gear != 1 -> "挡位不是 P 挡（${data.gear ?: "未知"}）"
+                data.speed != 0 -> "车速不是 0（${data.speed ?: "未知"}）"
+                data.lockFL != 2 -> if (data.lockFL == 1) "车辆已经解锁" else "门锁状态未知"
+                listOf(data.doorFL, data.doorFR, data.doorRL, data.doorRR).any { it != 0 } -> "车门未全部关闭或状态未知"
+                else -> {
+                    val result = vehicleApi.writeUnlockDoors()
+                    finish(result.fold(
+                        onSuccess = { "已向车辆发送解锁指令；若门锁无动作，优先检查车型 FID/固件映射" },
+                        onFailure = { "解锁失败：${it.javaClass.simpleName}:${it.message ?: "无详细信息"}" },
+                    ))
+                    return
+                }
+            }
+            log.record("bluetooth-unlock", "check ${attempt + 1}/8 blocked: $lastReason")
+            if (lastReason == "车辆已经解锁" || data?.gear?.let { it != 1 } == true || data?.speed?.let { it != 0 } == true) {
+                finish("解锁取消：$lastReason")
+                return
+            }
+            delay(1_500L)
+        }
+        finish("解锁取消：$lastReason")
     }
 
     private fun maybeAttachWidget() {
