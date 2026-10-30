@@ -74,6 +74,13 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
         var aec: AcousticEchoCanceler? = null
         var agc: AutomaticGainControl? = null
         try {
+            // The relay runs asynchronously, so permission can be revoked after start().
+            // Check again on the worker immediately before constructing AudioRecord.
+            if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                fileLog.record("mic/error", "RECORD_AUDIO permission missing before AudioRecord creation")
+                handler.post { if (generation == session) { stop(); report("喊话失败：麦克风权限已被撤销") } }
+                return
+            }
             val rate = 16_000
             val inputSize = AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
             val outputSize = AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
