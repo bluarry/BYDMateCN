@@ -1,4 +1,4 @@
-name: 发布 WIP 预发布版
+name: 发布正式版或预发布版
 
 on:
   push:
@@ -118,7 +118,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: 创建 GitHub WIP 预发布版
+      - name: 按版本格式创建 GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -126,8 +126,18 @@ jobs:
         run: |
           set -euo pipefail
           # 已有同名 Release 时失败，不覆盖已发布安装包。
+          # 三段数字版本为正式版；四段数字版本为 WIP 预发布版。
+          release_flags=()
+          title="BYDMateCN $RELEASE_TAG"
+          if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            release_flags+=(--prerelease --latest=false)
+            title+=" · WIP"
+          elif [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "不支持的版本标签：$RELEASE_TAG" >&2
+            exit 1
+          fi
           gh release create "$RELEASE_TAG" release-assets/BYDMateCN.apk release-assets/BYDMateCN.apk.sha256 \
-            --verify-tag --prerelease --title "BYDMateCN $RELEASE_TAG · WIP" \
+            --verify-tag "${release_flags[@]}" --title "$title" \
             --notes-file "release-notes/$RELEASE_TAG.md"
 
       - name: 清理临时签名文件

@@ -1,6 +1,7 @@
 package com.bydmatecn.app.local
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,7 +42,7 @@ internal fun LocalDashboard(ui: LocalUiState, modifier: Modifier = Modifier) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     val sections = ui.sections.toList().ifEmpty { listOf(LocalSection("功能", 0)) }
     val active = selected.coerceIn(0, sections.lastIndex)
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.background)) {
         val wide = maxWidth >= 900.dp
         Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

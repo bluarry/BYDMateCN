@@ -69,9 +69,11 @@ internal fun ComponentActivity.installLocalContent(ui: LocalUiState, content: (@
     val fontScale = LocalePreferences(this).getFontScale()
     setContent {
         BYDMateTheme(fontScale) {
-            Surface(modifier = Modifier.fillMaxSize()) {
-                if (content == null) LocalPanel(ui, Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) else content()
-                LocalDialog(ui)
+            VehicleToolTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    if (content == null) LocalPanel(ui, Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) else content()
+                    LocalDialog(ui)
+                }
             }
         }
     }

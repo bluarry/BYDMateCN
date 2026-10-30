@@ -17,17 +17,21 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** Explicit, parked push-to-talk. No network, recording file, global stream or audio mode writes. */
 class LocalMicRelay(private val context: Context, private val report: (String) -> Unit) {
+    private val exteriorSession = ExteriorAudioSession(context)
     private val handler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val running = AtomicBoolean(false)
+    private val relayPending = AtomicBoolean(false)
     private var focus: AudioFocusRequest? = null
     @Volatile private var generation = 0
     private var closed = false
     private var watchdog: Runnable? = null
     val active: Boolean get() = running.get()
+    @Suppress("TooGenericExceptionCaught") // Focus must be released on every provider/Parcel failure.
     fun start(attributes: AudioAttributes, volume: Int) {
         check(!closed)
+        check(!relayPending.get()) { "上一段喊话正在停止，请稍后重试" }
         stop()
         check(context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { "需要麦克风权限" }
         val session = generation
@@ -36,7 +40,12 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
                 if (generation == session && change != AudioManager.AUDIOFOCUS_GAIN) { stop(); report("喊话失去焦点，已停止") }
             }, handler).build()
         focus = request
-        check(audio.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) { "系统拒绝喊话音频焦点" }
+        if (audio.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            stop()
+            error("系统拒绝喊话音频焦点")
+        }
+        try { exteriorSession.acquire() } catch (error: Exception) { stop(); throw error }
+        relayPending.set(true)
         running.set(true)
         watchdog = Runnable { if (generation == session) { stop(); report("喊话15秒到时停止") } }
             .also { handler.postDelayed(it, 15_000) }
@@ -46,6 +55,7 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
         running.set(false); generation++
         watchdog?.let { handler.removeCallbacks(it) }; watchdog = null
         focus?.let { audio.abandonAudioFocusRequest(it) }; focus = null
+        if (!relayPending.get()) exteriorSession.release()
     }
     fun close() {
         if (closed) return
@@ -56,7 +66,7 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
 
     private fun relayPcm(input: AudioRecord, output: AudioTrack, session: Int) {
                 val buffer = ShortArray(320)
-                handler.post { if (generation == session) report("喊话中：最多15秒，音量上限50%；外部出声位置待实车确认") }
+                handler.post { if (generation == session) report("喊话中：最多15秒，音量上限50%") }
                 while (running.get() && generation == session) {
                     val count = input.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
                     check(count >= 0) { "麦克风读取失败：$count" }
@@ -106,6 +116,9 @@ class LocalMicRelay(private val context: Context, private val report: (String) -
             } finally {
                 runCatching { input?.stop() }; runCatching { input?.release() }
                 runCatching { output?.pause() }; runCatching { output?.flush() }; runCatching { output?.release() }
+                exteriorSession.release()
+                relayPending.set(false)
+                handler.post { if (generation == session) stop() }
             }
 
     }

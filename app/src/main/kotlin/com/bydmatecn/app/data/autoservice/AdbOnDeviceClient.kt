@@ -311,7 +311,7 @@ class AdbOnDeviceClientImpl @Inject constructor(
         )
 
         // Narrow whitelist for the two self-grants — only our own package.
-        private val PACKAGE_NAME_REGEX = Regex("""^com\.bydmate\.app$""")
+        private val PACKAGE_NAME_REGEX = Regex("""^com\.bydmatecn\.app$""")
 
         // Spawn token shape — alphanumeric only, so it can never break out of the spawn
         // command line. HelperBootstrap generates 32 hex characters.

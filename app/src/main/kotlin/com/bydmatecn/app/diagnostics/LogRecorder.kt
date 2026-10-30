@@ -123,11 +123,11 @@ class LogRecorder internal constructor(
         if (session != null) return StartResult.AlreadyRecording
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val fileName = "bydmate_logs_$timestamp.txt"
+        val fileName = "bydmatecn_logs_$timestamp.txt"
 
         val saveDir = listOf(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            File("/storage/emulated/0/Download"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BYDMateCN/logs"),
+            File("/storage/emulated/0/Download/BYDMateCN/logs"),
             appContext.getExternalFilesDir(null)
         ).firstOrNull { dir ->
             dir != null && (dir.exists() || dir.mkdirs()) && dir.canWrite()
@@ -348,6 +348,7 @@ class LogRecorder internal constructor(
     private fun pipeToFile(proc: Process, target: File, current: Session) {
         val lock = Any()
         val policy = PipeFlushPolicy()
+        val ownership = LogOwnership(android.os.Process.myPid(), appContext.packageName)
         var closed = false
         // Chars between flushes (a lower bound: Cyrillic or CJK take 2-3 bytes each), the file's
         // real length after every flush, the idle one included. Guarded by [lock].
@@ -372,7 +373,7 @@ class LogRecorder internal constructor(
                 try {
                     var line = reader.readLine()
                     while (line != null && session === current) {
-                        if (LogcatLineFilter.keep(line)) {
+                        if (ownership.keep(line) && LogcatLineFilter.keep(line)) {
                             // Stop if file exceeds size limit
                             if (synchronized(lock) { size > maxSizeBytes }) {
                                 current.endedByLimit = true

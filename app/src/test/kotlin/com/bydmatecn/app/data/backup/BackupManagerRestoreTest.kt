@@ -53,7 +53,7 @@ class BackupManagerRestoreTest {
             put("dbSchemaVersion", AppDatabase.SCHEMA_VERSION)
             put("createdAt", 0L)
         }.toString()
-        val zip = File(tmp.root, "bydmate_backup_$name.zip")
+        val zip = File(tmp.root, "bydmatecn_backup_$name.zip")
         ZipOutputStream(FileOutputStream(zip)).use { z ->
             z.putNextEntry(ZipEntry("bydmate.db")); z.write(dbBytes); z.closeEntry()
             z.putNextEntry(ZipEntry("prefs.json")); z.write(prefsJson.toByteArray()); z.closeEntry()
@@ -267,11 +267,11 @@ class BackupManagerRestoreTest {
     @Test
     fun `listBackupFiles keeps only export mask, newest first`() {
         val dir = tmp.newFolder("Download")
-        val older = File(dir, "bydmate_backup_20260101_000000.zip").apply { writeText("a"); setLastModified(1_000_000L) }
-        val newer = File(dir, "bydmate_backup_20260202_000000.zip").apply { writeText("b"); setLastModified(2_000_000L) }
+        val older = File(dir, "bydmatecn_backup_20260101_000000.zip").apply { writeText("a"); setLastModified(1_000_000L) }
+        val newer = File(dir, "bydmatecn_backup_20260202_000000.zip").apply { writeText("b"); setLastModified(2_000_000L) }
         File(dir, "other.zip").writeText("c")
-        File(dir, "bydmate_backup_20260303_000000.txt").writeText("d")
-        File(dir, "bydmate_backup_dir.zip").mkdirs()
+        File(dir, "bydmatecn_backup_20260303_000000.txt").writeText("d")
+        File(dir, "bydmatecn_backup_dir.zip").mkdirs()
 
         assertEquals(listOf(newer, older), BackupManager.listBackupFiles(dir))
     }

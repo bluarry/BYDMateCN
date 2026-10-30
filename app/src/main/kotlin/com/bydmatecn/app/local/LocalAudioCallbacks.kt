@@ -11,12 +11,13 @@ internal fun LocalAudioPlayer.onPrepared(ready: MediaPlayer, file: File, routeLa
                     ready.isLooping = looping && !boundedPlayback
                     applyVolume()
                     if (policy.mayPlay) ready.start()
+                    fileLog.record("audio/prepared", "route=$routeLabel; device=${ready.routedDevice?.type}/${ready.routedDevice?.id}; started=${policy.mayPlay}")
                     if (maximumDurationMs != null) {
                         timeout = Runnable {
                             if (requestGeneration == generation) { stop(); report("专用试听到时，已停止") }
                         }.also { handler.postDelayed(it, maximumDurationMs) }
                     }
-                    report(if (policy.mayPlay) "播放中：${file.name}；$routeLabel（扬声器需实车确认）" else "已准备，等待音频焦点或继续播放")
+                    report(if (policy.mayPlay) "播放中：${file.name}；$routeLabel；设备=${ready.routedDevice?.type}/${ready.routedDevice?.id}" else "已准备，等待音频焦点或继续播放")
                 }
 
 }
@@ -39,4 +40,37 @@ internal fun LocalAudioPlayer.onFocusChanged(change: Int, requestGeneration: Int
                         if (prepared && policy.mayPlay) player?.start()
                     }
                 }
+    }
+
+/** MediaPlayer creation is kept separate from focus and exterior-session ownership. */
+internal fun LocalAudioPlayer.prepareMediaPlayer(file: File, device: android.media.AudioDeviceInfo?,
+    playbackAttributes: android.media.AudioAttributes, routeLabel: String, maximumDurationMs: Long?) {
+        val requestGeneration = generation
+        val candidate = MediaPlayer()
+        player = candidate
+        try {
+            candidate.setAudioAttributes(playbackAttributes)
+            candidate.setDataSource(file.absolutePath)
+            if (device != null && !candidate.setPreferredDevice(device)) error("输出设备被拒绝")
+            applyVolume()
+            candidate.setOnPreparedListener { ready -> onPrepared(ready, file, routeLabel, maximumDurationMs, requestGeneration) }
+            candidate.setOnCompletionListener { completed ->
+                if (player === completed) { stop(); report("播放结束") }
+            }
+            candidate.setOnErrorListener { failed, what, extra ->
+                if (player === failed) { stop(); report("音频解码/输出失败：$what/$extra") }
+                true
+            }
+            candidate.prepareAsync()
+        } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) { stop(); report("播放失败：${error.message}") } catch (error: IllegalStateException) { stop(); report("播放失败：${error.message}") } catch (error: IllegalArgumentException) { stop(); report("播放失败：${error.message}") } catch (error: SecurityException) { stop(); report("播放失败：${error.message}") }
+}
+    // Restore runs even when provider/Parcel decoding throws an unexpected firmware exception.
+    @Suppress("TooGenericExceptionCaught")
+    internal fun LocalAudioPlayer.startExteriorSession(): Boolean = try {
+        exteriorSession.acquire()
+        true
+    } catch (error: Exception) {
+        stop()
+        report("车外路由启动失败：${error.message}")
+        false
     }

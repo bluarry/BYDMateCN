@@ -155,7 +155,7 @@ class BackupManager(
         private const val ENTRY_PREFS = "prefs.json"
         private const val ENTRY_MANIFEST = "manifest.json"
 
-        private const val BACKUP_FILE_PREFIX = "bydmate_backup_"
+        private const val BACKUP_FILE_PREFIX = "bydmatecn_backup_"
         private const val BACKUP_FILE_SUFFIX = ".zip"
 
         /** Export zips in [dir] (name mask used by export()), newest first. */
@@ -439,7 +439,7 @@ class BackupManager(
 
         // 6. Write zip to Downloads
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val downloadsDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BYDMateCN/backups")
         if (!downloadsDir.exists()) downloadsDir.mkdirs()
         val zipFile = freeBackupFile(downloadsDir, timestamp)
 
@@ -508,7 +508,7 @@ class BackupManager(
 
     /** Export zips in the public Download folder, newest first. */
     fun listBackups(): List<File> =
-        listBackupFiles(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS))
+        listBackupFiles(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BYDMateCN/backups"))
 
     /** Parts [file] carries, read from its manifest alone; the restore dialog offers only these. */
     fun archiveParts(file: File): Set<BackupPart> {

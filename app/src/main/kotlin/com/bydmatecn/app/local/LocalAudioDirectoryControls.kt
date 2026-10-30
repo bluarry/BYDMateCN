@@ -20,7 +20,7 @@ internal fun LocalToolsActivity.audioDirectoryControls() {
             storagePermission.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
             return@button
         }
-        val input = LocalInput("/storage/emulated/0/Music 或 U盘目录")
+        val input = LocalInput("/storage/emulated/0/Music 或 U盘目录", "/storage/emulated/0/Music")
         LocalDialogBuilder(this).setTitle("添加音频目录").setView(input).setNegativeButton("取消", null)
             .setPositiveButton("添加") { _, _ -> addAudioDirectory(input.text.toString().trim()) }.show()
     }
@@ -71,9 +71,14 @@ internal fun LocalToolsActivity.showAudioDirectoryPicker(directory: File) {
 }
 
 private fun LocalToolsActivity.promptAudioDirectory() {
-    val input = LocalInput("请输入绝对目录路径")
+    val input = LocalInput("请输入绝对目录路径", "/storage/emulated/0")
     LocalDialogBuilder(this).setTitle("音频目录路径").setView(input).setNegativeButton("取消", null)
-        .setPositiveButton("浏览") { _, _ -> showAudioDirectoryPicker(File(input.text.toString().trim())) }.show()
+        .setPositiveButton("浏览") { _, _ ->
+            val path = input.text.trim()
+            val directory = File(path)
+            if (!directory.isAbsolute || !directory.isDirectory || !directory.canRead()) status.text = "目录不存在或不可读取：$path"
+            else showAudioDirectoryPicker(directory)
+        }.show()
 }
 
 private fun LocalToolsActivity.scanAudioDirectories() {

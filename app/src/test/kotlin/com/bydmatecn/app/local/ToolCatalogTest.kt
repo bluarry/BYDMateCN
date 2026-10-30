@@ -10,6 +10,14 @@ class ToolCatalogTest {
         assertEquals(localTools.size, localTools.map { it.id }.distinct().size)
         org.junit.Assert.assertTrue(localTools.all { it.accent in 0..3 })
     }
+    @Test fun noPlaceholderTools() {
+        org.junit.Assert.assertTrue(localTools.none { it.id in setOf("front", "traffic", "bluetooth", "touch", "advanced", "wheel", "status", "guard", "sentry") })
+    }
+    @Test fun telephonyIsNotAMediaSink() {
+        org.junit.Assert.assertFalse(ordinaryAudioOutput(18))
+        org.junit.Assert.assertFalse(ordinaryAudioOutput(1))
+        org.junit.Assert.assertTrue(ordinaryAudioOutput(2))
+    }
     @Test fun mirrorReusesBlindSpotRoute() {
         assertEquals("blind_spot", localTools.single { it.id == "mirror" }.route)
     }

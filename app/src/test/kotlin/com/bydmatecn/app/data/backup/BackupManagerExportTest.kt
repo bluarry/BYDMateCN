@@ -175,7 +175,7 @@ class BackupManagerExportTest {
 
     /** Base names export() may pick for the next few seconds, so a test crossing a second still collides. */
     private fun upcomingNames(prefix: String): List<File> {
-        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).apply { mkdirs() }
+        val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BYDMateCN/backups").apply { mkdirs() }
         val fmt = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
         val now = System.currentTimeMillis()
         return (0..2).map { File(dir, prefix + fmt.format(Date(now + it * 1000L)) + ".zip") }
@@ -262,19 +262,19 @@ class BackupManagerExportTest {
         every { appDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)", null) } answers { checkpointCursor(busy = 0) }
         val first = manager().export()
         val firstBytes = first.readBytes()
-        upcomingNames("bydmate_backup_").forEach { if (!it.exists()) it.writeBytes(byteArrayOf(9)) }
+        upcomingNames("bydmatecn_backup_").forEach { if (!it.exists()) it.writeBytes(byteArrayOf(9)) }
 
         val second = manager().export()
 
         assertNotEquals(first.absolutePath, second.absolutePath)
-        assertTrue(second.name, second.name.startsWith("bydmate_backup_") && second.name.endsWith("_2.zip"))
+        assertTrue(second.name, second.name.startsWith("bydmatecn_backup_") && second.name.endsWith("_2.zip"))
         assertArrayEquals(firstBytes, first.readBytes())
     }
 
     @Test
     fun `export does not reuse a name the auto runner already renamed`() {
         every { appDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)", null) } answers { checkpointCursor(busy = 0) }
-        val autoCopies = upcomingNames("bydmate_backup_auto_").onEach { it.writeBytes(byteArrayOf(9)) }
+        val autoCopies = upcomingNames("bydmatecn_backup_auto_").onEach { it.writeBytes(byteArrayOf(9)) }
 
         val exported = manager().export()
 

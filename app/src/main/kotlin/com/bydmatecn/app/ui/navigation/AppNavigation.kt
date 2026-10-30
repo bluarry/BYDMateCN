@@ -314,7 +314,8 @@ fun AppNavigation(
                 com.bydmatecn.app.ui.settings.BlindSpotSettingsScreen(onBack = { navController.popBackStack() })
             }
             composable("tool_settings/{section}") { entry ->
-                SettingsScreen(initialSection = entry.arguments?.getString("section"))
+                com.bydmatecn.app.ui.settings.VehicleToolSettingsScreen(
+                    section = entry.arguments?.getString("section") ?: "", onBack = { navController.popBackStack() })
             }
             composable(Screen.Automation.route) { AutomationScreen() }
             composable(Screen.Settings.route) {

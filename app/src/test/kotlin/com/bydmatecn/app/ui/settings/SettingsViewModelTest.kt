@@ -1752,7 +1752,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `openRestorePicker lists backups into the state, close clears it`() = runTest {
-        val files = listOf(File("/sdcard/Download/bydmate_backup_2.zip"), File("/sdcard/Download/bydmate_backup_1.zip"))
+        val files = listOf(File("/sdcard/Download/bydmatecn_backup_2.zip"), File("/sdcard/Download/bydmatecn_backup_1.zip"))
         backupManager = mockk { every { listBackups() } returns files }
         val vm = buildViewModel().apply { ioDispatcher = testDispatcher }
         assertNull(vm.uiState.value.restoreCandidates)
@@ -1767,7 +1767,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `a picked backup opens the parts dialog with the parts its manifest lists`() = runTest {
-        val file = File("/sdcard/Download/bydmate_backup_1.zip")
+        val file = File("/sdcard/Download/bydmatecn_backup_1.zip")
         val parts = setOf(com.bydmatecn.app.data.backup.BackupPart.TABLES)
         backupManager = mockk { every { archiveParts(file) } returns parts }
         val vm = buildViewModel().apply { ioDispatcher = testDispatcher }
@@ -1782,7 +1782,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `restoreConfig ignores a second restore while the first one runs`() = runTest {
-        val file = File("/sdcard/Download/bydmate_backup_1.zip")
+        val file = File("/sdcard/Download/bydmatecn_backup_1.zip")
         val parts = setOf(com.bydmatecn.app.data.backup.BackupPart.TABLES)
         val calls = java.util.concurrent.atomic.AtomicInteger()
         backupManager = mockk { every { restore(file, parts) } answers { calls.incrementAndGet(); error("broken") } }
@@ -1814,7 +1814,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `closeRestorePicker during a scan drops the scan result`() = runTest {
-        val files = listOf(File("/sdcard/Download/bydmate_backup_1.zip"))
+        val files = listOf(File("/sdcard/Download/bydmatecn_backup_1.zip"))
         lateinit var vm: SettingsViewModel
         // The scan closes the picker from inside listBackups(): ensureActive() after it must drop the result.
         backupManager = mockk { every { listBackups() } answers { vm.closeRestorePicker(); files } }

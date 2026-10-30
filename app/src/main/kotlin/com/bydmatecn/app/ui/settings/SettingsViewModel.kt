@@ -2993,7 +2993,7 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
 
     /**
      * Reflects all static int/long constants out of the BYD SDK fid classes via the helper
-     * daemon, writes the result to the public Download/fid-dump-<timestamp>.txt, prepends a
+     * daemon, writes the result to the public Download/BYDMateCN/logs/bydmatecn-fid-dump-<timestamp>.txt, prepends a
      * 3-line header, then fires the standard ACTION_SEND share sheet.
      *
      * The folder is public (W6-F4) because the previous private filesDir target was reachable
@@ -3039,13 +3039,11 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
             }
             try {
                 val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-                val fileName = "fid-dump-$timestamp.txt"
-                // Same candidate chain and same target folder as startLogRecording(): straight
-                // into the public Download, no subfolder — CSV export, config backup and the APK
-                // update all land there too.
+                val fileName = "bydmatecn-fid-dump-$timestamp.txt"
+                // Keep diagnostics in this fork's public directory, separate from the upstream app.
                 val dir = listOfNotNull(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                    File("/storage/emulated/0/Download"),
+                    File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BYDMateCN/logs"),
+                    File("/storage/emulated/0/Download/BYDMateCN/logs"),
                     appContext.getExternalFilesDir(null),
                 ).firstOrNull { (it.isDirectory || it.mkdirs()) && it.canWrite() }
                 if (dir == null) {
@@ -3054,7 +3052,7 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
                 }
                 // Keep only the most recent dump so a share still reading the previous URI
                 // can finish; the new file makes it the second, giving a two-file rolling window.
-                dir.listFiles { _, name -> name.startsWith("fid-dump-") && name.endsWith(".txt") }
+                dir.listFiles { _, name -> name.startsWith("bydmatecn-fid-dump-") && name.endsWith(".txt") }
                     ?.sortedByDescending { it.lastModified() }
                     ?.drop(1)
                     ?.forEach { it.delete() }
@@ -3076,7 +3074,7 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
                 }
                 shareFile(file, "text/plain")
                 // Show the path the user actually sees in a file manager (storage root stripped),
-                // e.g. "Download/fid-dump-20260729-120000.txt".
+                // e.g. "Download/BYDMateCN/logs/bydmatecn-fid-dump-20260729-120000.txt".
                 val storageRoot = Environment.getExternalStorageDirectory()?.absolutePath
                 val visiblePath = file.absolutePath.let { path ->
                     if (storageRoot != null && path.startsWith(storageRoot))

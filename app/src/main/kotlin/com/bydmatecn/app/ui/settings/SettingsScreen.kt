@@ -1471,12 +1471,7 @@ private fun DisplaySection() {
 /** Alternate entry only: shares the original card, preferences and service controller. */
 @Composable
 fun BlindSpotSettingsScreen(onBack: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        TextButton(onClick = onBack) { Text("返回") }
-        Text("电子后视 · 盲区显示", style = MaterialTheme.typography.headlineSmall)
-        Text("复用现有转向灯联动。不是常驻后视镜；宋 L DM-i 的镜头方位及权限需真车确认。")
-        BlindSpotCard()
-    }
+    VehicleToolPage("电子后视镜", "转向联动 · 显示位置 · 镜头布局", onBack) { BlindSpotCard() }
 }
 
 @Composable
@@ -4627,4 +4622,28 @@ private fun cloudOverWifiStatusText(state: CloudOverWifiState): String? = when (
     CloudOverWifiState.ServerRefused -> stringResource(R.string.settings_cloud_wifi_status_refused)
     CloudOverWifiState.Connected -> stringResource(R.string.settings_cloud_wifi_status_connected)
     CloudOverWifiState.ReturnPending -> stringResource(R.string.settings_cloud_wifi_status_return_pending)
+}
+
+
+/** Dedicated tool pages: retain the existing vehicle controllers and preference contracts. */
+@Composable
+fun VehicleToolSettingsScreen(section: String, onBack: () -> Unit) {
+    val title = when (section) { "SPLIT" -> "分屏"; "DISPLAY" -> "投屏"; "WIDGET" -> "桌面"; else -> "车机工具" }
+    VehicleToolPage(title, "显示与车辆联动设置", onBack) {
+        when (section) { "SPLIT" -> SplitSection(); "DISPLAY" -> DisplaySection(); "WIDGET" -> WidgetSection() }
+    }
+}
+
+@Composable
+private fun VehicleToolPage(title: String, subtitle: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize().background(NavyDark).padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column { Text(title, color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = TextMuted, fontSize = 15.sp) }
+            TextButton(onClick = onBack) { Text("返回", fontSize = 18.sp) }
+        }
+        Card(Modifier.weight(1f).fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardSurface)) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { content() }
+        }
+    }
 }

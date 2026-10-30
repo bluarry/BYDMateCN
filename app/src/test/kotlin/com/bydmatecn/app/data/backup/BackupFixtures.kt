@@ -100,7 +100,7 @@ internal object BackupFixtures {
             put("createdAt", 0L)
             if (parts != null) put("parts", JSONArray(parts.map { it.id }))
         }.toString()
-        val zip = File.createTempFile("bydmate_backup_", ".zip").apply { deleteOnExit() }
+        val zip = File.createTempFile("bydmatecn_backup_", ".zip").apply { deleteOnExit() }
         ZipOutputStream(FileOutputStream(zip)).use { z ->
             z.putNextEntry(ZipEntry(dbEntry)); z.write(dbBytes); z.closeEntry()
             z.putNextEntry(ZipEntry("prefs.json")); z.write(BackupManager.serializePrefs(prefs).toByteArray()); z.closeEntry()

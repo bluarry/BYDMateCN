@@ -22,7 +22,7 @@ data class ManualSaveResult(val file: File, val sent: Boolean, val sendError: St
  * the user's Telegram bot. Pure of WorkManager so it can be unit-tested; [AutoBackupWorker] only
  * maps the [RunOutcome].
  *
- * Auto files keep the `bydmate_backup_` prefix so the restore picker lists them; the `_auto_`
+ * Auto files keep the `bydmatecn_backup_` prefix so the restore picker lists them; the `_auto_`
  * infix keeps rotation away from the user's manual exports.
  */
 class AutoBackupRunner(
@@ -34,8 +34,8 @@ class AutoBackupRunner(
     companion object {
         private const val TAG = "AutoBackup"
         const val KEEP_LOCAL = 5
-        private const val BACKUP_PREFIX = "bydmate_backup_"
-        const val AUTO_PREFIX = "bydmate_backup_auto_"
+        private const val BACKUP_PREFIX = "bydmatecn_backup_"
+        const val AUTO_PREFIX = "bydmatecn_backup_auto_"
         private const val ZIP_SUFFIX = ".zip"
         private const val BYTES_PER_MB = 1024.0 * 1024.0
 

@@ -5,6 +5,8 @@ import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -40,10 +42,10 @@ import androidx.compose.ui.unit.sp
 
 private val toolAccents = listOf(Color(0xFF00D4D8), Color(0xFFFFB12B), Color(0xFFD77DF3), Color(0xFF00BBFF))
 private fun toolIcon(id: String): androidx.compose.ui.graphics.vector.ImageVector = when (id) {
-    "audio", "bluetooth" -> androidx.compose.material.icons.Icons.Outlined.VolumeUp
+    "audio" -> androidx.compose.material.icons.Icons.AutoMirrored.Outlined.VolumeUp
     "recorder", "mirror" -> androidx.compose.material.icons.Icons.Outlined.Videocam
     "files" -> androidx.compose.material.icons.Icons.Outlined.Folder
-    "diagnostics", "status", "guard" -> androidx.compose.material.icons.Icons.Outlined.Info
+    "diagnostics" -> androidx.compose.material.icons.Icons.Outlined.Info
     else -> androidx.compose.material.icons.Icons.Outlined.Settings
 }
 
@@ -60,11 +62,11 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF101A2D)).padding(20.dp)) {
-        val columns = when { maxWidth >= 1400.dp -> 4; maxWidth >= 900.dp -> 3; maxWidth >= 600.dp -> 2; else -> 1 }
+        val columns = when { maxWidth >= 840.dp -> 4; maxWidth >= 600.dp -> 3; maxWidth >= 400.dp -> 2; else -> 1 }
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(5.dp).height(28.dp).background(toolAccents[0], RoundedCornerShape(3.dp)))
-                Text("车机工具", Modifier.padding(start = 12.dp), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text("工具", Modifier.padding(start = 12.dp), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 Text("BYDMateCN · WIP", color = Color(0xFF91A6C3), fontSize = 14.sp)
             }
@@ -72,23 +74,24 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
                 horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 items(localTools, key = { it.id }) { tool ->
                     val accent = toolAccents[tool.accent]
-                    Card(onClick = { open(tool) }, modifier = Modifier.fillMaxWidth().height(146.dp),
-                        shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0xFF39516F)),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF182A42))) {
-                        Row(Modifier.fillMaxSize().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(50.dp).background(accent.copy(alpha = .24f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                                Icon(toolIcon(tool.id), contentDescription = null, tint = accent, modifier = Modifier.size(32.dp))
+                    Card(onClick = { open(tool) }, modifier = Modifier.fillMaxWidth().height(112.dp),
+                        shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Color(0xFF587BA7)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF203450))) {
+                        Row(Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(48.dp).background(accent.copy(alpha = .23f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                                Icon(toolIcon(tool.id), contentDescription = null, tint = accent, modifier = Modifier.size(30.dp))
                             }
-                            Column(Modifier.weight(1f).padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(tool.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(tool.subtitle, color = Color(0xFFD1DCEF), fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Column(Modifier.weight(1f).padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(tool.title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(tool.subtitle, color = Color(0xFF91A6C3), fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
-                            Text("➜", color = accent, fontSize = 24.sp)
+                            Box(Modifier.size(30.dp).background(Color(0xFF314D72), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
                 }
             }
-            Text("权限/设备接口未验证时明确提示；红绿灯实时数据和云端能力不纳入本地版。", color = Color(0xFF91A6C3), fontSize = 15.sp)
         }
     }
 }

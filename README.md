@@ -120,9 +120,9 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 感谢 BYDMate 原作者、贡献者与所基于分支的维护者；本分支保留原项目版权与许可证约束。请阅读 [LICENSE](LICENSE)，尤其非商业使用及再分发条件；fork 和功能扩展不改变原许可证，不意味着获得商业发布授权。
 
-## GitHub 自动预发布
+## GitHub 自动发布
 
-推送与应用版本一致的 `v1.0.0` 等标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN.apk`，创建 **WIP 预发布版**并附 SHA-256 校验文件。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
+推送与应用版本一致的标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN.apk`，并附 SHA-256 校验文件。三段数字标签（如 `v1.0.0`）创建 **正式 Release**；四段数字标签（如 `v1.0.0.1`）创建 **WIP Pre-release**，不会被设置为最新正式版。每个标签必须与 `app/build.gradle.kts` 的 `versionName` 一致，并提供 `release-notes/<标签>.md` 发布说明；覆盖安装必须保持原发布签名且递增 `versionCode`。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
 
 ## 界面实现
 

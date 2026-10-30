@@ -44,7 +44,7 @@ internal fun LocalCameraActivity.createCameraViews() {
                 }
             }
         }
-        ui.title = "本地相机"
+        ui.title = "驻车录像"
         ui.status = status
         ui.onBack = { finish() }
         ui.section("相机与权限")

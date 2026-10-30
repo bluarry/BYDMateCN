@@ -135,7 +135,7 @@ class LocalToolsActivity : ComponentActivity(), LocalComposeHost {
         localPlayer = LocalAudioPlayer(this) { message -> status.text = message }
         val lastAudio = getSharedPreferences("local-audio", Context.MODE_PRIVATE).getString("selected", null)
         selectedAudio = audioLibrary.resolve(lastAudio)
-        val tool = intent.getStringExtra("tool") ?: "status"
+        val tool = intent.getStringExtra("tool") ?: "diagnostics"
         ui.title = localTools.firstOrNull { it.id == tool }?.title ?: "本地工具"
         ui.status = status
         ui.onBack = { finish() }

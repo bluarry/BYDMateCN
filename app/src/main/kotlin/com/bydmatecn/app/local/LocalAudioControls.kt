@@ -87,7 +87,7 @@ internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.Share
 
 internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.SharedPreferences) {
         ui.section("车外试听")
-        label("固件专用路由：仅驻车手动试听，最多 15 秒；不代表已实现自动锁车播放。")
+        label("选择本地音频试听，最长15秒。")
         button("检测车外 / 锁车试听接口（不播放）") { status.text = firmwareAudio.probe() }
         FirmwareAudioRoute.entries.filter { it != FirmwareAudioRoute.LOCK_EVENT }.forEach { route ->
             button("${route.title}：试听选中音频") {
@@ -144,6 +144,7 @@ internal fun LocalToolsActivity.playFirmwareAudio(route: FirmwareAudioRoute) {
                 val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
                 check(request == audioRequestGeneration && firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) { "非驻车、车辆状态未知或页面不可见" }
                 val attrs = firmwareAudio.attributes(route)
+                LocalFileLog.get(this@playFirmwareAudio).record("audio/vehicle", "gear=${snapshot?.gear}; speed=${snapshot?.speed}; route=$route")
                 firmwarePlayback = true
                 localPlayer.play(file, null, attrs, route.title, 15_000L)
             } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) {
@@ -213,6 +214,6 @@ internal fun LocalToolsActivity.diagnosticControls() {
             }
         }
         button("导出 JSON 适配报告") {
-            if (diagnosticReport.isBlank()) status.text = "请先刷新报告" else exportDiagnostics.launch("BYDMate-capabilities.json")
+            if (diagnosticReport.isBlank()) status.text = "请先刷新报告" else exportDiagnostics.launch("BYDMateCN-capabilities.json")
         }
     }

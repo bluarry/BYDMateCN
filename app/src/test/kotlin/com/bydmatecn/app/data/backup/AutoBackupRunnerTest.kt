@@ -55,7 +55,7 @@ class AutoBackupRunnerTest {
         runBlocking { settings.setAutoBackupPeriod(AutoBackupPeriod.DAILY) }
         every { backupManager.export(any()) } answers {
             exportCount++
-            File(dir, "bydmate_backup_20260923_1000${exportCount.toString().padStart(2, '0')}.zip").apply {
+            File(dir, "bydmatecn_backup_20260923_1000${exportCount.toString().padStart(2, '0')}.zip").apply {
                 writeBytes(ByteArray(2048))
                 setLastModified(now)
             }
@@ -116,19 +116,19 @@ class AutoBackupRunnerTest {
 
         assertEquals(RunOutcome.SUCCESS, outcome)
         val names = dir.list()!!.toList()
-        assertEquals(listOf("bydmate_backup_auto_20260923_100001.zip"), names)
+        assertEquals(listOf("bydmatecn_backup_auto_20260923_100001.zip"), names)
         assertEquals(now, settings.getAutoBackupLastTs())
         assertEquals(AutoBackupRunner.RESULT_LOCAL_ONLY, settings.getAutoBackupLastResult())
         assertEquals("", settings.getAutoBackupPendingUpload())
     }
 
     @Test fun `rotation keeps the five newest auto backups and never touches manual exports`() = runTest {
-        val manual = File(dir, "bydmate_backup_20200101_000000.zip").apply {
+        val manual = File(dir, "bydmatecn_backup_20200101_000000.zip").apply {
             writeBytes(ByteArray(1)); setLastModified(now - 1_000_000)
         }
         val other = File(dir, "notes.zip").apply { writeBytes(ByteArray(1)); setLastModified(now - 1_000_000) }
         val oldAuto = (1..6).map { i ->
-            File(dir, "bydmate_backup_auto_2026090${i}_000000.zip").apply {
+            File(dir, "bydmatecn_backup_auto_2026090${i}_000000.zip").apply {
                 writeBytes(ByteArray(1)); setLastModified(now - (10 - i) * 60_000L)
             }
         }
@@ -137,7 +137,7 @@ class AutoBackupRunnerTest {
 
         val autoLeft = dir.listFiles()!!.filter { it.name.startsWith(AutoBackupRunner.AUTO_PREFIX) }.map { it.name }.toSet()
         assertEquals(AutoBackupRunner.KEEP_LOCAL, autoLeft.size)
-        assertTrue("bydmate_backup_auto_20260923_100001.zip" in autoLeft)
+        assertTrue("bydmatecn_backup_auto_20260923_100001.zip" in autoLeft)
         // The two oldest of the six pre-existing auto files are gone, the four newest stay.
         assertFalse(oldAuto[0].exists())
         assertFalse(oldAuto[1].exists())
@@ -148,14 +148,14 @@ class AutoBackupRunnerTest {
 
     @Test fun `fresh export survives rotation even when older files carry later timestamps`() = runTest {
         val skewed = (1..6).map { i ->
-            File(dir, "bydmate_backup_auto_2030010${i}_000000.zip").apply {
+            File(dir, "bydmatecn_backup_auto_2030010${i}_000000.zip").apply {
                 writeBytes(ByteArray(1)); setLastModified(now + i * 60_000L)
             }
         }
 
         runner().run()
 
-        assertTrue(File(dir, "bydmate_backup_auto_20260923_100001.zip").exists())
+        assertTrue(File(dir, "bydmatecn_backup_auto_20260923_100001.zip").exists())
         assertEquals(AutoBackupRunner.KEEP_LOCAL, dir.list()!!.size)
         assertFalse(skewed[0].exists())
         assertFalse(skewed[1].exists())
@@ -163,9 +163,9 @@ class AutoBackupRunnerTest {
     }
 
     @Test fun `rotation leaves a directory with an auto backup name alone`() = runTest {
-        val folder = File(dir, "bydmate_backup_auto_20200101_000000.zip").apply { mkdir(); setLastModified(now - 1_000_000) }
+        val folder = File(dir, "bydmatecn_backup_auto_20200101_000000.zip").apply { mkdir(); setLastModified(now - 1_000_000) }
         (1..5).forEach { i ->
-            File(dir, "bydmate_backup_auto_2026090${i}_000000.zip").apply {
+            File(dir, "bydmatecn_backup_auto_2026090${i}_000000.zip").apply {
                 writeBytes(ByteArray(1)); setLastModified(now - (10 - i) * 60_000L)
             }
         }
@@ -197,7 +197,7 @@ class AutoBackupRunnerTest {
 
         runCatching { runner().run() }
 
-        assertTrue(settings.getAutoBackupPendingUpload().endsWith("bydmate_backup_auto_20260923_100001.zip"))
+        assertTrue(settings.getAutoBackupPendingUpload().endsWith("bydmatecn_backup_auto_20260923_100001.zip"))
     }
 
     @Test fun `ok false answer with a permanent code leaves nothing pending`() = runTest {
@@ -226,7 +226,7 @@ class AutoBackupRunnerTest {
     @Test fun `file over the telegram limit is a permanent error without an upload`() = runTest {
         configureTelegram()
         every { backupManager.export(any()) } answers {
-            File(dir, "bydmate_backup_20260923_100001.zip").apply {
+            File(dir, "bydmatecn_backup_20260923_100001.zip").apply {
                 RandomAccessFile(this, "rw").use { it.setLength(TelegramBackupSink.MAX_UPLOAD_BYTES + 1) }
             }
         }
@@ -246,7 +246,7 @@ class AutoBackupRunnerTest {
 
         assertEquals(AutoBackupRunner.RESULT_SENT, settings.getAutoBackupLastResult())
         assertEquals("", settings.getAutoBackupPendingUpload())
-        coVerify { sink.sendDocument("123:abc", 42L, match { it.name.startsWith("bydmate_backup_auto_") }, match { it.startsWith("BYDMate: бэкап ") && it.endsWith(" МБ") }) }
+        coVerify { sink.sendDocument("123:abc", 42L, match { it.name.startsWith("bydmatecn_backup_auto_") }, match { it.startsWith("BYDMate: бэкап ") && it.endsWith(" МБ") }) }
     }
 
     @Test fun `transient upload failure keeps the file pending and asks for a retry`() = runTest {
@@ -257,7 +257,7 @@ class AutoBackupRunnerTest {
         assertEquals(RunOutcome.RETRY, runner().run())
 
         val pending = settings.getAutoBackupPendingUpload()
-        assertTrue(pending.endsWith("bydmate_backup_auto_20260923_100001.zip"))
+        assertTrue(pending.endsWith("bydmatecn_backup_auto_20260923_100001.zip"))
         assertEquals("send_error:NO_NETWORK", settings.getAutoBackupLastResult())
     }
 
@@ -281,7 +281,7 @@ class AutoBackupRunnerTest {
     }
 
     @Test fun `pending path pointing to a deleted file exports a fresh backup`() = runTest {
-        settings.setAutoBackupPendingUpload(File(dir, "bydmate_backup_auto_gone.zip").absolutePath)
+        settings.setAutoBackupPendingUpload(File(dir, "bydmatecn_backup_auto_gone.zip").absolutePath)
 
         assertEquals(RunOutcome.SUCCESS, runner().run())
 
@@ -290,7 +290,7 @@ class AutoBackupRunnerTest {
     }
 
     @Test fun `stale pending path is cleared even when the fresh export fails`() = runTest {
-        settings.setAutoBackupPendingUpload(File(dir, "bydmate_backup_auto_gone.zip").absolutePath)
+        settings.setAutoBackupPendingUpload(File(dir, "bydmatecn_backup_auto_gone.zip").absolutePath)
         every { backupManager.export(any()) } throws IllegalStateException("База данных занята")
 
         assertEquals(RunOutcome.FAILURE, runner().run())
@@ -302,7 +302,7 @@ class AutoBackupRunnerTest {
         configureTelegram()
         settings.setAutoBackupPeriod(AutoBackupPeriod.WEEKLY)
         settings.setAutoBackupLastTs(now - 24L * 60 * 60 * 1000)
-        val stuck = File(dir, "bydmate_backup_auto_20260901_000000.zip").apply { writeBytes(ByteArray(1)) }
+        val stuck = File(dir, "bydmatecn_backup_auto_20260901_000000.zip").apply { writeBytes(ByteArray(1)) }
         settings.setAutoBackupPendingUpload(stuck.absolutePath)
         coEvery { sink.sendDocument(any(), any(), any(), any()) } returns Result.success(Unit)
 
@@ -317,7 +317,7 @@ class AutoBackupRunnerTest {
         configureTelegram()
         settings.setAutoBackupPeriod(AutoBackupPeriod.WEEKLY)
         settings.setAutoBackupLastTs(now - 8L * 24 * 60 * 60 * 1000)
-        val stuck = File(dir, "bydmate_backup_auto_20260901_000000.zip").apply {
+        val stuck = File(dir, "bydmatecn_backup_auto_20260901_000000.zip").apply {
             writeBytes(ByteArray(1)); setLastModified(now - 1_000_000)
         }
         settings.setAutoBackupPendingUpload(stuck.absolutePath)
@@ -327,7 +327,7 @@ class AutoBackupRunnerTest {
         assertEquals(RunOutcome.RETRY, runner().run())
 
         verify(exactly = 1) { backupManager.export(any()) }
-        val fresh = File(dir, "bydmate_backup_auto_20260923_100001.zip")
+        val fresh = File(dir, "bydmatecn_backup_auto_20260923_100001.zip")
         coVerify(exactly = 1) { sink.sendDocument(any(), any(), match { it.absolutePath == fresh.absolutePath }, any()) }
         assertEquals(fresh.absolutePath, settings.getAutoBackupPendingUpload())
         assertEquals(now, settings.getAutoBackupLastTs())
@@ -376,7 +376,7 @@ class AutoBackupRunnerTest {
 
         verify(exactly = 1) { backupManager.export(setOf(BackupPart.KEYS)) }
         coVerify(exactly = 1) {
-            sink.sendDocument("123:abc", 42L, match { it.name == "bydmate_backup_20260923_100001.zip" }, match { it.startsWith("BYDMate: бэкап ") })
+            sink.sendDocument("123:abc", 42L, match { it.name == "bydmatecn_backup_20260923_100001.zip" }, match { it.startsWith("BYDMate: бэкап ") })
         }
         assertTrue(result.sent)
         assertEquals(null, result.sendError)
@@ -405,6 +405,6 @@ class AutoBackupRunnerTest {
         coVerify(exactly = 0) { sink.sendDocument(any(), any(), any(), any()) }
         assertFalse(result.sent)
         assertEquals(null, result.sendError)
-        assertEquals(listOf("bydmate_backup_20260923_100001.zip"), dir.list()!!.toList())
+        assertEquals(listOf("bydmatecn_backup_20260923_100001.zip"), dir.list()!!.toList())
     }
 }

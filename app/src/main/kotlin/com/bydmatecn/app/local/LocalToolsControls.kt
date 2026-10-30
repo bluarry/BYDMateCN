@@ -17,18 +17,8 @@ internal fun LocalToolsActivity.configureTool(tool: String) {
             "audio" -> audioControls()
             "diagnostics" -> diagnosticControls()
             "files" -> fileControls()
-            "sentry" -> sentryControls()
-            "status", "guard" -> vehicleControls(tool == "guard")
-            "bluetooth" -> {
-                label("可进入系统蓝牙设置配对。米篓宝的专用数据协议尚未恢复，配对成功不等于插件可用。")
-                button("系统蓝牙设置") { openSettings(Settings.ACTION_BLUETOOTH_SETTINGS) }
-            }
-            "front" -> label("前车起步判断尚缺有效输入与已验证算法，不使用自车速度变化冒充识别结果。")
-            "traffic" -> label("实时红绿灯需要外部信号源；此前约定的本地版不移植此项，不显示虚假倒计时。")
-            "touch" -> {
-                label("已有投屏并不自动提供触摸注入权限；当前 helper 尚未有经确认的仪表输入协议，不执行猜测的 input 命令。")
-                button("设备显示诊断") { lifecycleScope.launch { status.text = helper.listDisplays()?.joinToString("\n") ?: "helper 不可用" } }
-            }
+            else -> { status.text = "此工具已移除"; finish(); return }
+
         }
 
         observeAudio()
@@ -76,8 +66,8 @@ internal fun LocalToolsActivity.fileControls() {
             val captures = LocalCaptureStore(File(filesDir, "local-captures")).captures()
             status.text = "音频：${audio.size} 个；截图/帧：${captures.size} 个\n" + audio.joinToString("\n") { it.name }
         }
-        button("导出音频和截图 ZIP") { if (!busy) exportFiles.launch("BYDMate-local-resources.zip") }
-        button("系统分享设置") { openSettings(Settings.ACTION_WIRELESS_SETTINGS) }
+        button("导出音频和截图 ZIP") { if (!busy) exportFiles.launch("BYDMateCN-local-resources.zip") }
+
     }
 
 internal fun LocalToolsActivity.mediaRuleControls() {
@@ -109,11 +99,11 @@ internal fun LocalToolsActivity.mediaRuleControls() {
 
 internal fun LocalToolsActivity.audioControls() {
         ui.section("音频库")
-        label("普通播放使用 Android 输出设备；下方新增固件专用车外/锁车试听入口。专用标签已恢复，外功放授权和实际出声仍需真车验证。")
+        label("管理本地音频目录，选择文件并配置播放和车辆音效。")
         audioDirectoryControls()
         ui.section("播放控制")
         button("选择系统输出设备") {
-            val devices = (getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            val devices = (getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_OUTPUTS).filter { ordinaryAudioOutput(it.type) }
             val names = arrayOf("系统默认") + devices.map { "${it.productName} (type=${it.type}, id=${it.id})" }.toTypedArray()
             LocalDialogBuilder(this).setTitle("输出设备（不等于外扬声器路由）").setItems(names) { _, which ->
                 selectedOutput = if (which == 0) null else devices[which - 1]

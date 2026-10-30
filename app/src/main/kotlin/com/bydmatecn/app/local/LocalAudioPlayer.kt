@@ -12,6 +12,8 @@ import java.io.File
 
 /** Main-thread local playback. Never force-routes AVAS or suppresses OEM audio. */
 class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) {
+    internal val exteriorSession = ExteriorAudioSession(context)
+    internal val fileLog = LocalFileLog.get(context)
     internal val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     internal var player: MediaPlayer? = null
     internal var prepared = false
@@ -43,23 +45,9 @@ class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) 
         timeout = Runnable {
             if (requestGeneration == generation && !prepared) { stop(); report("音频准备超时") }
         }.also { handler.postDelayed(it, 10_000) }
-        val candidate = MediaPlayer()
-        player = candidate
-        try {
-            candidate.setAudioAttributes(playbackAttributes)
-            candidate.setDataSource(file.absolutePath)
-            if (device != null && !candidate.setPreferredDevice(device)) error("输出设备被拒绝")
-            applyVolume()
-            candidate.setOnPreparedListener { ready -> onPrepared(ready, file, routeLabel, maximumDurationMs, requestGeneration) }
-            candidate.setOnCompletionListener { completed ->
-                if (player === completed) { stop(); report("播放结束") }
-            }
-            candidate.setOnErrorListener { failed, what, extra ->
-                if (player === failed) { stop(); report("音频解码/输出失败：$what/$extra") }
-                true
-            }
-            candidate.prepareAsync()
-        } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) { stop(); report("播放失败：${error.message}") } catch (error: IllegalStateException) { stop(); report("播放失败：${error.message}") } catch (error: IllegalArgumentException) { stop(); report("播放失败：${error.message}") } catch (error: SecurityException) { stop(); report("播放失败：${error.message}") }
+        if (maximumDurationMs != null && !startExteriorSession()) return
+        fileLog.record("audio/start", "file=${file.name}; route=$routeLabel; attrs=$playbackAttributes; preferred=${device?.id}")
+        prepareMediaPlayer(file, device, playbackAttributes, routeLabel, maximumDurationMs)
     }
 
     fun togglePause() {
@@ -94,9 +82,13 @@ class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) 
         timeout?.let { handler.removeCallbacks(it) }; timeout = null
         val old = player
         player = null; prepared = false; policy.stop()
-        old?.release()
         val oldFocus = focus
         focus = null
-        oldFocus?.let { audio.abandonAudioFocusRequest(it) }
+        try {
+            old?.release()
+        } finally {
+            try { oldFocus?.let { audio.abandonAudioFocusRequest(it) } }
+            finally { exteriorSession.release() }
+        }
     }
 }
