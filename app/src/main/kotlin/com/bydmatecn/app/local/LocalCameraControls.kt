@@ -47,6 +47,7 @@ internal fun LocalCameraActivity.createCameraViews() {
             }
         }
         ui.title = "驻车录像"
+        ui.subtitle = "实时预览 · 分段录像 · 事件保护"
         ui.status = status
         ui.onBack = { finish() }
         ui.section("相机与权限")
@@ -139,7 +140,7 @@ private fun LocalCameraActivity.CameraLayout() {
     val wide = LocalConfiguration.current.screenWidthDp >= 650
     if (wide) {
         Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            LocalPanel(ui, Modifier.width(if (panelVisible) 440.dp else 0.dp).fillMaxHeight())
+            LocalPanel(ui, Modifier.width(if (panelVisible) 560.dp else 0.dp).fillMaxHeight())
             CameraPreviews(Modifier.weight(1f).fillMaxHeight())
         }
     } else {

@@ -5,11 +5,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -59,6 +64,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import com.bydmatecn.app.data.repository.SettingsRepository
@@ -209,6 +215,22 @@ fun AppNavigation(
     }
 
     val isWelcome = currentDestination?.route == "welcome"
+    val wideNavigation = LocalConfiguration.current.screenWidthDp >= 900
+    val localChildRoutes = setOf("blind_spot", "tool_settings/{section}")
+    fun isSelected(screen: Screen): Boolean {
+        val exact = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+        return exact || (screen == Screen.Local && currentDestination?.route in localChildRoutes)
+    }
+    fun navigateTo(screen: Screen) {
+        Trace.event(TraceArea.USER, "tab", "to" to screen.route)
+        navController.navigate(screen.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
     // Grows past NavBarHeight only once a large text size makes the label too tall for it.
     // The bar pads itself by its bottom window inset inside this height, so the inset is added on top.
     val density = LocalDensity.current
@@ -220,7 +242,7 @@ fun AppNavigation(
     Scaffold(
         containerColor = NavyDark,
         bottomBar = {
-            if (!isWelcome) {
+            if (!isWelcome && !wideNavigation) {
                 NavigationBar(
                     modifier = Modifier.height(navBarHeight),
                     containerColor = NavBarBackground
@@ -240,17 +262,8 @@ fun AppNavigation(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             },
-                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                            onClick = {
-                                Trace.event(TraceArea.USER, "tab", "to" to screen.route)
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            selected = isSelected(screen),
+                            onClick = { navigateTo(screen) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = AccentGreen,
                                 selectedTextColor = AccentGreen,
@@ -264,11 +277,18 @@ fun AppNavigation(
             }
         }
     ) { paddingValues ->
-        NavHost(
-            navController = navController,
-            startDestination = startDestination!!,
-            modifier = Modifier.padding(paddingValues)
-        ) {
+        Row(Modifier.fillMaxSize().padding(paddingValues)) {
+            if (!isWelcome && wideNavigation) {
+                VehicleSideNavigation(
+                    selected = ::isSelected,
+                    onSelected = ::navigateTo,
+                )
+            }
+            NavHost(
+                navController = navController,
+                startDestination = startDestination!!,
+                modifier = Modifier.weight(1f),
+            ) {
             composable("welcome") {
                 WelcomeScreen(
                     onComplete = {
@@ -349,6 +369,67 @@ fun AppNavigation(
             }
             composable("voice_user_phrases") {
                 com.bydmatecn.app.ui.settings.VoiceUserPhrasesScreen(onBack = { navController.popBackStack() })
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun VehicleSideNavigation(
+    selected: (Screen) -> Boolean,
+    onSelected: (Screen) -> Unit,
+) {
+    Column(
+        Modifier
+            .width(178.dp)
+            .fillMaxHeight()
+            .background(Color(0xFF0A1725))
+            .padding(horizontal = 14.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Text(
+            "BYDMateCN",
+            color = Color.White,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+        )
+        Text(
+            "车机助手",
+            color = Color(0xFF7188A1),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+        )
+        Screen.entries.forEach { screen ->
+            val active = selected(screen)
+            Card(
+                onClick = { onSelected(screen) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(15.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (active) Color(0xFF087BC1) else Color.Transparent,
+                ),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(
+                        imageVector = screen.icon,
+                        contentDescription = null,
+                        tint = if (active) Color.White else Color(0xFF8298AE),
+                        modifier = Modifier.size(23.dp),
+                    )
+                    Text(
+                        stringResource(screen.labelRes),
+                        color = if (active) Color.White else Color(0xFFA8BACB),
+                        fontSize = 14.sp,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

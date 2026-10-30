@@ -38,6 +38,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.Build
@@ -52,12 +55,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -4636,14 +4641,78 @@ fun VehicleToolSettingsScreen(section: String, onBack: () -> Unit) {
 
 @Composable
 private fun VehicleToolPage(title: String, subtitle: String, onBack: () -> Unit, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().background(NavyDark).padding(24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column { Text(title, color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = TextMuted, fontSize = 15.sp) }
-            TextButton(onClick = onBack) { Text("返回", fontSize = 18.sp) }
-        }
-        Card(Modifier.weight(1f).fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardSurface)) {
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { content() }
+    BoxWithConstraints(
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Color(0xFF0B1A2B), Color(0xFF081321)))
+        )
+    ) {
+        val wide = maxWidth >= 920.dp
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = if (wide) 30.dp else 20.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(52.dp).background(Color(0xFF15283D), RoundedCornerShape(16.dp)),
+                ) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回", tint = Color.White)
+                }
+                Column(Modifier.weight(1f).padding(start = 16.dp)) {
+                    Text(title, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                    Text(subtitle, color = Color(0xFF8FA5BC), fontSize = 14.sp)
+                }
+                Row(
+                    Modifier.background(Color(0xFF123A48), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = Color(0xFF1FD1C9), modifier = Modifier.size(18.dp))
+                    Text("本地配置", color = Color(0xFFBDF7F2), fontSize = 13.sp, modifier = Modifier.padding(start = 7.dp))
+                }
+            }
+
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                if (wide) {
+                    Card(
+                        Modifier.width(220.dp).fillMaxHeight(),
+                        shape = RoundedCornerShape(22.dp),
+                        border = BorderStroke(1.dp, Color(0xFF203A52)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0E1D2D)),
+                    ) {
+                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Box(
+                                Modifier.size(48.dp).background(Color(0xFF153D54), RoundedCornerShape(15.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Outlined.Tune, contentDescription = null, tint = Color(0xFF27D4D2), modifier = Modifier.size(27.dp))
+                            }
+                            Text("$title 设置", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                            Text(subtitle, color = Color(0xFF91A7BD), fontSize = 13.sp, lineHeight = 20.sp)
+                            HorizontalDivider(color = Color(0xFF20384F))
+                            Text("修改后即时保存", color = Color(0xFF27D4D2), fontSize = 13.sp)
+                            Text("配置沿用现有车辆控制逻辑", color = Color(0xFF7189A1), fontSize = 12.sp, lineHeight = 18.sp)
+                        }
+                    }
+                }
+                Card(
+                    Modifier.weight(1f).fillMaxHeight(),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, Color(0xFF29445E)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF101F31)),
+                ) {
+                    Column(
+                        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                            .padding(horizontal = if (wide) 28.dp else 20.dp, vertical = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Text("功能配置", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                        Box(Modifier.width(44.dp).height(3.dp).background(Color(0xFF20D2D1), RoundedCornerShape(2.dp)))
+                        content()
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
         }
     }
 }
