@@ -19,6 +19,17 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) load(FileInputStream(keystorePropsFile))
 }
 
+// Single source of truth for application and artifact versions.
+val versionPropsFile = rootProject.file("version.properties")
+require(versionPropsFile.isFile) { "Missing version.properties" }
+val versionProps = Properties().apply { load(FileInputStream(versionPropsFile)) }
+val appVersionName = versionProps.getProperty("VERSION_NAME")?.trim()
+    ?.takeIf { it.matches(Regex("""\d+\.\d+\.\d+(?:\.\d+)?""")) }
+    ?: error("VERSION_NAME in version.properties must be a three- or four-part numeric version")
+val appVersionCode = versionProps.getProperty("VERSION_CODE")?.trim()?.toIntOrNull()
+    ?.takeIf { it > 0 }
+    ?: error("VERSION_CODE in version.properties must be a positive integer")
+
 android {
     namespace = "com.bydmatecn.app"
     // Modern AndroidX/Compose compile APIs; car head-unit runtime remains API 29+.
@@ -31,8 +42,8 @@ android {
         // on DiLink Android 12 (requestLegacyExternalStorage works).
         // targetSdk 30+ would break listFiles() on /storage/emulated/0/energydata/
         targetSdk = 29
-        versionCode = 511
-        versionName = "1.0.0.3"
+        versionCode = appVersionCode
+        versionName = appVersionName
         // Independent fork: no donor APKs may be offered as this application's updates.
         buildConfigField("String", "APP_UPDATE_URL", "\"https://api.github.com/repos/bluarry/BYDMateCN/releases?per_page=20\"")
         // Retain donor donation UI/resources, but hide every entry in this fork.
@@ -69,7 +80,7 @@ android {
     applicationVariants.all {
         outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "BYDMateCN-${defaultConfig.versionName}.apk"
+            output.outputFileName = "BYDMateCN-$appVersionName.apk"
         }
     }
 

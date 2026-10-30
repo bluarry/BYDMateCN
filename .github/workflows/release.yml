@@ -34,10 +34,21 @@ jobs:
           tag = os.environ['RELEASE_TAG']
           if not re.fullmatch(r'v\d+\.\d+\.\d+(?:\.\d+)?', tag):
               raise SystemExit('标签格式应为 v1.0.0 或 v1.0.0.1')
-          source = Path('app/build.gradle.kts').read_text(encoding='utf-8')
-          version = re.search(r'versionName\s*=\s*"([^"\n]+)"', source)
-          if not version or tag != 'v' + version.group(1):
-              raise SystemExit('标签版本与 app/build.gradle.kts 中 versionName 不一致')
+          values = {}
+          for line in Path('version.properties').read_text(encoding='utf-8').splitlines():
+              line = line.strip()
+              if not line or line.startswith('#'):
+                  continue
+              key, separator, value = line.partition('=')
+              if not separator or key.strip() in values:
+                  raise SystemExit('version.properties 格式无效')
+              values[key.strip()] = value.strip()
+          version = values.get('VERSION_NAME')
+          version_code = values.get('VERSION_CODE', '')
+          if not version or tag != 'v' + version:
+              raise SystemExit('标签版本与 version.properties 中 VERSION_NAME 不一致')
+          if not version_code.isdigit() or int(version_code) <= 0:
+              raise SystemExit('version.properties 中 VERSION_CODE 必须是正整数')
           notes = Path('release-notes') / (tag + '.md')
           if not notes.is_file() or not notes.read_text(encoding='utf-8').strip():
               raise SystemExit('缺少或为空的版本发布说明：' + str(notes))

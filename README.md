@@ -122,7 +122,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 ## GitHub 自动发布
 
-推送与应用版本一致的标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN-<版本号>.apk`，并附 SHA-256 校验文件。三段数字标签（如 `v1.0.0`）创建 **正式 Release**；四段数字标签（如 `v1.0.0.1`）创建 **WIP Pre-release**，不会被设置为最新正式版。每个标签必须与 `app/build.gradle.kts` 的 `versionName` 一致，并提供 `release-notes/<标签>.md` 发布说明；覆盖安装必须保持原发布签名且递增 `versionCode`。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
+推送与应用版本一致的标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN-<版本号>.apk`，并附 SHA-256 校验文件。三段数字标签（如 `v1.0.0`）创建 **正式 Release**；四段数字标签（如 `v1.0.0.1`）创建 **WIP Pre-release**，不会被设置为最新正式版。应用版本只在根目录 `version.properties` 配置；每个标签必须与其中的 `VERSION_NAME` 一致，并提供 `release-notes/<标签>.md` 发布说明；覆盖安装必须保持原发布签名且递增 `versionCode`。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
 
 ## 界面实现
 
