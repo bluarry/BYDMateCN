@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import com.bydmatecn.app.data.vehicle.HelperClient
 import com.bydmatecn.app.data.vehicle.VehicleApi
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.isActive
@@ -26,11 +27,12 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class LocalLockSoundService : Service() {
     @Inject lateinit var vehicle: VehicleApi
+    @Inject lateinit var helper: HelperClient
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var job: Job? = null
     private lateinit var player: LocalAudioPlayer
     private val prefs by lazy { getSharedPreferences("local-lock-sound", MODE_PRIVATE) }
-    override fun onCreate() { super.onCreate(); player = LocalAudioPlayer(this) { note(it) } }
+    override fun onCreate() { super.onCreate(); player = LocalAudioPlayer(this, helper) { note(it) } }
     override fun onBind(intent: Intent?) = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action != ARM) { stopSelf(); return START_NOT_STICKY }

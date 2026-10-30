@@ -132,7 +132,7 @@ class LocalToolsActivity : ComponentActivity(), LocalComposeHost {
         super.onCreate(savedInstanceState)
         LocalFileLog.get(this).record("LocalTools", "page opened")
         resources = LocalResourceStore(File(filesDir, "local-audio"))
-        localPlayer = LocalAudioPlayer(this) { message -> status.text = message }
+        localPlayer = LocalAudioPlayer(this, helper) { message -> status.text = message }
         val lastAudio = getSharedPreferences("local-audio", Context.MODE_PRIVATE).getString("selected", null)
         selectedAudio = audioLibrary.resolve(lastAudio)
         val tool = intent.getStringExtra("tool") ?: "diagnostics"

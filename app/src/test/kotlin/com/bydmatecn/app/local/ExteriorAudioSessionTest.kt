@@ -2,6 +2,10 @@ package com.bydmatecn.app.local
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.bydmatecn.app.data.vehicle.HelperClient
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -66,5 +70,28 @@ class ExteriorAudioSessionTest {
         val retry = ExteriorAudioSession(context) { commands += it }
         try { retry.acquire() } finally { retry.release() }
         assertEquals(2, commands.size)
+    }
+
+    @Test fun productionWriterUsesPrivilegedHelperForOpenAndClose() {
+        ExteriorControllerProfile.select(context, ExteriorControllerProfile.CONTROLLER_23)
+        val helper = mockk<HelperClient>()
+        coEvery { helper.writeStatus(any(), any(), any()) } returns 1
+        val session = ExteriorAudioSession(context, helper)
+
+        try { session.acquire() } finally { session.release() }
+
+        coVerify(exactly = 1) { helper.writeStatus(1000, -1442839934, 1) }
+        coVerify(exactly = 1) { helper.writeStatus(1000, -1442839934, 0) }
+    }
+
+    @Test fun helperRefusalDoesNotClaimOwnership() {
+        ExteriorControllerProfile.select(context, ExteriorControllerProfile.CONTROLLER_23)
+        val helper = mockk<HelperClient>()
+        coEvery { helper.writeStatus(any(), any(), any()) } returns -1
+
+        assertThrows(IllegalStateException::class.java) {
+            ExteriorAudioSession(context, helper).acquire()
+        }
+        coVerify(exactly = 1) { helper.writeStatus(1000, -1442839934, 1) }
     }
 }

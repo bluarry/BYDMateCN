@@ -20,15 +20,11 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <!-- Trusted-device auto-unlock: bonded-device selection and ACL connection edges. -->
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s" />
     <!-- DiLink 厂商音频服务使用的权限；实际授权仍由车机固件决定。 -->
     <uses-permission android:name="android.permission.BYDAUTO_AUDIO_COMMON" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.BYDAUTO_AUDIO_GET" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.BYDAUTO_AUDIO_SET" tools:ignore="ProtectedPermissions" />
-    <!-- 攻城狮助手所声明的 DiLink 车机权限集合；是否获批仍取决于系统签名、预装白名单及固件策略。 -->
+    <!-- DiLink 车机权限集合；是否获批仍取决于系统签名、预装白名单及固件策略。 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
@@ -211,16 +207,6 @@
         android:theme="@style/Theme.BYDMate">
 
         <activity android:name=".local.LocalToolsActivity" android:exported="false" />
-        <activity android:name=".local.TrustedBluetoothActivity" android:exported="false" />
-        <receiver
-            android:name=".local.TrustedBluetoothReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
-                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
-            </intent-filter>
-        </receiver>
         <service android:name=".local.LocalLockSoundService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <activity android:name=".local.LocalBackupActivity" android:exported="false" />
         <activity android:name=".local.LocalMediaActivity" android:exported="false" />

@@ -1,5 +1,6 @@
 package com.bydmatecn.app.local
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -36,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +55,7 @@ internal fun dashboardColumns(widthDp: Int): Int = if (widthDp >= 620) 2 else 1
 @Composable
 internal fun LocalDashboard(ui: LocalUiState, modifier: Modifier = Modifier) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
+    var sectionRailCollapsed by rememberSaveable { mutableStateOf(false) }
     val sections = ui.sections.toList().ifEmpty { listOf(LocalSection("功能", 0)) }
     val active = selected.coerceIn(0, sections.lastIndex)
     BoxWithConstraints(
@@ -84,7 +87,13 @@ internal fun LocalDashboard(ui: LocalUiState, modifier: Modifier = Modifier) {
             }
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 if (wide && sections.size > 1) {
-                    SectionRail(sections, active, onSelect = { selected = it })
+                    SectionRail(
+                        sections = sections,
+                        active = active,
+                        collapsed = sectionRailCollapsed,
+                        onSelect = { selected = it },
+                        onToggle = { sectionRailCollapsed = !sectionRailCollapsed },
+                    )
                 }
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ui.status?.let { StatusBanner(it) }
@@ -124,15 +133,49 @@ private fun ToolHeader(ui: LocalUiState) {
 }
 
 @Composable
-private fun SectionRail(sections: List<LocalSection>, active: Int, onSelect: (Int) -> Unit) {
+private fun SectionRail(
+    sections: List<LocalSection>,
+    active: Int,
+    collapsed: Boolean,
+    onSelect: (Int) -> Unit,
+    onToggle: () -> Unit,
+) {
+    val width by animateDpAsState(
+        targetValue = if (collapsed) 68.dp else 184.dp,
+        label = "工具分类导航宽度",
+    )
     Card(
-        Modifier.width(224.dp).fillMaxHeight(),
+        Modifier.width(width).fillMaxHeight(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF0E1D2D)),
         border = BorderStroke(1.dp, Color(0xFF20374E)),
     ) {
-        Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("功能分类", color = Color(0xFF7890AA), fontSize = 13.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+        Column(
+            Modifier.padding(if (collapsed) 8.dp else 10.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (collapsed) Arrangement.Center else Arrangement.SpaceBetween,
+            ) {
+                if (!collapsed) {
+                    Text(
+                        "功能分类",
+                        color = Color(0xFF7890AA),
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                IconButton(onClick = onToggle) {
+                    Icon(
+                        imageVector = if (collapsed) Icons.AutoMirrored.Outlined.ArrowForward
+                        else Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = if (collapsed) "展开功能分类" else "折叠功能分类",
+                        tint = Color(0xFF8DA6BD),
+                    )
+                }
+            }
             sections.forEachIndexed { index, section ->
                 val chosen = active == index
                 Card(
@@ -141,12 +184,44 @@ private fun SectionRail(sections: List<LocalSection>, active: Int, onSelect: (In
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = if (chosen) Color(0xFF1C4A5D) else Color.Transparent),
                 ) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(8.dp).background(if (chosen) MaterialTheme.colorScheme.primary else Color(0xFF405B73), RoundedCornerShape(4.dp))
-                        )
-                        Text(section.title, Modifier.weight(1f).padding(start = 12.dp), color = if (chosen) Color.White else Color(0xFFB5C4D5), fontSize = 16.sp, fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal)
-                        if (chosen) Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(
+                            horizontal = if (collapsed) 0.dp else 12.dp,
+                            vertical = 10.dp,
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = if (collapsed) Arrangement.Center else Arrangement.Start,
+                    ) {
+                        if (collapsed) {
+                            Text(
+                                section.title.take(1),
+                                color = if (chosen) Color.White else Color(0xFFB5C4D5),
+                                fontSize = 17.sp,
+                                fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium,
+                            )
+                        } else {
+                            Box(
+                                Modifier.size(8.dp).background(
+                                    if (chosen) MaterialTheme.colorScheme.primary else Color(0xFF405B73),
+                                    RoundedCornerShape(4.dp),
+                                )
+                            )
+                            Text(
+                                section.title,
+                                Modifier.weight(1f).padding(start = 10.dp),
+                                color = if (chosen) Color.White else Color(0xFFB5C4D5),
+                                fontSize = 15.sp,
+                                fontWeight = if (chosen) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (chosen) Icon(
+                                Icons.AutoMirrored.Outlined.ArrowForward,
+                                null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(17.dp),
+                            )
+                        }
                     }
                 }
             }

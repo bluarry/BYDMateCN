@@ -2,7 +2,10 @@ package com.bydmatecn.app.local
 
 import android.content.Context
 import android.os.SystemClock
+import com.bydmatecn.app.data.vehicle.HelperClient
 import java.lang.reflect.InvocationTargetException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 
 /** Vehicle-specific exterior-audio routing observed in the working reference APK. */
 @Suppress("LongParameterList")
@@ -57,6 +60,7 @@ internal data class ExteriorAudioCommand(val device: Int, val featureId: Int, va
  */
 internal class ExteriorAudioSession(
     private val context: Context,
+    private val helper: HelperClient? = null,
     private val commandWriter: ((ExteriorAudioCommand) -> Unit)? = null,
 ) {
     private val log get() = LocalFileLog.get(context)
@@ -111,8 +115,17 @@ internal class ExteriorAudioSession(
         log.record("exterior/setInt", "device=${command.device}; fid=${command.featureId}; value=${command.value}")
         try {
             val supplied = commandWriter
-            if (supplied != null) supplied(command) else AutoServiceWriter.write(context, command)
-            log.record("exterior/setInt-ok", "device=${command.device}; fid=${command.featureId}; value=${command.value}")
+            val helperStatus = when {
+                supplied != null -> { supplied(command); null }
+                helper != null -> HelperServiceWriter.write(helper, command)
+                else -> { AutoServiceWriter.write(context, command); null }
+            }
+            log.record(
+                "exterior/setInt-ok",
+                "device=${command.device}; fid=${command.featureId}; value=${command.value}; " +
+                    "writer=${if (helper != null && supplied == null) "helper" else "app"}; " +
+                    "status=${helperStatus ?: "n/a"}",
+            )
         } catch (error: InvocationTargetException) {
             val cause = error.targetException ?: error
             log.record("exterior/setInt-error", "${cause.javaClass.simpleName}: ${cause.message}")
@@ -120,6 +133,27 @@ internal class ExteriorAudioSession(
         } catch (error: ReflectiveOperationException) {
             log.record("exterior/setInt-error", "${error.javaClass.simpleName}: ${error.message}")
             throw IllegalStateException("固件没有可用的 auto.setInt 接口：${error.message}", error)
+        } catch (error: IllegalStateException) {
+            log.record("exterior/setInt-error", "${error.javaClass.simpleName}: ${error.message}")
+            throw error
+        } catch (error: Exception) {
+            log.record("exterior/setInt-error", "${error.javaClass.simpleName}: ${error.message}")
+            throw IllegalStateException("高权限 helper 写入车外通道失败：${error.message}", error)
+        }
+    }
+
+    /**
+     * A manifest declaration does not guarantee that the firmware granted BYDAUTO_AUDIO_SET to
+     * this app UID. Send the exact, fixed exterior-audio commands through the already-bound shell
+     * helper instead; status >= 0 is the autoservice accepted/no-op convention.
+     */
+    private object HelperServiceWriter {
+        fun write(helper: HelperClient, command: ExteriorAudioCommand): Int {
+            val status = runBlocking(Dispatchers.IO) {
+                helper.writeStatus(command.device, command.featureId, command.value)
+            } ?: throw IllegalStateException("高权限 helper 未连接或无响应")
+            check(status >= 0) { "autoservice 拒绝车外通道指令，status=$status" }
+            return status
         }
     }
 

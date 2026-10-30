@@ -13,7 +13,7 @@ import java.io.File
 /** Activity-scoped controls; the activity owns state and lifecycle cleanup. */
 internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.SharedPreferences) {
         ui.section("车外喊话")
-        micRelay = LocalMicRelay(this) { status.text = it }
+        micRelay = LocalMicRelay(this, helper) { status.text = it }
         label("实时车外喊话 · 按住说话，松手停止 · 最长15秒")
         exteriorControllerControls(audioPrefs)
         ui.toggle("已实际确认所选控制器配置可从车外扬声器出声，理解啸叫风险", audioPrefs.getBoolean("exterior_verified", false)) { checked ->

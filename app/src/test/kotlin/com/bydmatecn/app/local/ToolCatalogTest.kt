@@ -11,7 +11,12 @@ class ToolCatalogTest {
         org.junit.Assert.assertTrue(localTools.all { it.accent in 0..3 })
     }
     @Test fun noPlaceholderTools() {
-        org.junit.Assert.assertTrue(localTools.none { it.id in setOf("front", "traffic", "bluetooth", "touch", "advanced", "wheel", "status", "guard", "sentry") })
+        org.junit.Assert.assertTrue(localTools.none {
+            it.id in setOf(
+                "front", "traffic", "bluetooth", "bluetooth_unlock", "touch",
+                "advanced", "wheel", "status", "guard", "sentry",
+            )
+        })
     }
     @Test fun telephonyIsNotAMediaSink() {
         org.junit.Assert.assertFalse(ordinaryAudioOutput(18))

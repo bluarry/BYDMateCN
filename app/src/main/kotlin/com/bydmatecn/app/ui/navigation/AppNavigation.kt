@@ -1,6 +1,8 @@
 package com.bydmatecn.app.ui.navigation
 
+import android.content.Context
 import android.content.Intent
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -29,12 +31,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -48,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -90,6 +96,10 @@ private val NavBarHeight = 64.dp
 
 // Indicator (24 dp icon + 2 x 4 dp), 4 dp to the label, 2 x 4 dp minimum item padding.
 private val NavBarItemChrome = 40.dp
+private val SideNavigationExpandedWidth = 152.dp
+private val SideNavigationCollapsedWidth = 72.dp
+private const val SIDE_NAV_PREFS = "navigation-ui"
+private const val KEY_SIDE_NAV_COLLAPSED = "side_nav_collapsed"
 
 enum class Screen(val route: String, val labelRes: Int, val icon: ImageVector) {
     Dashboard("dashboard", R.string.nav_tab_dashboard, Icons.Outlined.Home),
@@ -216,6 +226,12 @@ fun AppNavigation(
 
     val isWelcome = currentDestination?.route == "welcome"
     val wideNavigation = LocalConfiguration.current.screenWidthDp >= 900
+    val navigationPrefs = remember(autoCheckContext) {
+        autoCheckContext.getSharedPreferences(SIDE_NAV_PREFS, Context.MODE_PRIVATE)
+    }
+    var sideNavigationCollapsed by rememberSaveable {
+        mutableStateOf(navigationPrefs.getBoolean(KEY_SIDE_NAV_COLLAPSED, false))
+    }
     val localChildRoutes = setOf("blind_spot", "tool_settings/{section}")
     fun isSelected(screen: Screen): Boolean {
         val exact = currentDestination?.hierarchy?.any { it.route == screen.route } == true
@@ -282,6 +298,11 @@ fun AppNavigation(
                 VehicleSideNavigation(
                     selected = ::isSelected,
                     onSelected = ::navigateTo,
+                    collapsed = sideNavigationCollapsed,
+                    onCollapsedChange = { collapsed ->
+                        sideNavigationCollapsed = collapsed
+                        navigationPrefs.edit().putBoolean(KEY_SIDE_NAV_COLLAPSED, collapsed).apply()
+                    },
                 )
             }
             NavHost(
@@ -379,30 +400,48 @@ fun AppNavigation(
 private fun VehicleSideNavigation(
     selected: (Screen) -> Boolean,
     onSelected: (Screen) -> Unit,
+    collapsed: Boolean,
+    onCollapsedChange: (Boolean) -> Unit,
 ) {
+    val width by animateDpAsState(
+        targetValue = if (collapsed) SideNavigationCollapsedWidth else SideNavigationExpandedWidth,
+        label = "主导航宽度",
+    )
     Column(
         Modifier
-            .width(178.dp)
+            .width(width)
             .fillMaxHeight()
             .background(Color(0xFF0A1725))
-            .padding(horizontal = 14.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp),
+            .padding(horizontal = 8.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            "BYDMateCN",
-            color = Color.White,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-        )
-        Text(
-            "车机助手",
-            color = Color(0xFF7188A1),
-            fontSize = 12.sp,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-        )
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (collapsed) Arrangement.Center else Arrangement.SpaceBetween,
+        ) {
+            if (!collapsed) {
+                Text(
+                    "BYDMateCN",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            IconButton(onClick = { onCollapsedChange(!collapsed) }) {
+                Icon(
+                    imageVector = if (collapsed) Icons.AutoMirrored.Outlined.ArrowForward
+                    else Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = if (collapsed) "展开主导航" else "折叠主导航",
+                    tint = Color(0xFF9CB1C5),
+                )
+            }
+        }
         Screen.entries.forEach { screen ->
             val active = selected(screen)
+            val label = stringResource(screen.labelRes)
             Card(
                 onClick = { onSelected(screen) },
                 modifier = Modifier.fillMaxWidth(),
@@ -412,23 +451,28 @@ private fun VehicleSideNavigation(
                 ),
             ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
+                    Modifier.fillMaxWidth().padding(
+                        horizontal = if (collapsed) 0.dp else 12.dp,
+                        vertical = 12.dp,
+                    ),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = if (collapsed) Arrangement.Center else Arrangement.spacedBy(10.dp),
                 ) {
                     Icon(
                         imageVector = screen.icon,
-                        contentDescription = null,
+                        contentDescription = label,
                         tint = if (active) Color.White else Color(0xFF8298AE),
                         modifier = Modifier.size(23.dp),
                     )
-                    Text(
-                        stringResource(screen.labelRes),
-                        color = if (active) Color.White else Color(0xFFA8BACB),
-                        fontSize = 14.sp,
-                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1,
-                    )
+                    if (!collapsed) {
+                        Text(
+                            label,
+                            color = if (active) Color.White else Color(0xFFA8BACB),
+                            fontSize = 14.sp,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }

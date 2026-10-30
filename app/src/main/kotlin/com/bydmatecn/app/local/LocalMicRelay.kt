@@ -15,13 +15,18 @@ import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
 import android.os.Handler
 import android.os.Looper
+import com.bydmatecn.app.data.vehicle.HelperClient
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 
 /** Parked push-to-talk routed through the selected BYD exterior-audio controller profile. */
-class LocalMicRelay(private val context: Context, private val report: (String) -> Unit) {
-    private val exteriorSession = ExteriorAudioSession(context)
+class LocalMicRelay(
+    private val context: Context,
+    helper: HelperClient? = null,
+    private val report: (String) -> Unit,
+) {
+    private val exteriorSession = ExteriorAudioSession(context, helper)
     private val fileLog = LocalFileLog.get(context)
     private val handler = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()

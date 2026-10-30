@@ -8,11 +8,16 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
+import com.bydmatecn.app.data.vehicle.HelperClient
 import java.io.File
 
 /** Main-thread local playback; bounded exterior playback uses the selected controller profile. */
-class LocalAudioPlayer(context: Context, internal val report: (String) -> Unit) {
-    internal val exteriorSession = ExteriorAudioSession(context)
+class LocalAudioPlayer(
+    context: Context,
+    helper: HelperClient? = null,
+    internal val report: (String) -> Unit,
+) {
+    internal val exteriorSession = ExteriorAudioSession(context, helper)
     internal val fileLog = LocalFileLog.get(context)
     internal val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     internal var player: MediaPlayer? = null
