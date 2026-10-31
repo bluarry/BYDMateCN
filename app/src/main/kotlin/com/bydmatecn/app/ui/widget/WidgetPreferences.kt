@@ -1,0 +1,316 @@
+package com.bydmatecn.app.ui.widget
+
+import android.content.Context
+import android.content.SharedPreferences
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+
+/** What the left-third tap should do when zoning is enabled. */
+enum class LeftTapMode { APP, SPLIT }
+
+/**
+ * Thin wrapper around the "bydmate_widget" SharedPreferences file.
+ * Keeps the keys in one place and exposes a Flow so Settings UI can react
+ * live to the drag-to-trash gesture flipping `enabled` off.
+ */
+class WidgetPreferences(private val prefs: SharedPreferences) {
+
+    constructor(context: Context) : this(
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    )
+
+    init { migrateLegacyLeftTapKey() }
+
+    fun isEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, false)
+
+    fun setEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
+    }
+
+    fun getX(): Int = prefs.getInt(KEY_X, 0)
+    fun getY(): Int = prefs.getInt(KEY_Y, 0)
+
+    fun savePosition(x: Int, y: Int) {
+        prefs.edit().putInt(KEY_X, x).putInt(KEY_Y, y).apply()
+    }
+
+    fun resetPosition() {
+        prefs.edit().remove(KEY_X).remove(KEY_Y).apply()
+    }
+
+    fun enabledFlow(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == KEY_ENABLED) {
+                trySend(isEnabled())
+            }
+        }
+        trySend(isEnabled())
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    fun getAlpha(): Float = prefs.getFloat(KEY_ALPHA, 1.0f)
+
+    fun setAlpha(alpha: Float) {
+        val clamped = alpha.coerceIn(0.3f, 1.0f)
+        prefs.edit().putFloat(KEY_ALPHA, clamped).apply()
+    }
+
+    fun alphaFlow(): Flow<Float> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == KEY_ALPHA) trySend(getAlpha())
+        }
+        trySend(getAlpha())
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    fun getScale(): Float = prefs.getFloat(KEY_SCALE, 1.0f)
+
+    fun setScale(scale: Float) {
+        val clamped = scale.coerceIn(SCALE_MIN, SCALE_MAX)
+        prefs.edit().putFloat(KEY_SCALE, clamped).apply()
+    }
+
+    fun scaleFlow(): Flow<Float> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == KEY_SCALE) trySend(getScale())
+        }
+        trySend(getScale())
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    /**
+     * Transient flag: when true, widget stays hidden until user opens MainActivity.
+     * Triggered by long-press on the widget. Cleared in onActivityResumed.
+     */
+    fun isHiddenUntilAppLaunch(): Boolean = prefs.getBoolean(KEY_HIDDEN_UNTIL_LAUNCH, false)
+
+    fun setHiddenUntilAppLaunch(hidden: Boolean) {
+        prefs.edit().putBoolean(KEY_HIDDEN_UNTIL_LAUNCH, hidden).apply()
+    }
+
+    /**
+     * When true, the LEFT third of the widget launches the configured app
+     * (default Yandex Navigator). The rest opens BYDMate. When false, a tap
+     * anywhere opens BYDMate — historical behaviour.
+     */
+    fun isLeftTapZoningEnabled(): Boolean =
+        prefs.getBoolean(KEY_LEFT_TAP_ZONING, false)
+
+    /** Widget section: a change made here also drops the split switch's snapshot (see [setSplitTapOn]). */
+    fun setLeftTapZoningEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_LEFT_TAP_ZONING, enabled)
+            .remove(KEY_SPLIT_TAP_PREV_ZONING).remove(KEY_SPLIT_TAP_PREV_MODE).apply()
+    }
+
+    fun getLeftTapAppPackage(): String =
+        prefs.getString(KEY_LEFT_TAP_APP_PKG, DEFAULT_LEFT_TAP_APP_PKG) ?: DEFAULT_LEFT_TAP_APP_PKG
+
+    fun getLeftTapAppLabel(): String =
+        prefs.getString(KEY_LEFT_TAP_APP_LABEL, DEFAULT_LEFT_TAP_APP_LABEL) ?: DEFAULT_LEFT_TAP_APP_LABEL
+
+    fun setLeftTapApp(packageName: String, label: String) {
+        prefs.edit()
+            .putString(KEY_LEFT_TAP_APP_PKG, packageName)
+            .putString(KEY_LEFT_TAP_APP_LABEL, label)
+            .apply()
+    }
+
+    fun getLeftTapMode(): LeftTapMode =
+        prefs.getString(KEY_LEFT_TAP_MODE, null)
+            ?.let { runCatching { LeftTapMode.valueOf(it) }.getOrNull() }
+            ?: LeftTapMode.APP
+
+    /** Widget section: a change made here also drops the split switch's snapshot (see [setSplitTapOn]). */
+    fun setLeftTapMode(mode: LeftTapMode) {
+        prefs.edit().putString(KEY_LEFT_TAP_MODE, mode.name)
+            .remove(KEY_SPLIT_TAP_PREV_ZONING).remove(KEY_SPLIT_TAP_PREV_MODE).apply()
+    }
+
+    /** Left tap currently opens an app (zoning on, APP mode): turning the split tap on replaces it. */
+    fun leftTapOpensApp(): Boolean = isLeftTapZoningEnabled() && getLeftTapMode() == LeftTapMode.APP
+
+    /** The split section's «Тап по левой трети» switch: on = zoning on + SPLIT. */
+    fun isSplitTapOn(): Boolean = isLeftTapZoningEnabled() && getLeftTapMode() == LeftTapMode.SPLIT
+
+    /**
+     * On: remembers the current zoning/mode, then sets zoning on + SPLIT. Off: puts back what was
+     * remembered and forgets it; with nothing remembered (the Widget section changed the tap since,
+     * which drops the snapshot) zoning stays as is and the mode goes back to APP. Writes the keys
+     * directly: the public setters would drop the snapshot this switch just took.
+     */
+    fun setSplitTapOn(on: Boolean) {
+        if (on == isSplitTapOn()) return
+        val editor = prefs.edit()
+        if (on) {
+            editor.putBoolean(KEY_SPLIT_TAP_PREV_ZONING, isLeftTapZoningEnabled())
+                .putString(KEY_SPLIT_TAP_PREV_MODE, getLeftTapMode().name)
+                .putBoolean(KEY_LEFT_TAP_ZONING, true)
+                .putString(KEY_LEFT_TAP_MODE, LeftTapMode.SPLIT.name)
+        } else {
+            val mode = prefs.getString(KEY_SPLIT_TAP_PREV_MODE, null)
+                ?.let { runCatching { LeftTapMode.valueOf(it) }.getOrNull() } ?: LeftTapMode.APP
+            editor.putBoolean(KEY_LEFT_TAP_ZONING, prefs.getBoolean(KEY_SPLIT_TAP_PREV_ZONING, isLeftTapZoningEnabled()))
+                .putString(KEY_LEFT_TAP_MODE, mode.name)
+                .remove(KEY_SPLIT_TAP_PREV_ZONING).remove(KEY_SPLIT_TAP_PREV_MODE)
+        }
+        editor.apply()
+    }
+
+    data class LeftTapAppState(
+        val enabled: Boolean,
+        val packageName: String,
+        val label: String,
+        val mode: LeftTapMode = LeftTapMode.APP,
+    )
+
+    fun leftTapAppFlow(): Flow<LeftTapAppState> = callbackFlow {
+        fun snapshot() = LeftTapAppState(
+            enabled = isLeftTapZoningEnabled(),
+            packageName = getLeftTapAppPackage(),
+            label = getLeftTapAppLabel(),
+            mode = getLeftTapMode(),
+        )
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == KEY_LEFT_TAP_ZONING ||
+                changedKey == KEY_LEFT_TAP_APP_PKG ||
+                changedKey == KEY_LEFT_TAP_APP_LABEL ||
+                changedKey == KEY_LEFT_TAP_MODE
+            ) {
+                trySend(snapshot())
+            }
+        }
+        trySend(snapshot())
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    /**
+     * When true, the widget shows the 6 automation buttons: a single tap on the
+     * right zone slides them out, a double tap opens BYDMate. Default off — until
+     * the user opts in, a single tap keeps its historical "open BYDMate" behavior
+     * and the window stays 260x108.
+     */
+    fun isButtonsEnabled(): Boolean = prefs.getBoolean(KEY_BUTTONS_ENABLED, false)
+
+    fun setButtonsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BUTTONS_ENABLED, enabled).apply()
+    }
+
+    fun buttonsEnabledFlow(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == KEY_BUTTONS_ENABLED) trySend(isButtonsEnabled())
+        }
+        trySend(isButtonsEnabled())
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    /**
+     * Icon catalog id shown on expandable button [number] instead of its digit.
+     * Null = no icon chosen, the button keeps showing the number.
+     */
+    fun buttonIconId(number: Int): String? = prefs.getString(buttonIconKey(number), null)
+
+    fun setButtonIconId(number: Int, id: String?) {
+        val key = buttonIconKey(number)
+        val editor = prefs.edit()
+        if (id == null) editor.remove(key) else editor.putString(key, id)
+        editor.apply()
+    }
+
+    fun isHideOnYoutube(): Boolean = prefs.getBoolean(KEY_HIDE_ON_YOUTUBE, false)
+
+    fun setHideOnYoutube(hide: Boolean) {
+        prefs.edit().putBoolean(KEY_HIDE_ON_YOUTUBE, hide).apply()
+    }
+
+    fun hideOnYoutubeFlow(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == KEY_HIDE_ON_YOUTUBE) trySend(isHideOnYoutube())
+        }
+        trySend(isHideOnYoutube())
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    /** Show the widget only over the home screen (launcher); hide it in every other app. */
+    fun isHomeOnly(): Boolean = prefs.getBoolean(KEY_HOME_ONLY, false)
+
+    fun setHomeOnly(homeOnly: Boolean) {
+        prefs.edit().putBoolean(KEY_HOME_ONLY, homeOnly).apply()
+    }
+
+    fun homeOnlyFlow(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == KEY_HOME_ONLY) trySend(isHomeOnly())
+        }
+        trySend(isHomeOnly())
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    /**
+     * Packages the widget hides itself over, chosen by the user in Settings.
+     * SharedPreferences hands out its own live Set instance — copy on read and
+     * on write so callers can never mutate the stored value.
+     */
+    fun getHideInApps(): Set<String> =
+        prefs.getStringSet(KEY_HIDE_IN_APPS, null)?.toSet() ?: emptySet()
+
+    fun setHideInApps(packages: Set<String>) {
+        prefs.edit().putStringSet(KEY_HIDE_IN_APPS, packages.toSet()).apply()
+    }
+
+    fun hideInAppsFlow(): Flow<Set<String>> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == KEY_HIDE_IN_APPS) trySend(getHideInApps())
+        }
+        trySend(getHideInApps())
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    private fun migrateLegacyLeftTapKey() {
+        if (!prefs.contains(LEGACY_KEY_LEFT_TAP_NAVIGATOR)) return
+        val editor = prefs.edit().remove(LEGACY_KEY_LEFT_TAP_NAVIGATOR)
+        // Only copy legacy value if the new key has not been written yet.
+        // Protects against multi-process race where another instance already
+        // migrated and the user has since changed the setting.
+        if (!prefs.contains(KEY_LEFT_TAP_ZONING)) {
+            val legacy = prefs.getBoolean(LEGACY_KEY_LEFT_TAP_NAVIGATOR, false)
+            editor.putBoolean(KEY_LEFT_TAP_ZONING, legacy)
+        }
+        editor.apply()
+    }
+
+    companion object {
+        const val PREFS_NAME = "bydmate_widget"
+        const val KEY_ENABLED = "floating_widget_enabled"
+        const val KEY_X = "widget_x"
+        const val KEY_Y = "widget_y"
+        const val KEY_ALPHA = "widget_alpha"
+        const val KEY_SCALE = "widget_scale"
+        const val KEY_HIDDEN_UNTIL_LAUNCH = "widget_hidden_until_launch"
+        const val LEGACY_KEY_LEFT_TAP_NAVIGATOR = "widget_left_tap_navigator"
+        const val KEY_LEFT_TAP_ZONING = "widget_left_tap_zoning"
+        const val KEY_LEFT_TAP_APP_PKG = "widget_left_tap_app_pkg"
+        const val KEY_LEFT_TAP_APP_LABEL = "widget_left_tap_app_label"
+        const val KEY_LEFT_TAP_MODE = "widget_left_tap_mode"
+        const val KEY_SPLIT_TAP_PREV_ZONING = "widget_split_tap_prev_zoning"
+        const val KEY_SPLIT_TAP_PREV_MODE = "widget_split_tap_prev_mode"
+        const val KEY_BUTTONS_ENABLED = "widget_buttons_enabled"
+        const val KEY_HIDE_ON_YOUTUBE = "widget_hide_on_youtube"
+        const val KEY_HIDE_IN_APPS = "widget_hide_in_apps"
+        const val KEY_HOME_ONLY = "widget_home_only"
+        const val KEY_BUTTON_ICON_PREFIX = "widget_button_icon_"
+        fun buttonIconKey(number: Int): String = "$KEY_BUTTON_ICON_PREFIX$number"
+        const val DEFAULT_LEFT_TAP_APP_PKG = "ru.yandex.yandexnavi"
+        const val DEFAULT_LEFT_TAP_APP_LABEL = "Яндекс.Навигатор"
+        const val SCALE_MIN = 0.7f
+        const val SCALE_MAX = 2.0f
+    }
+}

@@ -24,7 +24,7 @@ DEFAULT_FW = (
     ".research/leopard3-pulled-fw20260514/decompiled/framework/sources/android/hardware/bydauto"
 )
 STUB_ROOT = "bydauto-stubs/src/main/java/android/hardware/bydauto"
-LISTENERS_KT = "app/src/main/kotlin/com/bydmate/app/helper/push/FidRecorderListeners.kt"
+LISTENERS_KT = "app/src/main/kotlin/com/bydmatecn/app/helper/push/FidRecorderListeners.kt"
 
 STUB_TEMPLATE = """package android.hardware.bydauto.{pkg};
 
@@ -55,7 +55,7 @@ public abstract class {cls} implements IBYDAutoListener {{
 }}
 """
 
-KT_HEADER = '''package com.bydmate.app.helper.push
+KT_HEADER = '''package com.bydmatecn.app.helper.push
 
 import android.hardware.bydauto.BYDAutoEventValue
 @IMPORTS@

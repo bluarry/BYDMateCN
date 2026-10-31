@@ -1,0 +1,521 @@
+package com.bydmatecn.app.data.nativestack
+
+import com.bydmatecn.app.data.autoservice.AutoserviceClient
+import com.bydmatecn.app.data.autoservice.SentinelDecoder
+import com.bydmatecn.app.data.remote.DiParsData
+import com.bydmatecn.app.data.repository.SettingsRepository
+import com.bydmatecn.app.data.vehicle.BatchReadItem
+import com.bydmatecn.app.data.vehicle.HelperClient
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.math.roundToInt
+
+/**
+ * ParsReader implementation that fetches live vehicle params from the system
+ * autoservice Binder, either via the daemon's batched TX_READ_BATCH transport
+ * (once [BatchReadGate] has shadow-validated it) or via on-device ADB, one
+ * fid at a time.
+ *
+ * Returns null if neither transport can produce a live snapshot (ADB
+ * disconnected, firmware without autoservice, or all probe fids return
+ * sentinel).
+ */
+@Singleton
+class NativeParsReader @Inject constructor(
+    private val autoservice: AutoserviceClient,
+    private val settings: SettingsRepository,
+    private val helperClient: HelperClient,
+    private val gate: BatchReadGate,
+    private val vehicleKind: VehicleKindMonitor,
+) : ParsReader {
+
+    /**
+     * Batch request for one poll tick, built against [table] — the snapshot of
+     * [FidAddresses] this fetch works from. Same entries in the same order, so the reply
+     * still lines up with [FidMap.entries] index by index. A HYBRID car gets [FidMap.hybrid]
+     * appended at its compiled addresses; the EV part is untouched either way.
+     */
+    private fun batchItems(table: ResolvedFidTable, hybrid: Boolean): List<BatchReadItem> {
+        val items = FidMap.entries.map {
+            val address = table.address(it.field)
+            BatchReadItem(it.transact, address.device, address.fid)
+        }
+        if (!hybrid) return items
+        return items + FidMap.hybrid.map { BatchReadItem(it.transact, it.device, it.fid) }
+    }
+
+    /**
+     * Last driveMode the car actually reported. The fid answers 0 while a mode switch is in
+     * flight, which is not a mode — holding the previous one keeps "!=" rules from seeing a
+     * null→value edge on the next poll and firing on a switch the user only passed through.
+     */
+    @Volatile private var lastDriveMode: Int? = null
+
+    /** Keeps the raw tech-panel line to one a minute on the 1 s DRIVE cadence (~700 an hour at 5 s). */
+    private val techLogThrottle = com.bydmatecn.app.data.autoservice.LogThrottle(60_000L)
+
+    /**
+     * One snapshot of [FidAddresses] per fetch. The global table is @Volatile and the
+     * catalog resolution can install a new one at any moment: taking the address from one
+     * table and the scale from another would decode a word read at the old address with
+     * the new scale (a 10x odometer glitch for one tick).
+     */
+    override suspend fun fetch(): DiParsData? {
+        val table = FidAddresses.table
+        // One read of the kind per fetch, so the request and its decoding agree.
+        val hybrid = vehicleKind.kind.value == VehicleKind.HYBRID
+        return when (gate.mode()) {
+            BatchMode.ACTIVE -> fetchViaBatch(table, hybrid) ?: fetchViaAdb(table, hybrid)
+            BatchMode.OFF -> fetchViaAdb(table, hybrid)
+            BatchMode.VALIDATING -> {
+                val adb = fetchViaAdb(table, hybrid)
+                val batchRaw = helperClient.readBatch(batchItems(table, hybrid))
+                if (batchRaw == null) {
+                    gate.recordBatchUnavailable()
+                } else {
+                    gate.recordComparison(
+                        adb,
+                        // Shadow snapshot: compared, never returned — so it must not update
+                        // any state a returned snapshot depends on (see stickyDriveMode).
+                        assembleSnapshot(
+                            decodeBatch(batchRaw, table, hybrid),
+                            windowRrRawFromBatch(batchRaw),
+                            rememberSticky = false,
+                        ),
+                    )
+                }
+                adb // the proven path stays primary until promotion
+            }
+        }
+    }
+
+    private suspend fun fetchViaBatch(table: ResolvedFidTable, hybrid: Boolean): DiParsData? {
+        val pairs = helperClient.readBatch(batchItems(table, hybrid)) ?: return null
+        return assembleSnapshot(decodeBatch(pairs, table, hybrid), windowRrRawFromBatch(pairs))
+    }
+
+    /** Raw pre-decode windowRR value when the read itself succeeded, else null. */
+    private fun windowRrRawFromBatch(pairs: List<Pair<Int, Int>>): Int? =
+        pairs.getOrNull(windowRrIndex)?.let { (status, word) -> if (status == 0) word else null }
+
+    /**
+     * Decodes raw (status, value) pairs with the EXACT pipeline the ADB path uses:
+     * status != 0 → null (parseParcelInt only matches status word 00000000);
+     * tx=5 → SentinelDecoder.decodeInt then ParamDecoder scaled/int;
+     * tx=7 → SentinelDecoder.parseFloatFromShellInt then ParamDecoder.decodeFloat
+     * on the raw IEEE-754 bits — mirroring AutoserviceClient.getInt/getFloat +
+     * the per-entry decode in fetchViaAdb. With [hybrid] the reply carries [FidMap.hybrid]
+     * after the [FidMap.entries] part; a missing tail word decodes to null.
+     */
+    private fun decodeBatch(
+        pairs: List<Pair<Int, Int>>,
+        table: ResolvedFidTable,
+        hybrid: Boolean,
+    ): Map<String, Any?> {
+        val decoded = mutableMapOf<String, Any?>()
+        FidMap.entries.forEachIndexed { i, entry ->
+            val (status, word) = pairs[i]
+            val value: Any? = if (status != 0) null else when (entry.transact) {
+                5 -> decodeTx5(entry, SentinelDecoder.decodeInt(word), table)
+                7 -> SentinelDecoder.parseFloatFromShellInt(word)?.let { f ->
+                    ParamDecoder.decodeFloat(java.lang.Float.floatToRawIntBits(f), entry.decoder)
+                }
+                else -> null
+            }
+            decoded[entry.field] = value
+        }
+        if (hybrid) {
+            FidMap.hybrid.forEachIndexed { j, entry ->
+                val (status, word) = pairs.getOrNull(FidMap.entries.size + j) ?: (-1 to 0)
+                decoded[entry.field] = if (status != 0) null else decodeHybrid(entry, word)
+            }
+        }
+        logTechRaw(pairs, decoded, hybrid)
+        return decoded
+    }
+
+    /**
+     * One throttled line with the RAW (pre-sentinel) words of every tech-panel fid, so a
+     * single test drive settles the unproven ones (motor currents, battery temp extremes)
+     * without another build. Values the batch failed to read print as "?". The motor split is
+     * the only decoded value here: it must read exactly as the «Техника» card renders it.
+     */
+    private fun logTechRaw(pairs: List<Pair<Int, Int>>, decoded: Map<String, Any?>, hybrid: Boolean) {
+        if (!techLogThrottle.shouldLog("tech")) return
+        fun raw(field: String): String {
+            val i = FidMap.entries.indexOfFirst { it.field == field }
+            if (i < 0) return "?"
+            val (status, word) = pairs.getOrNull(i) ?: return "?"
+            if (status != 0) return "?"
+            return if (FidMap.entries[i].transact == 7) {
+                java.lang.Float.intBitsToFloat(word).toString()
+            } else {
+                word.toString()
+            }
+        }
+        android.util.Log.i(
+            "TechPanel",
+            "tech: soc=${raw("soc")} remain=${raw("batteryRemainKwh")} " +
+                "ins=${raw("insulationKohm")} mF=${raw("motorTempFront")} mR=${raw("motorTempRear")} " +
+                "iF=${raw("inverterTempFront")} iR=${raw("inverterTempRear")} " +
+                "V=${raw("hvVoltage")} I=${raw("hvCurrent")} " +
+                "chg=${raw("bmsMaxChargeKw")} dis=${raw("bmsMaxDischargeKw")} " +
+                "tmax=${raw("maxBatTemp")} tmin=${raw("minBatTemp")} " +
+                "rF=${raw("motorRpmFront")} rR=${raw("motorRpmRear")} " +
+                "comp=${raw("compressorW")} ac=${raw("acStatus")} " +
+                "tyT=${raw("tyreTempFL")}/${raw("tyreTempFR")}/${raw("tyreTempRL")}/${raw("tyreTempRR")} " +
+                "acc=${raw("pedalAccel")} brk=${raw("pedalBrake")} " +
+                "cF=${raw("motorCurrentFront")} cR=${raw("motorCurrentRear")} " +
+                "gun=${raw("chargeGunState")} bms=${raw("bmsState")} " +
+                "chgConn=${raw("chargerConnectState")} chgInd=${raw("chargeConnectIndicator")} " +
+                "split=${splitText(decoded)}" +
+                if (hybrid) " fuel=${hybridRaw(pairs, "fuelPercent")} hev=${hybridRaw(pairs, "mileageHevKm")} " +
+                    "rpm=${hybridRaw(pairs, "engineRpm")}" else ""
+        )
+    }
+
+
+    private suspend fun fetchViaAdb(table: ResolvedFidTable, hybrid: Boolean): DiParsData? {
+        if (!autoservice.isAvailable()) return null
+
+        // Decoded values keyed by FidEntry.field.
+        val decoded = mutableMapOf<String, Any?>()
+
+        // Raw pre-decode windowRR sample; the fallback decision must be about the SAME
+        // sample the value came from, or a window that moved between two reads would
+        // decide the generation.
+        var windowRrRaw: Int? = null
+
+        for (entry in FidMap.entries) {
+            val address = table.address(entry.field)
+            val value: Any? = when {
+                entry === windowRrEntry -> {
+                    windowRrRaw = autoservice.getIntRaw(address.device, address.fid)
+                    decodeTx5(entry, windowRrRaw?.let { SentinelDecoder.decodeInt(it) }, table)
+                }
+                entry.transact == 5 -> decodeTx5(entry, autoservice.getInt(address.device, address.fid), table)
+                entry.transact == 7 -> {
+                    // AutoserviceClient.getFloat already rejects float sentinels (-1.0f, NaN, Inf).
+                    // Convert Float back to its raw IEEE-754 bits so ParamDecoder.decodeFloat
+                    // can apply its SentinelDecoder path (which also rejects -1.0f etc.).
+                    val f = autoservice.getFloat(address.device, address.fid)
+                    if (f == null) null
+                    else ParamDecoder.decodeFloat(java.lang.Float.floatToRawIntBits(f), entry.decoder)
+                }
+                else -> null
+            }
+            decoded[entry.field] = value
+        }
+        if (hybrid) decoded.putAll(readHybridViaAdb(autoservice))
+
+        return assembleSnapshot(decoded, windowRrRaw)
+    }
+
+    // Range rejects (INT_TEMP_C / INT_PERCENT) used to vanish silently: a car answering a
+    // plain out-of-range number (Dolphin cabin temp, #180) left no trace in any dump.
+    private val rejectLog = com.bydmatecn.app.data.autoservice.LogThrottle()
+
+    /**
+     * tx=5 decode tail, shared by the plain reads, the daemon batch and the raw windowRR
+     * sample. [table] is the fetch's own snapshot: the scale must be the one that goes with
+     * the address the word was read from.
+     */
+    private fun decodeTx5(entry: FidEntry, raw: Int?, table: ResolvedFidTable): Any? = raw?.let {
+        val value = when (entry.decoder) {
+            Decoder.INT_SCALED -> ParamDecoder.decodeScaled(it, table.scale(entry.field))
+            else               -> ParamDecoder.decodeInt(it, entry.decoder)
+        }
+        if (value == null && rejectLog.shouldLog(entry.field)) {
+            val address = table.address(entry.field)
+            android.util.Log.w(
+                "NativeParsReader",
+                "decode rejected: ${entry.field} dev=${address.device} " +
+                    "fid=${address.fid} decoder=${entry.decoder} raw=$it"
+            )
+        }
+        value
+    }
+
+    /**
+     * Shared tail of both transports: settings capacity, domain guards, liveness
+     * gate, and DiParsData assembly. Input is the per-field decoded map produced
+     * by either the ADB loop or the daemon batch. Extracted in wave L so the two
+     * paths cannot drift.
+     */
+    private suspend fun assembleSnapshot(
+        decoded: Map<String, Any?>,
+        windowRrPrimaryRaw: Int?,
+        rememberSticky: Boolean = true,
+    ): DiParsData? {
+        // What the poll read this tick, for the `poll≠push` dump comparison. Shadow snapshots
+        // are compared and thrown away, so they must not overwrite the returned tick's values.
+        if (rememberSticky) PollFieldValues.record(decoded)
+        // Battery capacity comes from user settings, not from autoservice.
+        val batteryCapacityKwh = settings.getBatteryCapacity()
+
+        // ── Domain-level guards ──────────────────────────────────────────────
+        // Cell voltages: autoservice raw is in mV scaled to V via INT_SCALED ÷1000.
+        // Filter anything ≤ 0.5 V (BMS not reporting).
+        @Suppress("UNCHECKED_CAST")
+        fun <T> field(name: String): T? = decoded[name] as? T
+
+        val maxCellVoltage = field<Double>("maxCellVoltage")?.let { FieldGuards.double("maxCellVoltage", it) }
+        val minCellVoltage = field<Double>("minCellVoltage")?.let { FieldGuards.double("minCellVoltage", it) }
+
+        // 12V: autoservice path uses FLOAT_VOLT which returns real volts directly —
+        // no dual-unit handling needed. Filter ≤ 0.0 as unavailable.
+        val voltage12v = field<Double>("voltage12v")?.let { FieldGuards.double("voltage12v", it) }
+
+        val soc = field<Double>("soc")?.toInt()
+        val mileage = field<Double>("mileage")
+
+        // Liveness gate: if every primary signal is null, autoservice is unreachable
+        // or returning sentinels — treat as a fetch failure so consumers can retry.
+        if (soc == null && mileage == null && voltage12v == null) {
+            return null
+        }
+
+        // Battery temps decode with a -40 offset via INT_TEMP_C_OFS40. avgBatTemp
+        // was dropped on the native cutover; restore it as the mean of the two live
+        // cell extremes (the dedicated avg fid is a suspected 24h-cached statistic).
+        val maxBatTemp = field<Int>("maxBatTemp")
+        val minBatTemp = field<Int>("minBatTemp")
+        val avgBatTemp = when {
+            maxBatTemp != null && minBatTemp != null -> ((maxBatTemp + minBatTemp) / 2.0).roundToInt()
+            else -> maxBatTemp ?: minBatTemp
+        }
+
+        // Tech panel readings: INT_RAW passes anything the sentinel filter let through, so each
+        // value is held to its physical envelope ([FieldGuards.RANGES], shared with the push
+        // path) before it reaches the UI.
+        fun ranged(name: String): Int? = field<Int>(name)?.let { FieldGuards.int(name, it) }
+        val hvVoltage = ranged("hvVoltage")
+        val hvCurrent = field<Double>("hvCurrent")
+        val batteryPowerW = FieldGuards.batteryPowerW(hvVoltage, hvCurrent)
+
+        // Indirect rain detection: with rain-sensing auto-wipers enabled the wiper
+        // relay only fires when the sensor sees water. In manual wiper mode rain is
+        // unknowable from this signal, so keep null rather than a false "dry".
+        val wiperRelay = field<Int>("wiperRelay")
+        val autoWipers = field<Int>("autoWipers")
+        val rain = when {
+            autoWipers != 1 || wiperRelay == null -> null
+            wiperRelay != 0 -> 1
+            else -> 0
+        }
+
+        // Charging status: refine the gun-connect state with the BMS's own charging
+        // flag so "connected" (gun plugged in, BMS not confirming charge) and
+        // "charging" (BMS confirms) are told apart. Preserves the existing
+        // 0=none/1=connected/2=charging codes the ChargingStatus trigger + template
+        // already depend on — only the source of the value changes.
+        val chargeGunState = field<Int>("chargeGunState")
+        val bmsState = field<Int>("bmsState")
+        val chargingStatus = when {
+            chargeGunState == null -> null
+            // Not plugged in. gun<2 covers both 1=NONE and the 0 cold-start
+            // sentinel (SentinelDecoder passes 0 through unfiltered), matching the
+            // gun>=2==connected convention every other consumer already uses
+            // (LoopState, AgentTools, AutoserviceChargingDetector, Iternio). A bare
+            // ==1 would let a cold-start 0 fall through to connected/charging.
+            chargeGunState < 2 -> 0
+            bmsState == 1 -> 2
+            else -> 1
+        }
+
+        return DiParsData(
+            soc                 = soc,
+            speed               = field<Double>("speed")?.toInt(),
+            mileage             = mileage,
+            power               = field<Int>("power")?.toDouble(),
+            chargeGunState      = chargeGunState,
+            maxBatTemp          = maxBatTemp,
+            avgBatTemp          = avgBatTemp,
+            minBatTemp          = minBatTemp,
+            chargingStatus      = chargingStatus,  // derived from chargeGunState + bmsState (see above)
+            batteryCapacityKwh  = batteryCapacityKwh,
+            totalElecConsumption = field<Double>("totalElecConsumption"),
+            batteryRemainKwh    = field<Double>("batteryRemainKwh"),
+            voltage12v          = voltage12v,
+            maxCellVoltage      = maxCellVoltage,
+            minCellVoltage      = minCellVoltage,
+            exteriorTemp        = field<Int>("exteriorTemp"),
+            gear                = field<Int>("gear"),
+            powerState          = field<Int>("powerState"),
+            insideTemp          = field<Int>("insideTemp"),
+            acStatus            = field<Int>("acStatus"),
+            acTemp              = field<Int>("acTemp"),
+            fanLevel            = field<Int>("fanLevel"),
+            acCirc              = field<Int>("acCirc"),
+            doorFL              = field<Int>("doorFL"),
+            doorFR              = field<Int>("doorFR"),
+            doorRL              = field<Int>("doorRL"),
+            doorRR              = field<Int>("doorRR"),
+            windowFL            = field<Int>("windowFL"),
+            windowFR            = field<Int>("windowFR"),
+            windowRL            = field<Int>("windowRL"),
+            // DiLink 5.0 fid first. The alternative-generation fid stands in ONLY when the
+            // primary answered DEVICE_THE_FEATURE_LINK_ERROR, i.e. the fid does not exist on
+            // this generation (#79) — a transient sentinel (-10013, protocol error) must not
+            // be answered with a reading taken from a different fid.
+            windowRR            = field<Int>("windowRR")
+                ?: field<Int>("windowRRGen3")?.takeIf { windowRrPrimaryRaw == FEATURE_LINK_ERROR },
+            sunroof             = field<Int>("sunroof"),  // percent; 7 = vent detent
+            trunk               = field<Int>("trunk"),
+            frontTrunk          = field<Int>("frontTrunk"),
+            hood                = field<Int>("hood"),
+            seatbeltFL          = field<Int>("seatbeltFL"),
+            lockFL              = field<Int>("lockFL"),
+            tirePressFL         = field<Int>("tirePressFL"),
+            tirePressFR         = field<Int>("tirePressFR"),
+            tirePressRL         = field<Int>("tirePressRL"),
+            tirePressRR         = field<Int>("tirePressRR"),
+            // 0 = transient state while switching modes, not a mode — hold the previous
+            // value (see lastDriveMode) so "!=" rules see no edge during the switch.
+            driveMode           = stickyDriveMode(field<Int>("driveMode"), rememberSticky),
+            workMode            = field<Int>("workMode"),
+            autoPark            = null,  // not in FidMap (unknown source)
+            rain                = rain,  // derived from wiperRelay + autoWipers (see above)
+            lightLow            = field<Int>("lightLow"),
+            drl                 = field<Int>("drl"),
+            turnSignal          = field<Int>("turnSignal"),
+            acDefrostFront      = field<Int>("acDefrostFront"),
+            acWindMode          = field<Int>("acWindMode"),
+            acCtrlMode          = field<Int>("acCtrlMode"),
+            seatHeatDriver      = field<Int>("seatHeatDriver"),
+            seatVentDriver      = field<Int>("seatVentDriver"),
+            seatHeatPassenger   = field<Int>("seatHeatPassenger"),
+            seatVentPassenger   = field<Int>("seatVentPassenger"),
+            lightSide           = field<Int>("lightSide"),
+            lightHigh           = field<Int>("lightHigh"),
+            seatbeltFR          = field<Int>("seatbeltFR"),
+            occupancyFL         = field<Int>("occupancyFL"),
+            occupancyFR         = field<Int>("occupancyFR"),
+            occupancyRL         = field<Int>("occupancyRL"),
+            occupancyRM         = field<Int>("occupancyRM"),
+            occupancyRR         = field<Int>("occupancyRR"),
+            lightLevel          = field<Int>("lightLevel"),
+            keyBatteryStatus    = field<Int>("keyBatteryStatus"),
+            wiperRelay          = wiperRelay,
+            autoWipers          = autoWipers,
+            bmsState            = bmsState,
+            insulationKohm      = ranged("insulationKohm"),
+            // -40 is the scale floor the firmware reports for a motor/inverter the car does not
+            // have (#186: FWD Song Plus showed -40 for the rear pair); treat it as absent.
+            motorTempFront      = ranged("motorTempFront"),
+            motorTempRear       = ranged("motorTempRear"),
+            inverterTempFront   = ranged("inverterTempFront"),
+            inverterTempRear    = ranged("inverterTempRear"),
+            hvVoltage           = hvVoltage,
+            hvCurrent           = hvCurrent,
+            batteryPowerW       = batteryPowerW,
+            bmsMaxChargeKw      = field<Double>("bmsMaxChargeKw")
+                ?.let { FieldGuards.double("bmsMaxChargeKw", it) },
+            bmsMaxDischargeAllowKw = field<Double>("bmsMaxDischargeAllowKw")
+                ?.let { FieldGuards.double("bmsMaxDischargeAllowKw", it) },
+            bmsMaxDischargeKw   = ranged("bmsMaxDischargeKw"),
+            motorRpmFront       = ranged("motorRpmFront"),
+            motorRpmRear        = ranged("motorRpmRear"),
+            motorCurrentFront   = motorAmps(decoded, "motorCurrentFront"),
+            motorCurrentRear    = motorAmps(decoded, "motorCurrentRear"),
+            compressorW         = ranged("compressorW"),
+            tyreTempFL          = ranged("tyreTempFL"),
+            tyreTempFR          = ranged("tyreTempFR"),
+            tyreTempRL          = ranged("tyreTempRL"),
+            tyreTempRR          = ranged("tyreTempRR"),
+            pedalAccel          = ranged("pedalAccel"),
+            pedalBrake          = ranged("pedalBrake"),
+            chargerConnectState = field<Int>("chargerConnectState"),
+            chargeConnectIndicator = field<Int>("chargeConnectIndicator"),
+            driveModeTarget     = field<Int>("driveModeTarget"),
+            seatbeltRL          = field<Int>("seatbeltRL"),
+            seatbeltRM          = field<Int>("seatbeltRM"),
+            seatbeltRR          = field<Int>("seatbeltRR"),
+            rearBeltSettingRL   = field<Int>("rearBeltSettingRL"),
+            rearBeltSettingRM   = field<Int>("rearBeltSettingRM"),
+            rearBeltSettingRR   = field<Int>("rearBeltSettingRR"),
+            // Present in [decoded] only when the fetch read FidMap.hybrid (HYBRID car).
+            fuelPercent         = field<Int>("fuelPercent"),
+            fuelRangeKm         = field<Int>("fuelRangeKm"),
+            fuelTotalL          = field<Double>("fuelTotalL"),
+            mileageHevKm        = field<Int>("mileageHevKm"),
+            mileageEvKm         = field<Int>("mileageEvKm"),
+            engineRpm           = field<Int>("engineRpm"),
+            evRangeKm           = field<Int>("evRangeKm"),
+        )
+    }
+
+    /**
+     * 0 from the driveMode fid means "switching", so it is answered with the last real mode.
+     * Null (fid unavailable) passes through, and so does 0 until the car has reported a mode
+     * once in this process — there is nothing to hold yet.
+     *
+     * [remember] is false for the shadow snapshot VALIDATING builds only to compare
+     * transports: a sample that is never returned to consumers must not become the value a
+     * later production snapshot holds.
+     */
+    private fun stickyDriveMode(raw: Int?, remember: Boolean): Int? {
+        if (raw == null) return null
+        if (raw != 0) {
+            if (remember) lastDriveMode = raw
+            return raw
+        }
+        return lastDriveMode
+    }
+
+    private companion object {
+        /** DEVICE_THE_FEATURE_LINK_ERROR: the fid is absent on this generation. */
+        const val FEATURE_LINK_ERROR = SentinelDecoder.FEATURE_LINK_ERROR
+
+        val windowRrEntry: FidEntry = FidMap.entries.first { it.field == "windowRR" }
+        val windowRrIndex: Int = FidMap.entries.indexOf(windowRrEntry)
+    }
+}
+
+/**
+ * Motor current as DiParsData holds it: the decoded reading, dropped when it falls outside the
+ * physical envelope. Both motors share the traction bus voltage, so the two magnitudes alone
+ * give the front/rear power split.
+ */
+private fun motorAmps(decoded: Map<String, Any?>, field: String): Float? =
+    (decoded[field] as? Double)?.let { FieldGuards.double(field, it) }?.toFloat()
+
+/** The split as the «Техника» card computes it, from the very values the card is given. */
+private fun splitText(decoded: Map<String, Any?>): String =
+    when (
+        val split = motorSplitPercent(
+            motorAmps(decoded, "motorCurrentFront"),
+            motorAmps(decoded, "motorCurrentRear"),
+        )
+    ) {
+        null, MotorSplit.Idle -> "-"
+        is MotorSplit.Share -> "${split.frontPercent}%/${split.rearPercent}%"
+    }
+
+/**
+ * Decode of one [FidMap.hybrid] word: the raw int for tx=5, the IEEE-754 bits for tx=7.
+ * Sentinels (255, 2046, 1048575, 8191, 65535, float -1/NaN, zero litres) come out null.
+ */
+private fun decodeHybrid(entry: FidEntry, word: Int): Any? = when (entry.transact) {
+    5 -> ParamDecoder.decodeInt(word, entry.decoder)
+    7 -> ParamDecoder.decodeFloat(word, entry.decoder)
+    else -> null
+}
+
+/** The [FidMap.hybrid] fields read one by one over the plain path, at their compiled addresses. */
+private suspend fun readHybridViaAdb(autoservice: AutoserviceClient): Map<String, Any?> =
+    FidMap.hybrid.associate { entry ->
+        entry.field to when (entry.transact) {
+            5 -> autoservice.getInt(entry.device, entry.fid)?.let { decodeHybrid(entry, it) }
+            7 -> autoservice.getFloat(entry.device, entry.fid)
+                ?.let { decodeHybrid(entry, java.lang.Float.floatToRawIntBits(it)) }
+            else -> null
+        }
+    }
+
+/** Raw tail word of one [FidMap.hybrid] field, "?" when the batch did not read it. */
+private fun hybridRaw(pairs: List<Pair<Int, Int>>, field: String): String {
+    val j = FidMap.hybrid.indexOfFirst { it.field == field }
+    val (status, word) = pairs.getOrNull(FidMap.entries.size + j) ?: return "?"
+    return if (status != 0) "?" else word.toString()
+}

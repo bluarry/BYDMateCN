@@ -1,0 +1,135 @@
+package com.bydmatecn.app.data.loop
+
+import android.os.SystemClock
+import android.util.Log
+import com.bydmatecn.app.data.local.EnergyDataReader
+import com.bydmatecn.app.data.local.dao.LastStateDao
+import com.bydmatecn.app.data.nativestack.ParsReader
+import com.bydmatecn.app.data.remote.DiParsData
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * A polled snapshot and when its read started, on the monotonic clock
+ * ([SystemClock.elapsedRealtime]). The time is set once, where the snapshot is produced, so a
+ * replay to a later subscriber (a service restarted in the same process) keeps the old time.
+ */
+data class TimedSnapshot(val data: DiParsData, val measuredAtElapsedMs: Long)
+
+/**
+ * Single owner of NativeParsReader. All read consumers subscribe to [flow].
+ * Cadence is decided per tick via [LoopFsm.classify]; backoff applies when
+ * fetch() returns null.
+ */
+@Singleton
+class SharedAdaptiveLoop constructor(
+    private val parsReader: ParsReader,
+    private val lastStateDao: LastStateDao,
+    private val energyDataReader: EnergyDataReader,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val cadence: CadenceConfig = CadenceConfig.default(),
+    private val elapsedNow: () -> Long = SystemClock::elapsedRealtime,
+) {
+    private val _flow = MutableSharedFlow<DiParsData>(
+        replay = 1, extraBufferCapacity = 0,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val flow: SharedFlow<DiParsData> = _flow.asSharedFlow()
+
+    /** [flow] with the measurement time of each snapshot. */
+    private val _samples = MutableSharedFlow<TimedSnapshot>(
+        replay = 1, extraBufferCapacity = 0,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val samples: SharedFlow<TimedSnapshot> = _samples.asSharedFlow()
+
+    private val _connected = MutableStateFlow(false)
+    val connected: StateFlow<Boolean> = _connected.asStateFlow()
+
+    private var job: Job? = null
+
+    companion object {
+        /** Max staleness of last_state.ts between writes; 5× inside TripRecorder's 5-min cold-start gap. */
+        const val HEARTBEAT_MS = 60_000L
+        private const val TAG = "SharedAdaptiveLoop"
+    }
+
+    @Synchronized
+    fun start(scope: CoroutineScope): Job {
+        job?.takeIf { it.isActive }?.let { return it }
+        job = scope.launch(dispatcher) { runLoop() }
+        return job!!
+    }
+
+    fun stop() { job?.cancel(); job = null }
+
+    private suspend fun runLoop() {
+        var consecutiveNull = 0
+        while (true) {
+            // Taken before the read: the snapshot is never younger than this.
+            val readStartedAt = elapsedNow()
+            val data = runCatching { parsReader.fetch() }.getOrNull()
+            if (data == null) {
+                consecutiveNull++
+                _connected.value = false
+                val backoff = (cadence.intervalFor(LoopState.IDLE) * pow15(consecutiveNull))
+                    .coerceAtMost(CadenceConfig.MAX_POLL_INTERVAL_MS)
+                delay(backoff)
+                continue
+            }
+            consecutiveNull = 0
+            _connected.value = true
+            _samples.emit(TimedSnapshot(data, readStartedAt))
+            _flow.emit(data)
+            runCatching { persistSnapshot(data) }
+                .onFailure { Log.w(TAG, "persistSnapshot failed, loop continues", it) }
+            delay(cadence.intervalFor(LoopFsm.classify(data)))
+        }
+    }
+
+    private suspend fun persistSnapshot(data: DiParsData) {
+        val now = System.currentTimeMillis()
+        val prev = lastStateDao.getCurrent()
+        val ignition = data.powerState
+        // Skip the fsync write when nothing changed and the heartbeat is fresh.
+        // (Spelled as one positive condition so the compiler smart-casts prev.)
+        if (prev != null &&
+            prev.soc == data.soc &&
+            prev.mileage == data.mileage &&
+            prev.totalElec == data.totalElecConsumption &&
+            prev.ignition == ignition &&
+            now - prev.ts < HEARTBEAT_MS
+        ) return
+        // Snapshot-only write: never touches open_trip_id / trip_start_*, which TripRecorder
+        // owns. A whole-row upsert() here raced with TripRecorder's openTrip()/clearOpenTrip()
+        // between getCurrent() above and the write, and could wipe a trip opened or closed
+        // concurrently with this tick.
+        lastStateDao.writeSnapshot(
+            ts = now,
+            soc = data.soc,
+            mileage = data.mileage,
+            totalElec = data.totalElecConsumption,
+            ignition = ignition,
+            energydataAvailable = if (energyDataReader.isAvailable()) 1 else 0,
+        )
+    }
+
+    private fun pow15(n: Int): Long {
+        var v = 1.0
+        repeat(n) { v *= 1.5 }
+        return v.toLong().coerceAtLeast(1L)
+    }
+}

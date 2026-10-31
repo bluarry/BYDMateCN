@@ -7,7 +7,7 @@
         errorLine1="                AudioRecord(src, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBuf)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/voice/AudioCapture.kt"
+            file="src/main/kotlin/com/bydmatecn/app/voice/AudioCapture.kt"
             line="169"
             column="17"/>
     </issue>
@@ -18,7 +18,7 @@
         errorLine1="        prefs.edit().putString(KEY_LANG, lang).commit()"
         errorLine2="                                               ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/data/local/LocalePreferences.kt"
+            file="src/main/kotlin/com/bydmatecn/app/data/local/LocalePreferences.kt"
             line="13"
             column="48"/>
     </issue>
@@ -29,7 +29,7 @@
         errorLine1="        prefs.edit().putBoolean(KEY_SETUP_MIRROR, true).commit()"
         errorLine2="                                                        ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/data/local/LocalePreferences.kt"
+            file="src/main/kotlin/com/bydmatecn/app/data/local/LocalePreferences.kt"
             line="21"
             column="57"/>
     </issue>
@@ -40,7 +40,7 @@
         errorLine1="        val sm = Class.forName(&quot;android.os.ServiceManager&quot;)"
         errorLine2="                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/data/vehicle/HelperClient.kt"
+            file="src/main/kotlin/com/bydmatecn/app/data/vehicle/HelperClient.kt"
             line="268"
             column="18"/>
     </issue>
@@ -51,7 +51,7 @@
         errorLine1="    val smCls = Class.forName(&quot;android.os.ServiceManager&quot;)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/helper/HelperDaemon.kt"
+            file="src/main/kotlin/com/bydmatecn/app/helper/HelperDaemon.kt"
             line="94"
             column="17"/>
     </issue>
@@ -62,7 +62,7 @@
         errorLine1="    Class.forName(&quot;android.app.ActivityTaskManager&quot;).getMethod(&quot;getService&quot;).invoke(null)"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/helper/HelperDaemon.kt"
+            file="src/main/kotlin/com/bydmatecn/app/helper/HelperDaemon.kt"
             line="412"
             column="5"/>
     </issue>
@@ -73,7 +73,7 @@
         errorLine1="    val atCls = Class.forName(&quot;android.app.ActivityThread&quot;)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/helper/HelperDaemon.kt"
+            file="src/main/kotlin/com/bydmatecn/app/helper/HelperDaemon.kt"
             line="489"
             column="17"/>
     </issue>
@@ -84,7 +84,7 @@
         errorLine1="        val cfg = Configuration(newBase.resources.configuration).apply { setLocale(locale) }"
         errorLine2="                                                                         ~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/MainActivity.kt"
+            file="src/main/kotlin/com/bydmatecn/app/MainActivity.kt"
             line="57"
             column="74"/>
     </issue>
@@ -326,7 +326,7 @@
         errorLine1="    modifier: Modifier = Modifier"
         errorLine2="    ~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/components/Components.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/components/Components.kt"
             line="396"
             column="5"/>
     </issue>
@@ -337,7 +337,7 @@
         errorLine1="                        val durationText by produceState("
         errorLine2="                                            ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/dashboard/DashboardScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/dashboard/DashboardScreen.kt"
             line="138"
             column="45"/>
     </issue>
@@ -348,7 +348,7 @@
         errorLine1="    val durationText by produceState(initialValue = formatDurationShort(context, sessionStartedAt), sessionStartedAt) {"
         errorLine2="                        ~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/widget/FloatingWidgetView.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/widget/FloatingWidgetView.kt"
             line="296"
             column="25"/>
     </issue>
@@ -546,7 +546,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= 28) {"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/BYDMateApp.kt"
+            file="src/main/kotlin/com/bydmatecn/app/BYDMateApp.kt"
             line="65"
             column="13"/>
     </issue>
@@ -557,7 +557,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/data/automation/ConfirmOverlayManager.kt"
+            file="src/main/kotlin/com/bydmatecn/app/data/automation/ConfirmOverlayManager.kt"
             line="107"
             column="17"/>
     </issue>
@@ -568,7 +568,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pi.longVersionCode"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/data/vehicle/HelperBootstrap.kt"
+            file="src/main/kotlin/com/bydmatecn/app/data/vehicle/HelperBootstrap.kt"
             line="133"
             column="13"/>
     </issue>
@@ -579,7 +579,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/overlay/ListeningOverlay.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/overlay/ListeningOverlay.kt"
             line="209"
             column="13"/>
     </issue>
@@ -590,7 +590,7 @@
         errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &amp;&amp;"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/MainActivity.kt"
+            file="src/main/kotlin/com/bydmatecn/app/MainActivity.kt"
             line="165"
             column="13"/>
     </issue>
@@ -601,7 +601,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/overlay/OverlayNotificationManager.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/overlay/OverlayNotificationManager.kt"
             line="73"
             column="17"/>
     </issue>
@@ -612,7 +612,7 @@
         errorLine1="                val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P)"
         errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsViewModel.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsViewModel.kt"
             line="1365"
             column="39"/>
     </issue>
@@ -623,7 +623,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/widget/WidgetController.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/widget/WidgetController.kt"
             line="145"
             column="17"/>
     </issue>
@@ -634,7 +634,7 @@
         errorLine1="            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)"
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/widget/WidgetController.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/widget/WidgetController.kt"
             line="528"
             column="17"/>
     </issue>
@@ -645,7 +645,7 @@
         errorLine1="    private var overlayView: View? = null"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/cluster/ClusterProjectionManager.kt"
+            file="src/main/kotlin/com/bydmatecn/app/cluster/ClusterProjectionManager.kt"
             line="106"
             column="5"/>
     </issue>
@@ -656,7 +656,7 @@
         errorLine1="    private var rootContainer: android.widget.FrameLayout? = null"
         errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/widget/WidgetController.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/widget/WidgetController.kt"
             line="108"
             column="5"/>
     </issue>
@@ -667,7 +667,7 @@
         errorLine1="    var startTs by remember(charge.id) { mutableStateOf(charge.startTs) }"
         errorLine2="                                         ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/charges/ChargeEditDialog.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/charges/ChargeEditDialog.kt"
             line="107"
             column="42"/>
     </issue>
@@ -678,7 +678,7 @@
         errorLine1="        mutableStateOf(prefs.getInt(ClusterProjectionManager.KEY_WIDTH_PCT, MAX_PROJECTION_PCT))"
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsScreen.kt"
             line="1011"
             column="9"/>
     </issue>
@@ -689,7 +689,7 @@
         errorLine1="        mutableStateOf(prefs.getInt(ClusterProjectionManager.KEY_HEIGHT_PCT, MAX_PROJECTION_PCT))"
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsScreen.kt"
             line="1014"
             column="9"/>
     </issue>
@@ -700,7 +700,7 @@
         errorLine1="        mutableStateOf(prefs.getInt(ClusterProjectionManager.KEY_OFFSET_X_PCT, CENTER_OFFSET_PCT))"
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsScreen.kt"
             line="1017"
             column="9"/>
     </issue>
@@ -711,7 +711,7 @@
         errorLine1="        mutableStateOf(prefs.getInt(ClusterProjectionManager.KEY_OFFSET_Y_PCT, CENTER_OFFSET_PCT))"
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsScreen.kt"
             line="1020"
             column="9"/>
     </issue>
@@ -722,7 +722,7 @@
         errorLine1="        mutableStateOf(prefs.getInt(ClusterProjectionManager.KEY_SCALE_PCT, DEFAULT_SCALE_PCT))"
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsScreen.kt"
             line="1023"
             column="9"/>
     </issue>
@@ -733,7 +733,7 @@
         errorLine1="        mutableStateOf(prefs.getInt(ClusterProjectionManager.KEY_TRIGGER_KEYCODE, DEFAULT_TRIGGER_KEYCODE))"
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsScreen.kt"
             line="1037"
             column="9"/>
     </issue>
@@ -744,7 +744,7 @@
         errorLine1="            var ratePct by remember(state.ttsRate) { mutableStateOf((state.ttsRate * 100).roundToInt()) }"
         errorLine2="                                                     ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsScreen.kt"
             line="2086"
             column="54"/>
     </issue>
@@ -755,7 +755,7 @@
         errorLine1="            var liveliness by remember(state.ttsLiveliness) { mutableStateOf(state.ttsLiveliness) }"
         errorLine2="                                                              ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/settings/SettingsScreen.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/settings/SettingsScreen.kt"
             line="2094"
             column="63"/>
     </issue>
@@ -766,7 +766,7 @@
         errorLine1="    private var alphaState = mutableStateOf(1.0f)"
         errorLine2="                             ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/widget/WidgetController.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/widget/WidgetController.kt"
             line="94"
             column="30"/>
     </issue>
@@ -777,7 +777,7 @@
         errorLine1="    private var scaleState = mutableStateOf(1.0f)"
         errorLine2="                             ~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/widget/WidgetController.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/widget/WidgetController.kt"
             line="95"
             column="30"/>
     </issue>
@@ -2208,7 +2208,7 @@
         errorLine1="        widgetView?.let { v -> v.setOnTouchListener(null) }"
         errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/widget/WidgetController.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/widget/WidgetController.kt"
             line="284"
             column="32"/>
     </issue>
@@ -2219,7 +2219,7 @@
         errorLine1="        override fun onTouch(v: android.view.View, event: MotionEvent): Boolean {"
         errorLine2="                     ~~~~~~~">
         <location
-            file="src/main/kotlin/com/bydmate/app/ui/widget/WidgetController.kt"
+            file="src/main/kotlin/com/bydmatecn/app/ui/widget/WidgetController.kt"
             line="655"
             column="22"/>
     </issue>

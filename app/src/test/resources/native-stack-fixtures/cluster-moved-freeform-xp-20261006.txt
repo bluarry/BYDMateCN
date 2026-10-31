@@ -44,4 +44,4 @@
 16:20:26.257 screen cluster-loss pkg=ru.auto.music loss=fled to=0 display=4 strike=2 dpi=160
 16:20:26.469 screen cluster-density-unsafe pkg=ru.auto.music dpi=160 loss=fled_to_display_0 reset=true
 16:22:24.570 screen cluster-loss pkg=ru.auto.music loss=fled to=0 display=4 strike=1 dpi=0
-16:22:39.947 bydmate_helper: pullback light path failed: task=54 state=TaskModeState(windowingMode=5, displayId=0) -> remove+relaunch
+16:22:39.947 bydmatecn_helper: pullback light path failed: task=54 state=TaskModeState(windowingMode=5, displayId=0) -> remove+relaunch

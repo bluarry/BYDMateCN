@@ -669,7 +669,7 @@
     <string name="welcome_autostart_dilink_hint">Калі аўтазапуск не спрацаваў, дадайце ў Di+:</string>
     <string name="welcome_autostart_dilink_instruction">Di+ → Predefined → Startup tasks</string>
     <string name="welcome_autostart_command_copied_toast">Скапіравана!</string>
-    <string name="welcome_autostart_command_explanation">打开应用 = «адкрыць праграму» + імя пакета.\nДля дзвюх праграм праз кропку з коскай:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmate.app</string>
+    <string name="welcome_autostart_command_explanation">打开应用 = «адкрыць праграму» + імя пакета.\nДля дзвюх праграм праз кропку з коскай:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmatecn.app</string>
     <string name="welcome_system_settings_section_title">Сістэмныя налады</string>
     <string name="welcome_autostart_open_settings_button">Адкрыць налады аўтазапуску</string>
     <string name="welcome_autostart_open_settings_error">Не ўдалося адкрыць налады аўтазапуску DiLink. Адкрыты налады праграмы.</string>

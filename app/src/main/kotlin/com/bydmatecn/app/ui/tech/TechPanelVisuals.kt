@@ -1,0 +1,88 @@
+package com.bydmatecn.app.ui.tech
+
+import com.bydmatecn.app.data.repository.equivalentFullCycles
+import com.bydmatecn.app.data.repository.fullCycleCapacityKwh
+import com.bydmatecn.app.data.repository.fullCycleKwh
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.text.NumberFormat
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
+/**
+ * Scale and threshold maths behind the small graphics on the «Техника» screen, kept out of the
+ * composables so the numbers can be tested without a UI.
+ */
+internal object TechPanelVisuals {
+
+    /** Overheat zones of a motor / inverter temperature. */
+    enum class TempZone { OK, WARM, HOT }
+
+    /** Yellow zone starts here, °C. */
+    const val TEMP_WARM_C = 90
+
+    /** Red zone starts here, °C. */
+    const val TEMP_HOT_C = 120
+
+    /** Full scale of the temperature bars, °C. */
+    const val TEMP_FULL_SCALE_C = 150.0
+
+    /** A tyre is flagged when it is this far from the average of the others. */
+    private const val TYRE_DEVIATION = 0.10
+
+    /**
+     * Scale of the cell range strip. Defaults to the LFP working window and widens itself when a
+     * pack (NMC, or a cell out of the window) sits outside it, so the band always fits.
+     */
+    fun cellScale(min: Double, max: Double): Pair<Double, Double> =
+        minOf(3.25, min - 0.05) to maxOf(3.40, max + 0.05)
+
+    fun tempZone(temp: Int): TempZone = when {
+        temp < TEMP_WARM_C -> TempZone.OK
+        temp < TEMP_HOT_C -> TempZone.WARM
+        else -> TempZone.HOT
+    }
+
+    /**
+     * Marks the tyres whose pressure is more than 10% off the average of the reported ones.
+     * With fewer than two readings there is nothing to compare against, so nothing is flagged.
+     */
+    /** Ready-to-draw parts of the «Полных циклов» row: «87» plus «6 340 кВт·ч ÷ 72,9». */
+    data class FullCycles(val value: String, val totalKwh: String, val capacity: String)
+
+    /**
+     * Full charge cycles of the pack, off the BMS lifetime counter when the car reports one and
+     * off the app's own charging sum otherwise ([fullCycleKwh]) — the same choice the «Зарядки»
+     * screen makes. The divisor is corrected for SoH ([fullCycleCapacityKwh]) and the caption
+     * shows that divisor, not the nominal. Null while neither source has anything to divide; a
+     * «0» would read as a measured value. Grouping and the decimal separator follow the device
+     * locale, like every other number on this screen.
+     */
+    fun fullCycles(
+        bmsLifetimeKwh: Double?,
+        chargedKwh: Double?,
+        nominalCapacityKwh: Double,
+        sohPercent: Float?,
+        locale: Locale = Locale.getDefault(),
+    ): FullCycles? {
+        val totalKwh = fullCycleKwh(bmsLifetimeKwh, chargedKwh) ?: return null
+        if (nominalCapacityKwh <= 0.0) return null
+        val lifetimeSource = bmsLifetimeKwh != null && bmsLifetimeKwh > 0.0
+        val cycles = equivalentFullCycles(totalKwh, nominalCapacityKwh, sohPercent, lifetimeSource)
+        val kwh = NumberFormat.getIntegerInstance(locale)
+        val capacity = DecimalFormat("0.0", DecimalFormatSymbols.getInstance(locale))
+        return FullCycles(
+            value = cycles.roundToInt().toString(),
+            totalKwh = kwh.format(totalKwh),
+            capacity = capacity.format(fullCycleCapacityKwh(nominalCapacityKwh, sohPercent, lifetimeSource)),
+        )
+    }
+
+    fun tyreDeviates(pressures: List<Int?>): List<Boolean> {
+        val known = pressures.filterNotNull()
+        if (known.size < 2) return List(pressures.size) { false }
+        val mean = known.sum().toDouble() / known.size
+        return pressures.map { it != null && abs(it - mean) > TYRE_DEVIATION * mean }
+    }
+}

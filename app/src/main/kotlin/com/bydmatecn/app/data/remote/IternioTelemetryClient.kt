@@ -1,0 +1,361 @@
+package com.bydmatecn.app.data.remote
+
+import android.util.Log
+import com.bydmatecn.app.data.autoservice.BatteryReading
+import com.bydmatecn.app.data.autoservice.ChargingReading
+import com.bydmatecn.app.data.nativestack.VehicleKind
+import com.bydmatecn.app.data.nativestack.VehicleKindMonitor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.math.abs
+import kotlin.math.round
+
+/**
+ * Sends live vehicle telemetry to the legacy Iternio Telemetry API
+ * (`/1/tlm/send`) for A Better Route Planner.
+ *
+ * Spec: https://documenter.getpostman.com/view/7396339/SWTK5a8w
+ *
+ * Body: `application/x-www-form-urlencoded` with `token` (user) + `tlm` (JSON).
+ * `api_key` (developer) is sent as a query parameter.
+ *
+ * Power sign: BYD instantaneous power matches Iternio convention.
+ * Positive = consumption (battery → motor/HVAC), negative = regen/charging
+ * (motor/grid → battery). Pass through without inverting.
+ *
+ * GPS is OFF by default — ABRP runs as a native Android app on DiLink and
+ * reads location from the OS itself; sending it unconditionally would leak
+ * position to a third-party server. Some ABRP setups, however, anchor the
+ * car marker to telemetry/cloud state instead of device GPS, so a Settings
+ * toggle lets the user opt into sending lat/lon (+heading).
+ */
+@Singleton
+class IternioTelemetryClient @Inject constructor(
+    private val httpClient: OkHttpClient,
+    private val vehicleKindMonitor: VehicleKindMonitor,
+) {
+    companion object {
+        private const val TAG = "IternioTelemetry"
+        private const val SEND_URL = "https://api.iternio.com/1/tlm/send"
+        // Gun-state values that mean the car is on a DC fast charger.
+        // 3=DC, 4=AC_DC (combo CCS), 5=VTOL — all bypass the onboard AC charger.
+        private val DCFC_GUN_STATES = setOf(3, 4, 5)
+        // Iternio rejects /1/tlm/send with HTTP 401 "Unauthorized Key" when no
+        // api_key query param is provided. This is the long-standing community
+        // key used by OVMS and teslamate-abrp — both major open-source ABRP
+        // bridges. We embed it as a fallback so users don't need to register
+        // their own developer key. Custom key from Settings still takes
+        // precedence when set.
+        const val DEFAULT_API_KEY = "32b2162f-9599-4647-8139-66e9f9528370"
+        // Sanity envelope for ENG_POW. Leopard 3 worst case: ~250 kW discharge
+        // on launch, ~150 kW DC charge. [-300, +500] covers it with margin;
+        // anything beyond is a sentinel or Parcel parse glitch.
+        private const val POWER_MIN_KW = -300
+        private const val POWER_MAX_KW = 500
+        // Traction-battery envelope on a 400 V pack. Below 200 V the reading is a sentinel or a
+        // BMS that is not talking, not a live bus.
+        private const val HV_VOLT_MIN = 200
+        private const val HV_VOLT_MAX = 900
+        private const val HV_AMP_MAX = 2000.0
+        // Climate set point range of the DiLink dial; anything outside is not a set point.
+        private const val HVAC_SETPOINT_MIN = 15
+        private const val HVAC_SETPOINT_MAX = 32
+    }
+
+    /**
+     * @param apiKey Developer API key issued by Iternio. Optional from caller
+     *               perspective — when blank, falls back to [DEFAULT_API_KEY]
+     *               so the request still passes Iternio's `api_key` gate.
+     * @param userToken Per-vehicle live-data token from ABRP "Generic" provider.
+     * @param data Live DiPars snapshot. SOC must be present — without it the
+     *             call returns a failure without hitting the network.
+     * @param nominalCapacityKwh Nominal battery capacity (user setting; 72.9 on
+     *                           Leopard 3). Sent as Iternio `capacity` so ABRP
+     *                           can translate SOC% to kWh. We do NOT use the
+     *                           DiPars `batteryCapacityKwh` field — on Leopard
+     *                           3 it returns ~4.5 (not nominal capacity).
+     * @param battery Optional autoservice battery snapshot (Leopard 3 only).
+     *                Adds `soh` when SoH is readable.
+     * @param charging Optional autoservice charging snapshot (Leopard 3 only).
+     *                 Adds `is_dcfc` and `kwh_charged` when readable.
+     * @param carModel Optional ABRP car-model code from settings.
+     * @param enginePowerKw Optional live battery power from autoservice ENG_POW
+     *                     (fid 339738656, dev=1012, tx=5). When present takes
+     *                     priority over `data.power` — autoservice reads
+     *                     battery-side draw directly, while DiPars `power` is
+     *                     motor mechanical and often null in reduced-payload
+     *                     mode on Leopard 3.
+     * @param sampleTimeMs Wall-clock time at which the snapshot was captured
+     *                    (epoch millis). Used for the `utc` field so ABRP
+     *                    plots samples at the moment of measurement, not at
+     *                    the moment our HTTP call lands. Defaults to now when
+     *                    null (call-time fallback).
+     *
+     * The base payload carries no position. TrackingService adds `lat`/`lon`/`heading` per
+     * target behind each target's own toggle (ABRP opt-in, webhook opt-in): ABRP on the head
+     * unit reads GPS itself, and two sources make the car marker jump (ABRP tickets, June 2026).
+     */
+    suspend fun send(
+        apiKey: String,
+        userToken: String,
+        data: DiParsData,
+        nominalCapacityKwh: Double,
+        battery: BatteryReading?,
+        charging: ChargingReading?,
+        carModel: String?,
+        enginePowerKw: Int? = null,
+        sampleTimeMs: Long? = null,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val token = userToken.trim()
+        if (token.isEmpty()) return@withContext Result.failure(IllegalArgumentException("пустой токен"))
+        val telemetry = try {
+            buildTelemetry(
+                data = data,
+                nominalCapacityKwh = nominalCapacityKwh,
+                battery = battery,
+                charging = charging,
+                carModel = carModel,
+                enginePowerKw = enginePowerKw,
+                sampleTimeMs = sampleTimeMs,
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "отправка не удалась: ${e.message}")
+            return@withContext Result.failure(e)
+        }
+        // Iternio docs: SOC is the one truly required telemetry field. Without
+        // it the route planner has nothing to update, so we skip the call.
+        if (telemetry == null) return@withContext Result.failure(IllegalStateException("SOC недоступен"))
+        sendTelemetry(apiKey, token, telemetry)
+    }
+
+    /**
+     * Build the Iternio telemetry payload. Extracted from [send] so the same
+     * JSON can be reused by other sinks (custom webhook) without a second
+     * round of autoservice reads.
+     *
+     * @return null when SOC is missing — the one field Iternio requires.
+     */
+    internal fun buildTelemetry(
+        data: DiParsData,
+        nominalCapacityKwh: Double,
+        battery: BatteryReading?,
+        charging: ChargingReading?,
+        carModel: String?,
+        enginePowerKw: Int? = null,
+        sampleTimeMs: Long? = null,
+    ): JSONObject? {
+        val soc = data.soc ?: return null
+
+        val telemetry = JSONObject()
+        val utc = (sampleTimeMs ?: System.currentTimeMillis()) / 1000L
+        telemetry.put("utc", utc)
+        telemetry.put("soc", soc)
+
+        data.speed?.let { telemetry.put("speed", it) }
+        // Power priority: autoservice ENG_POW > DiPars data.power > 0.
+        // ABRP rates data accuracy by samples-per-10s of each field;
+        // dropping `power` when both sources are dead pulls accuracy to
+        // ~12%. We always send the field (0 when sources are unavailable)
+        // and tag the chosen source in logcat so a missing live source
+        // shows up as `power_source=zero_fallback`, distinct from a
+        // genuine 0 kW snapshot during coast/standstill.
+        // On a DM-i only the pack power (V × A) goes out: never the motor's ENG_POW, DiPars or 0.
+        val hybrid = vehicleKindMonitor.kind.value == VehicleKind.HYBRID
+        val sanePower = enginePowerKw?.takeIf { !hybrid && it in POWER_MIN_KW..POWER_MAX_KW }
+        val isChargingNow = isCharging(data, charging)
+        // Traction battery V/A. Our hvCurrent already follows the Iternio convention —
+        // discharge positive, charge negative (FidMap: «negative = charging», #153) — so the
+        // reading goes out as it is read.
+        val hvVolt = data.hvVoltage?.takeIf { it in HV_VOLT_MIN..HV_VOLT_MAX }
+        val hvAmp = data.hvCurrent?.takeIf { it.isFinite() && abs(it) <= HV_AMP_MAX }
+        // ENG_POW is the MOTOR, so it reads 0 on a charging car. With V and A in hand the real
+        // input power is known, and Iternio wants input negative.
+        val chargePowerKw = if (isChargingNow && hvVolt != null && hvAmp != null) {
+            -(abs(hvVolt * hvAmp) / 1000.0).let { kw -> round(kw * 10) / 10 }
+        } else null
+        // On a DM-i V × A is the pack power.
+        val hybridPowerKw = if (hybrid && hvVolt != null && hvAmp != null) {
+            (hvVolt * hvAmp / 1000.0).let { kw -> round(kw * 10) / 10 }
+        } else null
+        val powerKw: Double? = if (hybrid) chargePowerKw ?: hybridPowerKw else chargePowerKw ?: sanePower?.toDouble() ?: data.power ?: 0.0
+        val powerSource = when {
+            chargePowerKw != null -> "hv_charging"
+            hybridPowerKw != null -> "hv_hybrid"
+            hybrid -> "none"
+            sanePower != null -> "autoservice"
+            data.power != null -> "diplus"
+            else -> "zero_fallback"
+        }
+        powerKw?.let { telemetry.put("power", it) }
+        hvVolt?.let { telemetry.put("voltage", it) }
+        hvAmp?.let { telemetry.put("current", it) }
+        // Climate set point — what the driver asked for, not the cabin reading.
+        data.acTemp?.takeIf { it in HVAC_SETPOINT_MIN..HVAC_SETPOINT_MAX }?.let {
+            telemetry.put("hvac_setpoint", it)
+        }
+        Log.d(TAG, "power=$powerKw source=$powerSource hv=$hvVolt/$hvAmp")
+
+        data.avgBatTemp?.let { telemetry.put("batt_temp", it) }
+        data.exteriorTemp?.let { telemetry.put("ext_temp", it) }
+        telemetry.put("capacity", nominalCapacityKwh)
+        data.mileage?.let { telemetry.put("odometer", it) }
+        data.insideTemp?.let { telemetry.put("cabin_temp", it) }
+        data.tirePressFL?.let { telemetry.put("tire_pressure_fl", it) }
+        data.tirePressFR?.let { telemetry.put("tire_pressure_fr", it) }
+        data.tirePressRL?.let { telemetry.put("tire_pressure_rl", it) }
+        data.tirePressRR?.let { telemetry.put("tire_pressure_rr", it) }
+
+        telemetry.put("is_charging", if (isChargingNow) 1 else 0)
+        data.gear?.let { telemetry.put("is_parked", if (it == 1) 1 else 0) }
+
+        // Autoservice-only enrichment — Leopard 3 etc. SoH lets ABRP derate
+        // nominal capacity by battery aging; is_dcfc separates fast-charge
+        // sessions from AC; kwh_charged shows session progress.
+        charging?.let { c ->
+            c.gunConnectState?.let { gun ->
+                telemetry.put("is_dcfc", if (gun in DCFC_GUN_STATES) 1 else 0)
+            }
+            // -1.0f is the autoservice "no value" sentinel — drop it.
+            // .toDouble() is required: Android's JSONObject only exposes
+            // put(String, double) — there is no put(String, float). On JVM
+            // the desktop org.json has the float overload, so this lands as
+            // NoSuchMethodError only at runtime on the device.
+            c.chargingCapacityKwh?.takeIf { it >= 0f }?.let {
+                telemetry.put("kwh_charged", it.toDouble())
+            }
+        }
+        battery?.sohPercent?.takeIf { it in 0f..100f }?.let {
+            telemetry.put("soh", it.toDouble())
+        }
+
+        carModel?.trim()?.takeIf { it.isNotEmpty() }?.let { telemetry.put("car_model", it) }
+
+        return telemetry
+    }
+
+    /**
+     * POST an already-built payload (see [buildTelemetry]). Kept separate from
+     * [send] so a caller that fans the same snapshot out to several sinks
+     * builds the JSON once.
+     */
+    suspend fun sendTelemetry(
+        apiKey: String,
+        userToken: String,
+        telemetry: JSONObject,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val token = userToken.trim()
+        if (token.isEmpty()) return@withContext Result.failure(IllegalArgumentException("пустой токен"))
+        try {
+            val form = FormBody.Builder()
+                .add("token", token)
+                .add("tlm", telemetry.toString())
+
+            val url = SEND_URL.toHttpUrl().newBuilder().apply {
+                val key = apiKey.trim().ifEmpty { DEFAULT_API_KEY }
+                addQueryParameter("api_key", key)
+            }.build()
+
+            val request = Request.Builder()
+                .url(url)
+                .post(form.build())
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    // Don't log raw body — Iternio may echo credentials back.
+                    Log.w(TAG, "HTTP ${response.code}")
+                    return@withContext Result.failure(mapErrorResponse(response.code, response.header("Retry-After")))
+                }
+                try {
+                    val json = JSONObject(body)
+                    val status = json.optString("status")
+                    if (status.isNotBlank() && !status.equals("ok", ignoreCase = true)) {
+                        // Iternio response may echo back token/api_key in error
+                        // body — never log or propagate any server-provided string.
+                        Log.w(TAG, "API returned non-ok status")
+                        return@withContext Result.failure(IllegalStateException("Iternio API returned non-ok status"))
+                    }
+                } catch (_: Exception) { /* пустой или не-JSON ответ считаем успехом при HTTP 2xx */ }
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.w(TAG, "отправка не удалась: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Map HTTP status to a typed exception so the caller (TrackingService) can
+     * apply different cooldowns for "slow down" vs "outage" without parsing
+     * status codes itself. 4xx other than 429 fall through to the generic
+     * IllegalStateException — they signal misconfiguration (bad token, wrong
+     * URL) and won't recover with backoff.
+     */
+    private fun mapErrorResponse(httpCode: Int, retryAfterHeader: String?): Throwable = when {
+        httpCode == 429 -> IternioRateLimitException(parseRetryAfter(retryAfterHeader))
+        httpCode in 500..599 -> IternioServerErrorException(httpCode)
+        else -> IllegalStateException("HTTP $httpCode")
+    }
+
+    /**
+     * RFC 7231 §7.1.3 — Retry-After is either delta-seconds OR an HTTP-date.
+     * We honor both, but cap at 3600 s; anything longer is almost certainly a
+     * misconfigured upstream (we'd rather try again sooner than wait an hour).
+     * Past dates yield 0. Unparseable input yields null so the caller picks
+     * its own bounded backoff.
+     */
+    internal fun parseRetryAfter(header: String?): Int? {
+        val raw = header?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        // delta-seconds path
+        raw.toIntOrNull()?.let { return it.takeIf { v -> v in 0..3600 } }
+        // HTTP-date path. java.time.RFC_1123_DATE_TIME has known issues with
+        // the leading-zero day-of-month that HTTP servers actually emit
+        // ("Sun, 01 Jan 2026 ..." instead of "Sun, 1 Jan 2026 ..."), so use
+        // SimpleDateFormat with explicit pattern and forced English locale.
+        return try {
+            val fmt = java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", java.util.Locale.US)
+            fmt.timeZone = java.util.TimeZone.getTimeZone("GMT")
+            // Lenient: don't reject if day-of-week disagrees with the date.
+            // Real servers stamp HTTP dates programmatically so the day name
+            // will match, but our test fixtures use arbitrary dates and we
+            // don't care about the prefix anyway.
+            fmt.isLenient = true
+            val whenMs = fmt.parse(raw)?.time ?: return null
+            val deltaSec = (whenMs - System.currentTimeMillis()) / 1000L
+            when {
+                deltaSec <= 0L -> 0
+                deltaSec > 3600L -> null
+                else -> deltaSec.toInt()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Charging detection: only physical-gun signals. Whitelist autoservice
+     * `gunConnectState` to {2=AC, 3=DC, 4=AC_DC, 5=VTOL} — anything else
+     * (incl. 0 sentinel from cold-start window and 1=NONE) means not plugged
+     * in. DiPars `chargeGunState == 2` is the same physical signal on
+     * non-Leopard 3 builds.
+     *
+     * We deliberately do NOT use `power < 0` (regenerative braking gives
+     * negative motor power but is not charging) or `chargingStatus > 0`
+     * (firmware-specific values that fire spuriously on idle).
+     */
+    private fun isCharging(data: DiParsData, charging: ChargingReading?): Boolean {
+        charging?.gunConnectState?.let { gun ->
+            if (gun in DCFC_GUN_STATES || gun == 2) return true
+        }
+        if (data.chargeGunState == 2) return true
+        return false
+    }
+}

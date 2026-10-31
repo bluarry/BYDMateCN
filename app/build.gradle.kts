@@ -19,19 +19,32 @@ val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) load(FileInputStream(keystorePropsFile))
 }
 
+
+val versionPropsFile = rootProject.file("version.properties")
+require(versionPropsFile.isFile) { "Missing version.properties" }
+val versionProps = Properties().apply { load(FileInputStream(versionPropsFile)) }
+val appVersionName = versionProps.getProperty("VERSION_NAME")?.trim()
+    ?.takeIf { it.matches(Regex("""\d+\.\d+\.\d+(?:\.\d+)?""")) }
+    ?: error("VERSION_NAME in version.properties must be a three- or four-part numeric version")
+val appVersionCode = versionProps.getProperty("VERSION_CODE")?.trim()?.toIntOrNull()
+    ?.takeIf { it > 0 }
+    ?: error("VERSION_CODE in version.properties must be a positive integer")
+
 android {
-    namespace = "com.bydmate.app"
-    compileSdk = 34
+    namespace = "com.bydmatecn.app"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bydmate.app"
+        applicationId = "com.bydmatecn.app"
         minSdk = 29
         // targetSdk 29 matches TripInfo — grants full legacy file access
         // on DiLink Android 12 (requestLegacyExternalStorage works).
         // targetSdk 30+ would break listFiles() on /storage/emulated/0/energydata/
         targetSdk = 29
-        versionCode = 512
-        versionName = "4.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
+        buildConfigField("String", "APP_UPDATE_URL", "\"https://api.github.com/repos/bluarry/BYDMateCN/releases?per_page=20\"")
+        buildConfigField("boolean", "DONATIONS_ENABLED", "false")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -65,7 +78,7 @@ android {
         val variant = this
         variant.outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "BYDMate-v${variant.versionName}.apk"
+            output.outputFileName = "BYDMateCN-$appVersionName.apk"
         }
     }
 
@@ -276,7 +289,7 @@ kover {
                     "*BuildConfig*",
                 )
                 // Compose screens are not the coverage target
-                packages("com.bydmate.app.ui")
+                packages("com.bydmatecn.app.ui")
             }
         }
     }

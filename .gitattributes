@@ -1,0 +1,3 @@
+
+# Keep the byte-exact prompt fixture identical on Windows and Linux.
+app/src/test/resources/ev-baseline/agent-system-prompt.txt text eol=lf
