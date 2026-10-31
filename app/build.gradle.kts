@@ -303,3 +303,9 @@ detekt {
     baseline = file("$rootDir/config/detekt/baseline.xml")
     autoCorrect = false
 }
+
+// Detekt 1.23.x supports bytecode targets only through JVM 22. The project runs Gradle
+// with JDK 24, but Android/Kotlin output targets JVM 17, so analysis must use that target too.
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = "17"
+}
