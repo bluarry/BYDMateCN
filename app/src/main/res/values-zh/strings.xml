@@ -131,14 +131,14 @@
 
     <!-- Settings: Integrations section -->
     <string name="settings_abrp_section_header">ABRP - 遥测</string>
-    <string name="settings_abrp_telemetry_label">实时数据 -> A Better Route Planner</string>
+    <string name="settings_abrp_telemetry_label">实时数据 -&gt; A Better Route Planner</string>
     <string name="settings_abrp_telemetry_description">实时数据（SOC、功率、温度、里程表、胎压）发送至 Iternio Telemetry API，用于在 ABRP 中获得最新的路线规划。默认不发送 GPS 坐标。</string>
     <string name="settings_abrp_token_label">ABRP 实时数据令牌</string>
     <string name="settings_abrp_save_button">保存 ABRP</string>
     <string name="settings_abrp_location_label">向 ABRP 发送坐标</string>
     <string name="settings_abrp_location_description">适用于少见的情况：车内的 ABRP 没有运行时，用手机上的 ABRP 查看车辆位置。如果车内打开了 ABRP，它会自己获取 GPS，开启此项后地图上的车辆标记会来回跳动。默认关闭。</string>
     <string name="settings_webhook_section_header">Webhook - 遥测</string>
-    <string name="settings_webhook_label">实时数据 -> 自己的服务器</string>
+    <string name="settings_webhook_label">实时数据 -&gt; 自己的服务器</string>
     <string name="settings_webhook_description">与发送至 ABRP 相同的 JSON（SOC、功率、温度、里程表、胎压、充电）通过 POST 请求发送到您的 URL：行驶时每秒一次，充电时每 8 秒一次，停车时每 30 秒一次。默认不发送坐标。</string>
     <string name="settings_webhook_url_label">URL（https://）</string>
     <string name="settings_webhook_secret_label">密钥（Authorization: Bearer 请求头），可选</string>
@@ -2247,4 +2247,9 @@
     <plurals name="tech_dtc_more_codes">
         <item quantity="other">还有 %1$d 个故障码放不下，全部见“诊断”窗口</item>
     </plurals>
+
+    <string name="nav_tab_local">工具</string>
+    <string name="automation_learned_key_label">按键 %1$d</string>
+    <string name="settings_fork_description">Fork 自 BYDMate 的独立社区分支。自愿驻车测试后反馈问题与日志；非比亚迪官方应用。</string>
+    <string name="tech_card_climate">空调</string>
 </resources>

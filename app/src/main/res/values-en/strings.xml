@@ -218,14 +218,14 @@
     <string name="settings_recalc_confirm_button">Recalculate</string>
     <string name="settings_cancel_button">Cancel</string>
     <string name="settings_abrp_section_header">ABRP - telemetry</string>
-    <string name="settings_abrp_telemetry_label">Live data -> A Better Route Planner</string>
+    <string name="settings_abrp_telemetry_label">Live data -&gt; A Better Route Planner</string>
     <string name="settings_abrp_telemetry_description">Live data (SOC, power, temperatures, odometer, tire pressure) is sent to the Iternio Telemetry API for an up-to-date plan in ABRP. GPS is not sent by default.</string>
     <string name="settings_abrp_token_label">Live data token from ABRP</string>
     <string name="settings_abrp_save_button">Save ABRP</string>
     <string name="settings_abrp_location_label">Send coordinates to ABRP</string>
     <string name="settings_abrp_location_description">For a rare case: following the car in ABRP on a phone while ABRP in the car itself is not running. If ABRP is open in the car, it takes GPS on its own, and with this setting the car marker on the map starts jumping. Off by default.</string>
     <string name="settings_webhook_section_header">Webhook - telemetry</string>
-    <string name="settings_webhook_label">Live data -> your own server</string>
+    <string name="settings_webhook_label">Live data -&gt; your own server</string>
     <string name="settings_webhook_description">The same JSON that goes to ABRP (SOC, power, temperatures, odometer, tire pressure, charging) is sent as a POST request to your URL: once per second while driving, once every 8 seconds while charging, once every 30 seconds while parked. Coordinates are not sent by default.</string>
     <string name="settings_webhook_url_label">URL (https://)</string>
     <string name="settings_webhook_secret_label">Secret (Authorization: Bearer header), optional</string>
@@ -374,7 +374,7 @@
     <string name="charges_go_to_settings_button">Go to Settings</string>
     <string name="charges_sentinel_empty_text">Charging statistics are unavailable for your car model - diagnostic data cannot be read. SoH is not shown either.</string>
     <string name="charges_not_tracking_banner">New charging sessions are not being tracked right now.</string>
-    <string name="charges_enable_tracking_button">Enable -></string>
+    <string name="charges_enable_tracking_button">Enable -&gt;</string>
     <string name="charges_stats_period_label">For the selected period</string>
     <string name="charges_stats_sessions">Sessions</string>
     <string name="charges_stats_cost">Cost</string>
@@ -586,7 +586,7 @@
     <string name="welcome_autostart_apk_update_warning">Check this setting after updating the APK!</string>
     <string name="welcome_autostart_dilink_section_title">Alternative: via DiLink+ (Di+)</string>
     <string name="welcome_autostart_dilink_hint">If autostart did not work, add this in Di+:</string>
-    <string name="welcome_autostart_dilink_instruction">Di+ -> Predefined -> Startup tasks</string>
+    <string name="welcome_autostart_dilink_instruction">Di+ -&gt; Predefined -&gt; Startup tasks</string>
     <string name="welcome_autostart_command_copied_toast">Copied!</string>
     <string name="welcome_autostart_command_explanation">打开应用 = \"open app\" + package name.\nFor two apps separated by semicolon:\n打开应用ru.yandex.yandexnavi;打开应用com.bydmatecn.app</string>
     <string name="welcome_system_settings_section_title">System settings</string>
@@ -2138,4 +2138,9 @@
         <item quantity="one">%1$d more code did not fit, all of them are in the “Diagnostics” window</item>
         <item quantity="other">%1$d more codes did not fit, all of them are in the “Diagnostics” window</item>
     </plurals>
+
+    <string name="nav_tab_local">Tools</string>
+    <string name="automation_learned_key_label">Key %1$d</string>
+    <string name="settings_fork_description">An independent community fork of BYDMate. Volunteer testing while parked is welcome; please report issues with logs. Not an official BYD application.</string>
+    <string name="tech_card_climate">Climate</string>
 </resources>

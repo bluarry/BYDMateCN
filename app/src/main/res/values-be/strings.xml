@@ -228,14 +228,14 @@
 
     <!-- Settings: Integrations section -->
     <string name="settings_abrp_section_header">ABRP - тэлеметрыя</string>
-    <string name="settings_abrp_telemetry_label">Жывыя даныя -> A Better Route Planner</string>
+    <string name="settings_abrp_telemetry_label">Жывыя даныя -&gt; A Better Route Planner</string>
     <string name="settings_abrp_telemetry_description">Жывыя даныя (SOC, магутнасць, тэмпературы, адометр, ціск шын) адпраўляюцца ў Iternio Telemetry API для актуальнага плана ў ABRP. GPS па змаўчанні не перадаецца.</string>
     <string name="settings_abrp_token_label">Токен жывых даных з ABRP</string>
     <string name="settings_abrp_save_button">Захаваць ABRP</string>
     <string name="settings_abrp_location_label">Адпраўляць каардынаты ў ABRP</string>
     <string name="settings_abrp_location_description">Для рэдкага выпадку: сачыць за машынай у ABRP з тэлефона, калі ABRP у самой машыне не запушчаны. Калі ABRP адкрыты ў машыне, ён бярэ GPS сам, і з гэтай наладай метка на карце пачынае скакаць. Па змаўчанні выключана.</string>
     <string name="settings_webhook_section_header">Вебхук - тэлеметрыя</string>
-    <string name="settings_webhook_label">Жывыя даныя -> свой сервер</string>
+    <string name="settings_webhook_label">Жывыя даныя -&gt; свой сервер</string>
     <string name="settings_webhook_description">Той самы JSON, што ідзе ў ABRP (SOC, магутнасць, тэмпературы, адометр, ціск шын, зарадка), адпраўляецца POST-запытам на ваш URL: раз на секунду ў руху, раз на 8 секунд на зарадцы, раз на 30 секунд на стаянцы. Каардынаты па змаўчанні не перадаюцца.</string>
     <string name="settings_webhook_url_label">URL (https://)</string>
     <string name="settings_webhook_secret_label">Сакрэт (загаловак Authorization: Bearer), неабавязкова</string>
@@ -2300,4 +2300,9 @@
         <item quantity="many">Яшчэ %1$d кодаў не змясціліся, усе ў акне «Дыягностыка»</item>
         <item quantity="other">Яшчэ %1$d кода не змясціліся, усе ў акне «Дыягностыка»</item>
     </plurals>
+
+    <string name="nav_tab_local">Інструменты</string>
+    <string name="automation_learned_key_label">Клавіша %1$d</string>
+    <string name="settings_fork_description">Незалежны супольны форк BYDMate. Добраахвотнае тэставанне толькі на стаянцы; паведамляйце пра праблемы і дадавайце журналы. Неафіцыйная праграма BYD.</string>
+    <string name="tech_card_climate">Клімат</string>
 </resources>
