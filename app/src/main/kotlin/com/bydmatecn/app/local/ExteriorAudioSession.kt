@@ -1,6 +1,7 @@
 package com.bydmatecn.app.local
 
 import android.content.Context
+import android.os.RemoteException
 import android.os.SystemClock
 import com.bydmatecn.app.data.vehicle.HelperClient
 import java.lang.reflect.InvocationTargetException
@@ -126,20 +127,29 @@ internal class ExteriorAudioSession(
                     "writer=${if (helper != null && supplied == null) "helper" else "app"}; " +
                     "status=${helperStatus ?: "n/a"}",
             )
-        } catch (error: InvocationTargetException) {
-            val cause = error.targetException ?: error
-            log.record("exterior/setInt-error", "${cause.javaClass.simpleName}: ${cause.message}")
-            throw IllegalStateException("车外通道指令被固件拒绝：${cause.message}", cause)
         } catch (error: ReflectiveOperationException) {
-            log.record("exterior/setInt-error", "${error.javaClass.simpleName}: ${error.message}")
-            throw IllegalStateException("固件没有可用的 auto.setInt 接口：${error.message}", error)
+            failWrite(error)
+        } catch (error: RemoteException) {
+            failWrite(error)
+        } catch (error: SecurityException) {
+            failWrite(error)
         } catch (error: IllegalStateException) {
-            log.record("exterior/setInt-error", "${error.javaClass.simpleName}: ${error.message}")
-            throw error
-        } catch (error: Exception) {
-            log.record("exterior/setInt-error", "${error.javaClass.simpleName}: ${error.message}")
-            throw IllegalStateException("高权限 helper 写入车外通道失败：${error.message}", error)
+            failWrite(error)
         }
+    }
+
+    private fun failWrite(error: Exception): Nothing {
+        val cause = (error as? InvocationTargetException)?.targetException ?: error
+        val translated = when {
+            error is InvocationTargetException ->
+                IllegalStateException("车外通道指令被固件拒绝：${cause.message}", cause)
+            error is ReflectiveOperationException ->
+                IllegalStateException("固件没有可用的 auto.setInt 接口：${error.message}", error)
+            error is IllegalStateException -> error
+            else -> IllegalStateException("高权限 helper 写入车外通道失败：${error.message}", error)
+        }
+        log.record("exterior/setInt-error", "${cause.javaClass.simpleName}: ${cause.message}")
+        throw translated
     }
 
     /**
@@ -151,7 +161,7 @@ internal class ExteriorAudioSession(
         fun write(helper: HelperClient, command: ExteriorAudioCommand): Int {
             val status = runBlocking(Dispatchers.IO) {
                 helper.writeStatus(command.device, command.featureId, command.value)
-            } ?: throw IllegalStateException("高权限 helper 未连接或无响应")
+            } ?: error("高权限 helper 未连接或无响应")
             check(status >= 0) { "autoservice 拒绝车外通道指令，status=$status" }
             return status
         }
