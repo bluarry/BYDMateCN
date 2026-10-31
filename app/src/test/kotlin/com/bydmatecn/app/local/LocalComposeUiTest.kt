@@ -3,6 +3,7 @@ package com.bydmatecn.app.local
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +41,12 @@ class LocalComposeUiTest {
         host.ui.dialog = null
         first.selected?.invoke(0)
         assertSame(next, host.ui.dialog)
+    }
+    @Test fun displayItemsDoNotCreateSelectionActions() {
+        val host = TestHost(ApplicationProvider.getApplicationContext())
+        val dialog = LocalDialogBuilder(host).setDisplayItems(arrayOf("一.wav", "二.mp3"))
+        assertEquals(listOf("一.wav", "二.mp3"), dialog.items)
+        assertNull(dialog.selected)
     }
     private class TestHost(context: Context) : android.content.ContextWrapper(context), LocalComposeHost {
         override val ui = LocalUiState()

@@ -40,7 +40,7 @@ class LocalToolsActivity : ComponentActivity(), LocalComposeHost {
         if (granted) showAudioDirectoryPicker(File("/storage/emulated/0"))
         else status.text = "未授予存储读取权限，无法扫描音频目录"
     }
-    internal var selectedAudio: File? = null
+    internal var currentAudio: File? = null
     internal var selectedOutput: AudioDeviceInfo? = null
     internal var resumed = false
     internal var busy = false
@@ -133,8 +133,6 @@ class LocalToolsActivity : ComponentActivity(), LocalComposeHost {
         LocalFileLog.get(this).record("LocalTools", "page opened")
         resources = LocalResourceStore(File(filesDir, "local-audio"))
         localPlayer = LocalAudioPlayer(this, helper) { message -> status.text = message }
-        val lastAudio = getSharedPreferences("local-audio", Context.MODE_PRIVATE).getString("selected", null)
-        selectedAudio = audioLibrary.resolve(lastAudio)
         val tool = intent.getStringExtra("tool") ?: "diagnostics"
         val toolInfo = localTools.firstOrNull { it.id == tool }
         ui.title = toolInfo?.title ?: "本地工具"
@@ -152,11 +150,13 @@ class LocalToolsActivity : ComponentActivity(), LocalComposeHost {
             when {
                 command == "stop" -> { stopAudio(); true }
                 file == null -> false
-                command == "play" -> { selectAudio(file); playSelected(); true }
+                command == "play" -> { playLocalAudio(file); true }
                 command in setOf("exterior", "lock_preview") &&
                     getSharedPreferences("local-audio", MODE_PRIVATE).getBoolean("exterior_verified", false) -> {
-                    selectAudio(file)
-                    playFirmwareAudio(if (command == "exterior") FirmwareAudioRoute.EXTERIOR_VOICE else FirmwareAudioRoute.LOCK_PREVIEW)
+                    playFirmwareAudio(
+                        if (command == "exterior") FirmwareAudioRoute.EXTERIOR_VOICE else FirmwareAudioRoute.LOCK_PREVIEW,
+                        file,
+                    )
                     true
                 }
                 else -> false

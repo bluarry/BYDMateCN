@@ -243,6 +243,7 @@ internal class LocalDialogBuilder(context: Context) {
     fun setMessage(value: String) = apply { message = value }
     fun setView(value: LocalInput) = apply { input = value }
     fun setItems(values: Array<String>, action: (Any?, Int) -> Unit) = apply { items = values.toList(); selected = { action(null, it) } }
+    fun setDisplayItems(values: Array<String>) = apply { items = values.toList(); selected = null }
     fun setPositiveButton(text: String, action: (Any?, Int) -> Unit) = apply { positive = text to { action(null, 0) } }
     fun setNegativeButton(text: String, action: ((Any?, Int) -> Unit)?) = apply { negative = text; dismissed = { action?.invoke(null, 0) } }
     fun show() { ui.dialog = this }
@@ -256,7 +257,21 @@ private fun LocalDialog(ui: LocalUiState) {
                 if (dialog.message.isNotEmpty()) Text(dialog.message)
                 dialog.input?.let { LocalInputField(it) }
                 dialog.items.forEachIndexed { index, text ->
-                    TextButton(onClick = { ui.dialog = null; dialog.selected?.invoke(index) }, modifier = Modifier.fillMaxWidth()) { Text(text) }
+                    val select = dialog.selected
+                    if (select != null) {
+                        TextButton(
+                            onClick = { ui.dialog = null; select(index) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(text) }
+                    } else {
+                        Text(
+                            text,
+                            color = Color(0xFFD8E4EF),
+                            modifier = Modifier.fillMaxWidth()
+                                .background(Color(0xFF14263A), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                        )
+                    }
                 }
             }
         } }, confirmButton = {

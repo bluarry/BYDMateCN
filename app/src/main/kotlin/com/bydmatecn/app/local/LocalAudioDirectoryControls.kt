@@ -32,14 +32,10 @@ internal fun LocalToolsActivity.audioDirectoryControls() {
                 stopAudio()
                 stopService(android.content.Intent(this@audioDirectoryControls, LocalLockSoundService::class.java))
                 audioLibrary.remove(directories[index])
-                if (audioLibrary.resolve(selectedAudio?.path) == null) {
-                    selectedAudio = null
-                    getSharedPreferences("local-audio", android.content.Context.MODE_PRIVATE).edit().remove("selected").apply()
-                }
                 status.text = "已移除目录，原文件保留；关联音效在重新添加目录前不可用"
             }.show()
     }
-    button("扫描目录并选择音频") { scanAudioDirectories() }
+    button("扫描并查看媒体") { scanAudioDirectories() }
 }
 
 internal fun LocalToolsActivity.addAudioDirectory(path: String) {
@@ -88,11 +84,36 @@ private fun LocalToolsActivity.scanAudioDirectories() {
             val unavailable = withContext(Dispatchers.IO) {
                 audioLibrary.directories().count { !it.isDirectory || !it.canRead() || it.listFiles() == null }
             }
-            status.text = "扫描完成：${files.size}个音频，${unavailable}个目录不可读；旧配置不自动替换"
-            if (files.isNotEmpty()) LocalDialogBuilder(this@scanAudioDirectories).setTitle("选择音频（完整路径）")
-                .setItems(files.map { it.path }.toTypedArray()) { _, index ->
-                    stopAudio(); selectAudio(files[index]); status.text = "已选中：${files[index].path}"
-                }.show()
+            status.text = "扫描完成：${files.size}个音频，${unavailable}个目录不可读"
+            if (files.isEmpty()) return@onSuccess
+            LocalDialogBuilder(this@scanAudioDirectories)
+                .setTitle("扫描到的媒体（${files.size}项）")
+                .setMessage("此处仅展示媒体；播放和音效设置请在对应设置项中选择。")
+                .setDisplayItems(files.map { it.path }.toTypedArray())
+                .setNegativeButton("关闭", null)
+                .show()
         }.onFailure { status.text = "扫描失败：${it.message}" }
+    }
+}
+
+internal fun LocalToolsActivity.showAudioPicker(title: String, selected: (File) -> Unit) {
+    lifecycleScope.launch {
+        if (audioLibrary.directories().isEmpty()) {
+            status.text = "请先在“本地媒体”中添加音频目录"
+            return@launch
+        }
+        val result = withContext(Dispatchers.IO) { runCatching { audioLibrary.files() } }
+        result.onSuccess { files ->
+            if (files.isEmpty()) {
+                status.text = "所选目录中没有可读取的音频，请到“本地媒体”重新扫描"
+                return@onSuccess
+            }
+            LocalDialogBuilder(this@showAudioPicker)
+                .setTitle("$title（${files.size}项）")
+                .setMessage("音频来自“本地媒体”中已选择的目录。")
+                .setItems(files.map { it.path }.toTypedArray()) { _, index -> selected(files[index]) }
+                .setNegativeButton("取消", null)
+                .show()
+        }.onFailure { status.text = "读取媒体失败：${it.message}" }
     }
 }

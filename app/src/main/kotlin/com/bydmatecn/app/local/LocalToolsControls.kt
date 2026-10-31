@@ -56,11 +56,14 @@ internal fun LocalToolsActivity.openSettings(action: String) {
     }
 
 internal fun LocalToolsActivity.fileControls() {
+        ui.section("音频目录")
+        label("这里只管理目录并展示扫描到的媒体；播放和音效设置请在对应设置项中选择。")
+        audioDirectoryControls()
+        ui.section("媒体工具")
         button("创建本地媒体自动化（按钮或方控触发）") { mediaRuleControls() }
         button("本地媒体备份 / 恢复") { startActivity(Intent(this, LocalBackupActivity::class.java)) }
         button("截图与录像相册 · 回看 / 导出 / 删除") { startActivity(Intent(this, LocalMediaActivity::class.java)) }
-        label("播放列表仅扫描所选目录；此处 ZIP 仅导出旧导入副本、录音、合成语音及截图，不包含外部音频目录。")
-        button("管理音频目录") { startActivity(Intent(this, LocalToolsActivity::class.java).putExtra("tool", "audio")) }
+        label("设置弹窗仅列出所选目录中的音频；此处 ZIP 仅导出旧导入副本、录音、合成语音及截图，不包含外部音频目录。")
         button("查看应用内生成 / 保留资源") {
             val audio = resources.files()
             val captures = LocalCaptureStore(File(filesDir, "local-captures")).captures()
@@ -71,37 +74,52 @@ internal fun LocalToolsActivity.fileControls() {
     }
 
 internal fun LocalToolsActivity.mediaRuleControls() {
-        val actions = arrayOf("截图", "开始MP4", "停止MP4", "选中音频播放", "停止音频", "车外试听", "锁车试听")
+        val actions = arrayOf("截图", "开始MP4", "停止MP4", "选择音频播放", "停止音频", "车外试听", "锁车试听")
         LocalDialogBuilder(this).setTitle("本地媒体动作（对应页面必须可见）").setItems(actions) { _, selected ->
             val command = listOf("snapshot", "record_start", "record_stop", "play", "stop", "exterior", "lock_preview")[selected]
-            val name = audioLibrary.resolve(selectedAudio?.path)?.path
-            if (selected in setOf(3, 5, 6) && name == null) { status.text = "先在音频页选中本地文件"; return@setItems }
-            val key = LocalInput("方控Android keyCode（留空=按钮触发）")
-            LocalDialogBuilder(this).setTitle(actions[selected]).setView(key).setNegativeButton("取消", null)
-                .setPositiveButton("创建停用规则") { _, _ ->
-                    lifecycleScope.launch {
-                        val code = key.text.toString().toIntOrNull()
-                        if (key.text.isNotBlank() && (code == null || code !in 1..1000)) { status.text = "keyCode无效"; return@launch }
-                        val trigger = com.bydmatecn.app.data.local.entity.TriggerDef(
-                            if (code == null) "button_press" else "steering_key", "本地触发", "==", code?.toString() ?: "",
-                            "${actions[selected]}快捷操作", if (code == null) "button_press" else "steering_key")
-                        val action = com.bydmatecn.app.data.local.entity.ActionDef("", actions[selected],
-                            if (selected < 3) "local_camera" else "local_audio",
-                            if (selected < 3) command else org.json.JSONObject().put("command", command).put("file", name).toString())
-                        val id = rules.insert(com.bydmatecn.app.data.local.entity.RuleEntity(name="本地：${actions[selected]}", enabled=false,
-                            triggers=com.bydmatecn.app.data.local.entity.TriggerDef.listToJson(listOf(trigger)),
-                            actions=com.bydmatecn.app.data.local.entity.ActionDef.listToJson(listOf(action)), requirePark=true, cooldownSeconds=5))
-                        status.text = "规则${id}已创建且停用，请在自动化页检查并启用；后台不能偷偷打开相机/音频页面。"
-                    }
-                }.show()
+            if (selected in setOf(3, 5, 6)) {
+                showAudioPicker("为“${actions[selected]}”选择音频") { file ->
+                    promptMediaRule(actions[selected], selected, command, file.path)
+                }
+            } else promptMediaRule(actions[selected], selected, command, null)
         }.show()
     }
 
+private fun LocalToolsActivity.promptMediaRule(
+    title: String,
+    selected: Int,
+    command: String,
+    filePath: String?,
+) {
+    val key = LocalInput("方控Android keyCode（留空=按钮触发）")
+    LocalDialogBuilder(this).setTitle(title).setView(key).setNegativeButton("取消", null)
+        .setPositiveButton("创建停用规则") { _, _ ->
+            lifecycleScope.launch {
+                val code = key.text.toString().toIntOrNull()
+                if (key.text.isNotBlank() && (code == null || code !in 1..1000)) {
+                    status.text = "keyCode无效"
+                    return@launch
+                }
+                val trigger = com.bydmatecn.app.data.local.entity.TriggerDef(
+                    if (code == null) "button_press" else "steering_key", "本地触发", "==", code?.toString() ?: "",
+                    "${title}快捷操作", if (code == null) "button_press" else "steering_key")
+                val actionValue = if (selected < 3) command else org.json.JSONObject()
+                    .put("command", command).apply { if (filePath != null) put("file", filePath) }.toString()
+                val action = com.bydmatecn.app.data.local.entity.ActionDef(
+                    "", title, if (selected < 3) "local_camera" else "local_audio", actionValue)
+                val id = rules.insert(com.bydmatecn.app.data.local.entity.RuleEntity(
+                    name = "本地：$title", enabled = false,
+                    triggers = com.bydmatecn.app.data.local.entity.TriggerDef.listToJson(listOf(trigger)),
+                    actions = com.bydmatecn.app.data.local.entity.ActionDef.listToJson(listOf(action)),
+                    requirePark = true, cooldownSeconds = 5))
+                status.text = "规则${id}已创建且停用，请在自动化页检查并启用；后台不能偷偷打开相机/音频页面。"
+            }
+        }.show()
+}
+
 internal fun LocalToolsActivity.audioControls() {
-        ui.section("音频库")
-        label("管理本地音频目录，选择文件并配置播放和车辆音效。")
-        audioDirectoryControls()
         ui.section("播放控制")
+        label("音频目录在“本地媒体”中管理；每次播放都在当前设置项中选择文件。")
         button("选择系统输出设备") {
             val devices = (getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_OUTPUTS).filter { ordinaryAudioOutput(it.type) }
             val names = arrayOf("系统默认") + devices.map { "${it.productName} (type=${it.type}, id=${it.id})" }.toTypedArray()
@@ -110,7 +128,9 @@ internal fun LocalToolsActivity.audioControls() {
                 status.text = names[which]
             }.show()
         }
-        button("播放") { playSelected() }
+        button("选择音频并播放") {
+            showAudioPicker("选择要播放的音频") { file -> playLocalAudio(file) }
+        }
         button("暂停 / 继续") { localPlayer.togglePause() }
         button("停止") { stopAudio(); status.text = "已停止" }
         val audioPrefs = audioPreferences()

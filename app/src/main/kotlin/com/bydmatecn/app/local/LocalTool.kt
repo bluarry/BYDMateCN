@@ -11,6 +11,6 @@ val localTools = listOf(
     LocalTool("split", "分屏", "多窗口", "tool_settings/SPLIT", 2),
     LocalTool("mirror", "电子后视", "转向联动 · 显示位置", "blind_spot", 0),
     LocalTool("cast", "投屏", "仪表输出", "tool_settings/DISPLAY", 3),
-    LocalTool("files", "本地媒体", "目录扫描 · 相册 · 备份", "native:files", 0),
+    LocalTool("files", "本地媒体", "目录选择 · 扫描媒体 · 相册备份", "native:files", 0),
     LocalTool("desktop", "桌面", "桌面卡片与媒体显示", "tool_settings/WIDGET", 0),
 )
