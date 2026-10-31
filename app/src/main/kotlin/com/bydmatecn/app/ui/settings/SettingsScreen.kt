@@ -4798,3 +4798,69 @@ private fun cloudOverWifiStatusText(state: CloudOverWifiState): String? = when (
     CloudOverWifiState.Connected -> stringResource(R.string.settings_cloud_wifi_status_connected)
     CloudOverWifiState.ReturnPending -> stringResource(R.string.settings_cloud_wifi_status_return_pending)
 }
+
+/** 独立工具入口：复用盲区显示的控制器与同一组持久化配置。 */
+@Composable
+fun BlindSpotSettingsScreen(onBack: () -> Unit) {
+    VehicleToolPage("电子后视镜", "转向联动、显示位置与镜头布局", onBack) {
+        BlindSpotCard()
+    }
+}
+
+/** 独立工具配置页：业务实现仍复用设置页现有控制器，避免产生两套配置。 */
+@Composable
+fun VehicleToolSettingsScreen(
+    section: String,
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel(),
+) {
+    val title = when (section) {
+        "SPLIT" -> "分屏"
+        "DISPLAY" -> "投屏"
+        "WIDGET" -> "桌面"
+        else -> "车机工具"
+    }
+    VehicleToolPage(title, "显示与车辆联动设置", onBack) {
+        when (section) {
+            "SPLIT" -> SplitSection(viewModel)
+            "DISPLAY" -> DisplaySection()
+            "WIDGET" -> WidgetSection()
+        }
+    }
+}
+
+@Composable
+private fun VehicleToolPage(
+    title: String,
+    subtitle: String,
+    onBack: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CardSurface)
+            .padding(horizontal = 28.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onBack) { Text("返回", color = PrimaryColor) }
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(title, color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = TextSecondary, fontSize = 14.sp)
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            content()
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}

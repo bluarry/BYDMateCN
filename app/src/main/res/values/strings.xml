@@ -2317,4 +2317,8 @@
         <item quantity="other">Ещё %1$d кода не поместились, все в окне «Диагностика»</item>
     </plurals>
     <string name="tech_value_pm25" translatable="false">%1$d µg/m³</string>
+    <string name="nav_tab_local">工具</string>
+    <string name="automation_learned_key_label">按键 %1$d</string>
+    <string name="settings_fork_description">BYDMate 的独立社区分支。仅在停车状态下自愿测试；反馈问题时请附带日志。非比亚迪官方应用。</string>
+    <string name="tech_card_climate">空调</string>
 </resources>
