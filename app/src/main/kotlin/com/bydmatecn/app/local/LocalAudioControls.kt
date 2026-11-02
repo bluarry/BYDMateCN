@@ -85,11 +85,9 @@ internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.Share
         speech = LocalSpeechPlayer(this) { status.text = it }
         val text = LocalInput("输入语音文本，最多 500 字", audioPrefs.getString("speech_text", "") ?: "", 500)
         ui.input(text)
-        label("语速 0.5～2.0")
-        val rate = LocalSlider(audioPrefs.getInt("speech_rate", 50).coerceIn(0, 150), 150)
+        val rate = LocalSlider(audioPrefs.getInt("speech_rate", 50).coerceIn(0, 150), 150, "语速 0.5～2.0")
         ui.slider(rate)
-        label("音调 0.5～2.0")
-        val pitch = LocalSlider(audioPrefs.getInt("speech_pitch", 50).coerceIn(0, 150), 150)
+        val pitch = LocalSlider(audioPrefs.getInt("speech_pitch", 50).coerceIn(0, 150), 150, "音调 0.5～2.0")
         ui.slider(pitch)
         button("朗读（系统默认音频输出）") {
             recorder?.finish(false); stopAudio()

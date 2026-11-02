@@ -102,8 +102,7 @@ internal fun LocalCameraActivity.addMirrorControls() {
             viewConfig = viewConfig.copy(rotation = (viewConfig.rotation + 90) % 360)
             applyViewConfig(); saveViewConfig()
         }
-        ui.label("画面缩放 100%～200%")
-        ui.slider(LocalSlider(viewConfig.zoomPercent - 100), changed = { progress ->
+        ui.slider(LocalSlider(viewConfig.zoomPercent - 100, title = "画面缩放 100%～200%"), changed = { progress ->
             viewConfig = viewConfig.copy(zoomPercent = 100 + progress); applyViewConfig(); saveViewConfig()
         })
 

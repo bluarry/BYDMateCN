@@ -98,15 +98,13 @@ private fun LocalToolsActivity.audioPreferences() = getSharedPreferences("local-
 private fun LocalToolsActivity.playbackPreferences(audioPrefs: android.content.SharedPreferences) {
         val volume = audioPrefs.getInt("volume", 50).coerceIn(0, 100)
         localPlayer.setVolume(volume)
-        label("应用播放音量（不修改原车系统音量）")
-        ui.slider(LocalSlider(volume), changed = { value ->
+        ui.slider(LocalSlider(volume, title = "应用播放音量（不修改原车系统音量）"), changed = { value ->
             localPlayer.setVolume(value); audioPrefs.edit().putInt("volume", value).apply()
         })
         val repeat = audioPrefs.getBoolean("repeat", false)
         localPlayer.setLooping(repeat)
         ui.toggle("循环播放", repeat) { checked -> localPlayer.setLooping(checked); audioPrefs.edit().putBoolean("repeat", checked).apply() }
-        label("播放位置（松手跳转）")
-        val position = LocalSlider(0)
+        val position = LocalSlider(0, title = "播放位置（松手跳转）")
         positionBar = position
         ui.slider(position, { seeking = true }, { localPlayer.seekPercent(position.progress); seeking = false })
         button("导入本地LRC歌词（UTF-8，不联网）") { importLyrics.launch(arrayOf("text/*", "application/octet-stream")) }
