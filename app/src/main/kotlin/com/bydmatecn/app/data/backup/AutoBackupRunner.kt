@@ -188,6 +188,6 @@ class AutoBackupRunner(
         val ru = Locale("ru")
         val date = SimpleDateFormat("d MMMM HH:mm", ru).format(Date(file.lastModified()))
         val sizeMb = String.format(ru, "%.1f", file.length() / BYTES_PER_MB)
-        return "BYDMate: бэкап $date, $sizeMb МБ"
+        return "BYDMateCN: бэкап $date, $sizeMb МБ"
     }
 }

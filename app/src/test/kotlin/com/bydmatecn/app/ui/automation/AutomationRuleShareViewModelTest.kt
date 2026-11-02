@@ -254,7 +254,7 @@ class AutomationRuleShareViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val file = sharedFiles.single()
-        assertEquals("bydmate_rule_bagazhnik.json", file.name)
+        assertEquals("bydmatecn_rule_bagazhnik.json", file.name)
         assertEquals(downloads, file.parentFile)
         assertFalse(file.readText().contains("375291234567"))
     }
@@ -281,9 +281,9 @@ class AutomationRuleShareViewModelTest {
         vm.confirmShare()
         assertNull(vm.uiState.value.pendingShare)
         testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(listOf("bydmate_rule_bagazhnik.json"), sharedFiles.map { it.name })
+        assertEquals(listOf("bydmatecn_rule_bagazhnik.json"), sharedFiles.map { it.name })
         assertEquals(
-            ctx.appLocalizedContext().getString(R.string.automation_share_saved_toast, "bydmate_rule_bagazhnik.json"),
+            ctx.appLocalizedContext().getString(R.string.automation_share_saved_toast, "bydmatecn_rule_bagazhnik.json"),
             ShadowToast.getTextOfLatestToast(),
         )
         assertFalse(vm.uiState.value.shareInProgress)
@@ -512,7 +512,7 @@ class AutomationRuleShareViewModelTest {
     }
 
     @Test fun `a file over the size limit is refused as invalid`() {
-        val file = File(downloads, "bydmate_rule_big.json")
+        val file = File(downloads, "bydmatecn_rule_big.json")
         val body = requireNotNull(javaClass.classLoader?.getResource("rule-share/bydmate_rule_speed.json")).readText()
         file.writeText(body.replace("\"Navi\"", "\"" + "x".repeat(RuleShareFiles.MAX_FILE_BYTES) + "\""))
         val vm = vm()
@@ -673,9 +673,9 @@ class AutomationRuleShareViewModelTest {
         vm.confirmShare()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(listOf("bydmate_rule_bagazhnik.json"), downloads.list()!!.toList())
+        assertEquals(listOf("bydmatecn_rule_bagazhnik.json"), downloads.list()!!.toList())
         assertEquals(1, sharedFiles.size)
         assertFalse(vm.uiState.value.shareInProgress)
-        assertTrue(RuleShare.parse(File(downloads, "bydmate_rule_bagazhnik.json").readText(), "x") is RuleParseResult.Ok)
+        assertTrue(RuleShare.parse(File(downloads, "bydmatecn_rule_bagazhnik.json").readText(), "x") is RuleParseResult.Ok)
     }
 }

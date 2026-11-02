@@ -49,7 +49,7 @@ class BackupManagerPartialRestoreTest {
     fun setUp() {
         every { appDatabase.openHelper.writableDatabase } returns mockk<SupportSQLiteDatabase>(relaxed = true)
         every { appDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)", null) } answers { BackupFixtures.checkpointCursor() }
-        liveDb = BackupFixtures.createCurrentDb(context, "bydmate.db")
+        liveDb = BackupFixtures.createCurrentDb(context, "bydmatecn.db")
         BackupFixtures.withDb(liveDb) { BackupFixtures.seedCurrent(it, "live", 1L, token = "live-token") }
         prefs("automation").edit().putString("pref", "live").commit()
     }
@@ -101,7 +101,7 @@ class BackupManagerPartialRestoreTest {
         }
         assertEquals("live", prefs("automation").getString("pref", null))
         assertTrue(prefs(PostRestoreCheck.PREFS_NAME).getBoolean(PostRestoreCheck.KEY_PENDING, false))
-        assertTrue(context.getDatabasePath("bydmate.db").parentFile!!.list()!!.none { it.endsWith(".tmp") })
+        assertTrue(context.getDatabasePath("bydmatecn.db").parentFile!!.list()!!.none { it.endsWith(".tmp") })
     }
 
     @Test
@@ -181,7 +181,7 @@ class BackupManagerPartialRestoreTest {
 
     @Test
     fun `trimmed database posing as a full archive is refused`() {
-        val zip = BackupFixtures.archive(archiveDbBytes(setOf(BackupPart.TABLES)), setOf(BackupPart.TABLES), dbEntry = "bydmate.db")
+        val zip = BackupFixtures.archive(archiveDbBytes(setOf(BackupPart.TABLES)), setOf(BackupPart.TABLES), dbEntry = "bydmatecn.db")
 
         assertThrows(IllegalStateException::class.java) { manager().restore(zip, BackupPart.ALL) }
 
@@ -192,7 +192,7 @@ class BackupManagerPartialRestoreTest {
     fun `merge runs while the live database write transaction is held`() {
         val supportDb = mockk<SupportSQLiteDatabase>(relaxed = true)
         every { appDatabase.openHelper.writableDatabase } returns supportDb
-        val merged = File(liveDb.parentFile, "bydmate.db.merge.tmp")
+        val merged = File(liveDb.parentFile, "bydmatecn.db.merge.tmp")
         var held = false
         // What the merged copy holds at the moment the write lock is released.
         val atRelease = mutableListOf<String?>()
@@ -245,7 +245,7 @@ class BackupManagerPartialRestoreTest {
             assertEquals(1, count(db, "charge_points"))
         }
         assertTrue(!prefs(PostRestoreCheck.PREFS_NAME).getBoolean(PostRestoreCheck.KEY_PENDING, false))
-        assertTrue(context.getDatabasePath("bydmate.db").parentFile!!.list()!!.none { it.endsWith(".tmp") })
+        assertTrue(context.getDatabasePath("bydmatecn.db").parentFile!!.list()!!.none { it.endsWith(".tmp") })
     }
 
     /** A v3.17.5 export: the rule still carries when it last fired on the source device. */

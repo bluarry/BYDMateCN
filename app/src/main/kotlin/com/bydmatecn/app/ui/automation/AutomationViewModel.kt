@@ -1284,7 +1284,7 @@ internal fun starterTemplates(lang: String): List<RuleEntity> {
                 TriggerDef("ExtTemp", "车外温度", "<", "0",
                     tName("车外温度 < 0°C", "Outside Temp < 0°C", "Темп. снаружи < 0°C")),
                 TriggerDef("ServiceStart", "服务启动", "==", "true",
-                    tName("BYDMate 启动", "BYDMate startup", "Запуск BYDMate"), kind = "service_start")
+                    tName("BYDMateCN 启动", "BYDMateCN startup", "Запуск BYDMateCN"), kind = "service_start")
             )),
             actions = ActionDef.listToJson(listOf(
                 ActionDef("主驾座椅加热2档",
@@ -1314,7 +1314,7 @@ internal fun starterTemplates(lang: String): List<RuleEntity> {
                 TriggerDef("InsideTemp", "车内温度", ">", "30",
                     tName("车内温度 > 30°C", "Cabin Temp > 30°C", "Темп. салона > 30°C")),
                 TriggerDef("ServiceStart", "服务启动", "==", "true",
-                    tName("BYDMate 启动", "BYDMate startup", "Запуск BYDMate"), kind = "service_start")
+                    tName("BYDMateCN 启动", "BYDMateCN startup", "Запуск BYDMateCN"), kind = "service_start")
             )),
             actions = ActionDef.listToJson(listOf(
                 ActionDef("主驾座椅通风1档",
@@ -1406,8 +1406,8 @@ internal fun telegramReportTemplates(lang: String): List<RuleEntity> {
             triggerLogic = "AND",
             triggers = TriggerDef.listToJson(listOf(
                 TriggerDef("ServiceStart", "服务启动", "==", "true", tName(
-                    "BYDMate 启动", "BYDMate startup", "Запуск BYDMate",
-                    "Запуск BYDMate", "Uruchomienie BYDMate", "Inicialização do BYDMate",
+                    "BYDMateCN 启动", "BYDMateCN startup", "Запуск BYDMateCN",
+                    "Запуск BYDMateCN", "Uruchomienie BYDMateCN", "Inicialização do BYDMateCN",
                 ), kind = "service_start")
             )),
             actions = ActionDef.listToJson(listOf(report(ReportField.SOC, ReportField.RANGE, ReportField.TRIP))),

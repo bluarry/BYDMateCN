@@ -182,7 +182,7 @@ class AvmCameraProbe(
         // All in-process users (blind-spot and manual preview) share exclusive ownership.
         synchronized(ownershipLock) {
             if (owner != null && owner !== this) {
-                append("open refused: another BYDMate camera session owns AVM")
+                append("open refused: another BYDMateCN camera session owns AVM")
                 return false
             }
             owner = this

@@ -66,7 +66,7 @@ internal class FidRecLog(val file: File, private val nowMs: () -> Long = System:
 
         /** File name of a run started at [atMs]. */
         fun nameFor(atMs: Long): String =
-            "bydmate_fidrec_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(atMs))}.txt"
+            "bydmatecn_fidrec_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(atMs))}.txt"
 
         /** Human-readable start time for the file header. */
         fun startedAtText(atMs: Long): String =

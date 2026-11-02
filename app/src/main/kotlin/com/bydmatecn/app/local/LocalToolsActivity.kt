@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import com.bydmatecn.app.data.vehicle.HelperClient
+import com.bydmatecn.app.data.vehicle.HelperBootstrap
 import com.bydmatecn.app.data.vehicle.VehicleApi
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,7 @@ class LocalToolsActivity : ComponentActivity(), LocalComposeHost {
     override val ui = LocalUiState()
     @Inject lateinit var vehicle: VehicleApi
     @Inject lateinit var helper: HelperClient
+    @Inject lateinit var helperBootstrap: HelperBootstrap
     @Inject lateinit var rules: com.bydmatecn.app.data.local.dao.RuleDao
     internal val status = LocalText("本地功能就绪") { LocalFileLog.get(this).record("tools/status", it) }
     internal lateinit var resources: LocalResourceStore

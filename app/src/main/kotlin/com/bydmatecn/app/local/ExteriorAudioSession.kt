@@ -118,13 +118,24 @@ internal class ExteriorAudioSession(
             val supplied = commandWriter
             val helperStatus = when {
                 supplied != null -> { supplied(command); null }
-                helper != null -> HelperServiceWriter.write(helper, command)
+                helper != null -> try {
+                    HelperServiceWriter.write(helper, command)
+                } catch (helperError: IllegalStateException) {
+                    log.record("exterior/helper-fallback", "${helperError.message}; trying app auto service")
+                    try {
+                        AutoServiceWriter.write(context, command)
+                        null
+                    } catch (appError: Exception) {
+                        appError.addSuppressed(helperError)
+                        throw appError
+                    }
+                }
                 else -> { AutoServiceWriter.write(context, command); null }
             }
             log.record(
                 "exterior/setInt-ok",
                 "device=${command.device}; fid=${command.featureId}; value=${command.value}; " +
-                    "writer=${if (helper != null && supplied == null) "helper" else "app"}; " +
+                    "writer=${if (helper != null && supplied == null && helperStatus != null) "helper" else "app"}; " +
                     "status=${helperStatus ?: "n/a"}",
             )
         } catch (error: ReflectiveOperationException) {

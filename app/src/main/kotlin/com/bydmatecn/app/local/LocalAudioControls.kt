@@ -194,22 +194,50 @@ internal fun LocalToolsActivity.playFirmwareAudio(route: FirmwareAudioRoute, req
             try {
                 stopAudio(); recorder?.finish(false); speech?.stop()
                 val request = audioRequestGeneration
-                val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
-                check(request == audioRequestGeneration && firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) { "非驻车、车辆状态未知或页面不可见" }
+                var safety = VehicleSafetyProbe(helper).read()
+                if (safety.motion == VehicleMotionState.UNKNOWN) {
+                    val recovered = kotlinx.coroutines.withTimeoutOrNull(20_000) { helperBootstrap.ensureRunning() } == true
+                    LocalFileLog.get(this@playFirmwareAudio).record("audio/helper-recovery", "success=$recovered; source=${safety.source}")
+                    if (recovered) safety = VehicleSafetyProbe(helper).read()
+                }
+                check(request == audioRequestGeneration && resumed) { "页面已经离开或播放请求已取消" }
+                if (safety.motion == VehicleMotionState.MOVING) {
+                    LocalFileLog.get(this@playFirmwareAudio).record(
+                        "audio/safety-blocked",
+                        "gear=${safety.gear}; speed=${safety.speedKph}; power=${safety.powerState}",
+                    )
+                    status.text = "车辆正在行驶，已取消试听"
+                    return@launch
+                }
+                if (safety.motion == VehicleMotionState.UNKNOWN) {
+                    LocalFileLog.get(this@playFirmwareAudio).record(
+                        "audio/safety-fallback",
+                        "驻车状态不可读；仅普通媒体试听；source=${safety.source}",
+                    )
+                    firmwarePlayback = false
+                    localPlayer.play(file, null, routeLabel = "普通媒体试听（驻车状态不可读）")
+                    status.text = "无法读取驻车状态，已降级为普通媒体试听"
+                    return@launch
+                }
                 val attrs = firmwareAudio.focusAttributes(route)
-                LocalFileLog.get(this@playFirmwareAudio).record("audio/vehicle", "gear=${snapshot?.gear}; speed=${snapshot?.speed}; route=$route")
+                LocalFileLog.get(this@playFirmwareAudio).record(
+                    "audio/vehicle",
+                    "gear=${safety.gear}; speed=${safety.speedKph}; power=${safety.powerState}; source=${safety.source}; route=$route",
+                )
                 firmwarePlayback = true
-                localPlayer.play(file, null, attrs, route.title, 15_000L)
-            } catch (error: kotlinx.coroutines.CancellationException) { throw error } catch (error: java.io.IOException) {
-                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+                localPlayer.play(file, null, attrs, route.title, 15_000L, fallbackToOrdinaryMedia = true)
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: java.io.IOException) {
+                fallbackToOrdinaryPreview(file, error)
             } catch (error: IllegalStateException) {
-                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+                fallbackToOrdinaryPreview(file, error)
             } catch (error: IllegalArgumentException) {
-                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+                fallbackToOrdinaryPreview(file, error)
             } catch (error: SecurityException) {
-                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+                fallbackToOrdinaryPreview(file, error)
             } catch (error: ReflectiveOperationException) {
-                stopAudio(); status.text = "专用路由未启动：${error.message}；没有降级为普通媒体"
+                fallbackToOrdinaryPreview(file, error)
             } finally { busy = false }
         }
     }
@@ -244,6 +272,16 @@ private fun LocalToolsActivity.verificationLogControls() {
     }
 }
 
+private fun LocalToolsActivity.fallbackToOrdinaryPreview(file: File, error: Exception) {
+    LocalFileLog.get(this).record(
+        "audio/preview-error",
+        "${error.javaClass.simpleName}: ${error.message}; falling back to ordinary media",
+    )
+    firmwarePlayback = false
+    localPlayer.play(file, null, routeLabel = "普通媒体试听（专用试听异常）")
+    status.text = "专用试听异常，已降级为普通媒体：${error.message}"
+}
+
 internal fun LocalToolsActivity.diagnosticControls() {
         verificationLogControls()
         label("固件包用于确认接口；实车还必须提供运行时类、Binder 服务、HAL 路由和权限。此检测只读，不自动授权，不改系统设置。")
@@ -263,7 +301,7 @@ internal fun LocalToolsActivity.diagnosticControls() {
                 busy = true
                 try {
                     val report = org.json.JSONObject()
-                        .put("schema", "bydmate.local-capabilities.v1")
+                        .put("schema", "bydmatecn.local-capabilities.v1")
                         .put("android_sdk", android.os.Build.VERSION.SDK_INT)
                         .put("build_display", android.os.Build.DISPLAY)
                         .put("model", android.os.Build.MODEL)

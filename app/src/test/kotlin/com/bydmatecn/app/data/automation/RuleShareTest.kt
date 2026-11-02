@@ -301,9 +301,9 @@ class RuleShareTest {
         val first = RuleShareFiles.writeTo(dir, rule, "x")
         val second = RuleShareFiles.writeTo(dir, rule, "x")
         val third = RuleShareFiles.writeTo(dir, rule, "x")
-        assertEquals("bydmate_rule_dom_zvonok.json", first.name)
-        assertEquals("bydmate_rule_dom_zvonok_2.json", second.name)
-        assertEquals("bydmate_rule_dom_zvonok_3.json", third.name)
+        assertEquals("bydmatecn_rule_dom_zvonok.json", first.name)
+        assertEquals("bydmatecn_rule_dom_zvonok_2.json", second.name)
+        assertEquals("bydmatecn_rule_dom_zvonok_3.json", third.name)
     }
 
     @Test fun `export leaves no temp file and a failed write leaves nothing importable`() {
@@ -327,24 +327,24 @@ class RuleShareTest {
 
     @Test fun `a temp file left behind is never listed for import`() {
         val dir = tmp.newFolder("Download")
-        java.io.File(dir, ".bydmate_rule_x.json.tmp").writeText("{")
+        java.io.File(dir, ".bydmatecn_rule_x.json.tmp").writeText("{")
         assertTrue(RuleShareFiles.listRuleFiles(dir).isEmpty())
     }
 
     @Test fun `read stops at 256 KiB`() {
         val dir = tmp.newFolder("Download")
-        val small = java.io.File(dir, "bydmate_rule_small.json").apply { writeText(fixture("bydmate_rule_speed.json")) }
+        val small = java.io.File(dir, "bydmatecn_rule_small.json").apply { writeText(fixture("bydmate_rule_speed.json")) }
         assertEquals(fixture("bydmate_rule_speed.json"), RuleShareFiles.readLimited(small))
-        val exact = java.io.File(dir, "bydmate_rule_exact.json").apply { writeBytes(ByteArray(RuleShareFiles.MAX_FILE_BYTES) { 'a'.code.toByte() }) }
+        val exact = java.io.File(dir, "bydmatecn_rule_exact.json").apply { writeBytes(ByteArray(RuleShareFiles.MAX_FILE_BYTES) { 'a'.code.toByte() }) }
         assertEquals(RuleShareFiles.MAX_FILE_BYTES, RuleShareFiles.readLimited(exact)!!.length)
-        val big = java.io.File(dir, "bydmate_rule_big.json").apply { writeBytes(ByteArray(RuleShareFiles.MAX_FILE_BYTES + 1) { 'a'.code.toByte() }) }
+        val big = java.io.File(dir, "bydmatecn_rule_big.json").apply { writeBytes(ByteArray(RuleShareFiles.MAX_FILE_BYTES + 1) { 'a'.code.toByte() }) }
         assertNull(RuleShareFiles.readLimited(big))
     }
 
     @Test fun `list returns only share files, newest first`() {
         val dir = tmp.newFolder("Download")
-        val old = java.io.File(dir, "bydmate_rule_a.json").apply { writeText("{}"); setLastModified(1_000_000L) }
-        val new = java.io.File(dir, "bydmate_rule_b.json").apply { writeText("{}"); setLastModified(2_000_000L) }
+        val old = java.io.File(dir, "bydmatecn_rule_a.json").apply { writeText("{}"); setLastModified(1_000_000L) }
+        val new = java.io.File(dir, "bydmatecn_rule_b.json").apply { writeText("{}"); setLastModified(2_000_000L) }
         java.io.File(dir, "bydmate_backup_1.zip").writeText("x")
         java.io.File(dir, "notes.json").writeText("x")
         assertEquals(listOf(new, old), RuleShareFiles.listRuleFiles(dir))

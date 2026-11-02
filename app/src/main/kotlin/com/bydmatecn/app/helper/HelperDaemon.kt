@@ -42,7 +42,7 @@ import java.nio.channels.OverlappingFileLockException
 import kotlin.system.exitProcess
 
 // Lock path on the device filesystem (writable by shell uid).
-private const val LOCK_PATH = "/data/local/tmp/bydmate_helper.lock"
+internal const val HELPER_LOCK_PATH = "/data/local/tmp/bydmatecn_helper.lock"
 
 // SELinux domain of the running process; the daemon must land in the shell domain to be
 // allowed to addService. Unreadable on some firmwares — never fatal.
@@ -145,7 +145,7 @@ internal fun acquireSingleOwnerLock(path: String): Pair<FileChannel, FileLock>? 
 /**
  * Shell-uid binder daemon entry point. Spawned by the app via:
  *   CLASSPATH=<apk> app_process /system/bin \
- *     --nice-name=bydmate_helper com.bydmatecn.app.helper.HelperDaemon <appUid> [<spawnToken>]
+ *     --nice-name=bydmatecn_helper com.bydmatecn.app.helper.HelperDaemon <appUid> [<spawnToken>]
  *
  * Lifecycle:
  *   1. Parse expectedUid from args[0] and the optional spawn token from args[1].
@@ -173,7 +173,7 @@ fun main(args: Array<String>) {
     val spawnToken = spawnTokenFrom(args)
 
     // Step 1: single-owner lock — prevents duplicate daemons.
-    val lockPair = acquireSingleOwnerLock(LOCK_PATH)
+    val lockPair = acquireSingleOwnerLock(HELPER_LOCK_PATH)
     if (lockPair == null) {
         println("ALREADY_RUNNING")
         // Clean exit: another owner already holds the service. Must exitProcess
@@ -300,7 +300,7 @@ fun main(args: Array<String>) {
                         true
                     }.getOrElse { t ->
                         android.util.Log.w(
-                            "bydmate_helper", "TX_MOVE_TASK_TO_DISPLAY failed task=$logTaskId display=$logDisplayId", t)
+                            "bydmatecn_helper", "TX_MOVE_TASK_TO_DISPLAY failed task=$logTaskId display=$logDisplayId", t)
                         reply?.writeInt(-1); reply?.writeInt(0); true
                     }
                 }
@@ -321,7 +321,7 @@ fun main(args: Array<String>) {
                         reply?.writeInt(0); reply?.writeInt(0)
                         true
                     }.getOrElse { t ->
-                        android.util.Log.w("bydmate_helper", "TX_SET_FOCUSED_TASK failed task=$logTaskId", t)
+                        android.util.Log.w("bydmatecn_helper", "TX_SET_FOCUSED_TASK failed task=$logTaskId", t)
                         reply?.writeInt(-1); reply?.writeInt(0); true
                     }
                 }
@@ -360,10 +360,10 @@ fun main(args: Array<String>) {
                         // The app asks for a PUBLIC display first and falls back to private flags on
                         // refusal: that SecurityException is expected, one line instead of a stack.
                         if (t is SecurityException) {
-                            android.util.Log.w("bydmate_helper", "TX_CREATE_VIRTUAL_DISPLAY: SecurityException " +
+                            android.util.Log.w("bydmatecn_helper", "TX_CREATE_VIRTUAL_DISPLAY: SecurityException " +
                                 "flags=$logFlags ${logWidth}x$logHeight (expected for PUBLIC; app falls back to private flags)")
                         } else {
-                            android.util.Log.w("bydmate_helper", "TX_CREATE_VIRTUAL_DISPLAY failed flags=$logFlags ${logWidth}x$logHeight", t)
+                            android.util.Log.w("bydmatecn_helper", "TX_CREATE_VIRTUAL_DISPLAY failed flags=$logFlags ${logWidth}x$logHeight", t)
                         }
                         reply?.writeInt(-1); reply?.writeInt(0); true
                     }
@@ -471,8 +471,8 @@ fun main(args: Array<String>) {
                         else if (now - clusterDiagLastMs < CLUSTER_DIAG_MIN_INTERVAL_MS) {
                             val cached = clusterDiagCache
                             if (cached != null) {
-                                android.util.Log.i("bydmate_helper", "cdiag: replaying cached snapshot (${cached.size} lines)")
-                                cached.forEach { android.util.Log.i("bydmate_helper", it) }
+                                android.util.Log.i("bydmatecn_helper", "cdiag: replaying cached snapshot (${cached.size} lines)")
+                                cached.forEach { android.util.Log.i("bydmatecn_helper", it) }
                             }
                             cached != null
                         } else {
@@ -486,8 +486,8 @@ fun main(args: Array<String>) {
                                 // A request arrived mid-collection (typically: recording just
                                 // started and wiped logcat) - emit the whole block once more.
                                 if (replay && lines != null) {
-                                    android.util.Log.i("bydmate_helper", "cdiag: replaying snapshot after collection (${lines.size} lines)")
-                                    lines.forEach { android.util.Log.i("bydmate_helper", it) }
+                                    android.util.Log.i("bydmatecn_helper", "cdiag: replaying snapshot after collection (${lines.size} lines)")
+                                    lines.forEach { android.util.Log.i("bydmatecn_helper", it) }
                                 }
                             }, "bydmate-cdiag").apply { isDaemon = true; start() }
                             true
@@ -506,7 +506,7 @@ fun main(args: Array<String>) {
                     // firmware would report no display at all.
                     val devices = ClusterDisplayDiag.parseDisplayDevices(
                         shExecBounded("dumpsys display", maxBytes = 256 * 1024))
-                    android.util.Log.i("bydmate_helper", "TX_LIST_DISPLAYS: ${devices.size} displays " +
+                    android.util.Log.i("bydmatecn_helper", "TX_LIST_DISPLAYS: ${devices.size} displays " +
                         devices.joinToString { "${it.id}:\"${it.name}\" ${it.width}x${it.height}" }.take(300))
                     reply?.writeInt(0)
                     reply?.writeInt(devices.size)
@@ -533,7 +533,7 @@ fun main(args: Array<String>) {
                         shExecBounded("dumpsys window displays", maxBytes = 256 * 1024))
                     val taskConfig = ClusterDisplayDiag.taskConfigLines(
                         shExecBounded("dumpsys activity activities", maxBytes = 512 * 1024), pkg)
-                    android.util.Log.i("bydmate_helper", "TX_CLUSTER_WM_DIAG pkg=$pkg " +
+                    android.util.Log.i("bydmatecn_helper", "TX_CLUSTER_WM_DIAG pkg=$pkg " +
                         "displays=${displays.size} task=${taskConfig.joinToString("; ").take(200)}")
                     reply?.writeInt(0)
                     reply?.writeString(displays.joinToString("\n"))
@@ -679,7 +679,7 @@ fun main(args: Array<String>) {
                         true
                     }.getOrElse { t ->
                         android.util.Log.w(
-                            "bydmate_helper", "TX_LAUNCH_FREEFORM failed pkg=$logPkg display=$logDisplayId", t)
+                            "bydmatecn_helper", "TX_LAUNCH_FREEFORM failed pkg=$logPkg display=$logDisplayId", t)
                         reply?.writeInt(-1); reply?.writeInt(0); true
                     }
                 }
@@ -736,7 +736,7 @@ fun main(args: Array<String>) {
                     reply?.writeByteArray(chunk)
                     true
                 }.getOrElse { e ->
-                    android.util.Log.e("bydmate_helper", "TX_DUMP_FIDS chunked: error", e)
+                    android.util.Log.e("bydmatecn_helper", "TX_DUMP_FIDS chunked: error", e)
                     // Write full protocol reply so the client reads status=-1 and returns ReadError,
                     // not BinderAbsent. Without totalLength+byteArray the client sees dataAvail()<8
                     // and maps the call to BinderAbsent ("демон недоступен"), which is a lie (Q4-1).
@@ -765,7 +765,7 @@ fun main(args: Array<String>) {
                     val iAtm = activityTaskManager()
                     val enter = splitMethod(iAtm, "enterSplitMode", 0)
                     if (enter == null) {
-                        android.util.Log.w("bydmate_helper", "TX_SPLIT37_ENTER: enterSplitMode absent")
+                        android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_ENTER: enterSplitMode absent")
                         reply?.writeInt(HelperBinderProtocol.SPLIT37_UNSUPPORTED); reply?.writeInt(-1)
                     } else {
                         enter.invoke(iAtm)
@@ -777,7 +777,7 @@ fun main(args: Array<String>) {
                     }
                     true
                 }.getOrElse { e ->
-                    android.util.Log.w("bydmate_helper", "TX_SPLIT37_ENTER failed", e)
+                    android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_ENTER failed", e)
                     reply?.writeInt(HelperBinderProtocol.SPLIT37_FAILED); reply?.writeInt(-1); true
                 }
 
@@ -785,7 +785,7 @@ fun main(args: Array<String>) {
                     val iAtm = activityTaskManager()
                     val byAreaId = splitMethod(iAtm, "getRootTaskIdByAreaId", 1)
                     if (byAreaId == null) {
-                        android.util.Log.w("bydmate_helper", "TX_SPLIT37_AREA_INFO: getRootTaskIdByAreaId absent")
+                        android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_AREA_INFO: getRootTaskIdByAreaId absent")
                         writeAreaInfoFailure(reply, HelperBinderProtocol.SPLIT37_UNSUPPORTED)
                     } else {
                         val areaMode = screenAreaMode(iAtm)
@@ -809,7 +809,7 @@ fun main(args: Array<String>) {
                     }
                     true
                 }.getOrElse { e ->
-                    android.util.Log.w("bydmate_helper", "TX_SPLIT37_AREA_INFO failed", e)
+                    android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_AREA_INFO failed", e)
                     writeAreaInfoFailure(reply, HelperBinderProtocol.SPLIT37_FAILED); true
                 }
 
@@ -823,7 +823,7 @@ fun main(args: Array<String>) {
                     reply?.writeInt(status); reply?.writeInt(0)
                     true
                 }.getOrElse { e ->
-                    android.util.Log.w("bydmate_helper", "TX_SPLIT37_MOVE_TASK failed", e)
+                    android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_MOVE_TASK failed", e)
                     reply?.writeInt(HelperBinderProtocol.SPLIT37_FAILED); reply?.writeInt(0); true
                 }
 
@@ -832,7 +832,7 @@ fun main(args: Array<String>) {
                     val iAtm = activityTaskManager()
                     val forTask = splitMethod(iAtm, "getTaskAreaIdForMulti", 1)
                     if (forTask == null) {
-                        android.util.Log.w("bydmate_helper", "TX_SPLIT37_TASK_AREA: getTaskAreaIdForMulti absent")
+                        android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_TASK_AREA: getTaskAreaIdForMulti absent")
                         reply?.writeInt(HelperBinderProtocol.SPLIT37_UNSUPPORTED); reply?.writeInt(-1)
                     } else {
                         // Invoke before the first write — see TX_SPLIT37_ENTER.
@@ -842,7 +842,7 @@ fun main(args: Array<String>) {
                     }
                     true
                 }.getOrElse { e ->
-                    android.util.Log.w("bydmate_helper", "TX_SPLIT37_TASK_AREA failed", e)
+                    android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_TASK_AREA failed", e)
                     reply?.writeInt(HelperBinderProtocol.SPLIT37_FAILED); reply?.writeInt(-1); true
                 }
 
@@ -851,7 +851,7 @@ fun main(args: Array<String>) {
                     // Exact vendor spelling, capital S — not a typo.
                     val swap = splitMethod(iAtm, "SwapSplitPosition", 0)
                     if (swap == null) {
-                        android.util.Log.w("bydmate_helper", "TX_SPLIT37_SWAP: SwapSplitPosition absent")
+                        android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_SWAP: SwapSplitPosition absent")
                         reply?.writeInt(HelperBinderProtocol.SPLIT37_UNSUPPORTED)
                     } else {
                         swap.invoke(iAtm)
@@ -860,7 +860,7 @@ fun main(args: Array<String>) {
                     reply?.writeInt(0)
                     true
                 }.getOrElse { e ->
-                    android.util.Log.w("bydmate_helper", "TX_SPLIT37_SWAP failed", e)
+                    android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_SWAP failed", e)
                     reply?.writeInt(HelperBinderProtocol.SPLIT37_FAILED); reply?.writeInt(0); true
                 }
 
@@ -869,7 +869,7 @@ fun main(args: Array<String>) {
                     val iAtm = activityTaskManager()
                     val change = splitMethod(iAtm, "changeSplitScreenMode", 1)
                     if (change == null) {
-                        android.util.Log.w("bydmate_helper", "TX_SPLIT37_CHANGE_MODE: changeSplitScreenMode absent")
+                        android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_CHANGE_MODE: changeSplitScreenMode absent")
                         reply?.writeInt(HelperBinderProtocol.SPLIT37_UNSUPPORTED); reply?.writeInt(-1)
                     } else {
                         change.invoke(iAtm, mode)
@@ -880,7 +880,7 @@ fun main(args: Array<String>) {
                     }
                     true
                 }.getOrElse { e ->
-                    android.util.Log.w("bydmate_helper", "TX_SPLIT37_CHANGE_MODE failed", e)
+                    android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_CHANGE_MODE failed", e)
                     reply?.writeInt(HelperBinderProtocol.SPLIT37_FAILED); reply?.writeInt(-1); true
                 }
 
@@ -889,7 +889,7 @@ fun main(args: Array<String>) {
                     val iAtm = activityTaskManager()
                     val infos = rootTaskInfosSnapshot(iAtm)
                     if (infos == null) {
-                        android.util.Log.w("bydmate_helper", "TX_SPLIT37_ROOT_STATE: getAllRootTaskInfos absent")
+                        android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_ROOT_STATE: getAllRootTaskInfos absent")
                         reply?.writeInt(HelperBinderProtocol.SPLIT37_UNSUPPORTED)
                     } else {
                         // Read before the first write — see TX_SPLIT37_ENTER.
@@ -899,7 +899,7 @@ fun main(args: Array<String>) {
                     }
                     true
                 }.getOrElse { e ->
-                    android.util.Log.w("bydmate_helper", "TX_SPLIT37_ROOT_STATE failed", e)
+                    android.util.Log.w("bydmatecn_helper", "TX_SPLIT37_ROOT_STATE failed", e)
                     reply?.writeInt(HelperBinderProtocol.SPLIT37_FAILED); true
                 }
 
@@ -1405,7 +1405,7 @@ private fun atmGetTasks(iAtm: Any, maxNum: Int): List<*>? {
             )
         } catch (e: NoSuchMethodException) {
             atmGetTasksTakesFlags = false
-            android.util.Log.i("bydmate_helper", "atm compat: getTasks(int) (Android 10 signature)")
+            android.util.Log.i("bydmatecn_helper", "atm compat: getTasks(int) (Android 10 signature)")
             iAtm.javaClass.getMethod("getTasks", Int::class.javaPrimitiveType)
         }
         atmGetTasksMethod = m
@@ -1687,7 +1687,7 @@ internal fun taskActivityType(taskId: Int): Int = runCatching {
     }
     -1
 }.getOrElse { e ->
-    android.util.Log.w("bydmate_helper", "taskActivityType(task=$taskId) failed: ${e.message}")
+    android.util.Log.w("bydmatecn_helper", "taskActivityType(task=$taskId) failed: ${e.message}")
     -1
 }
 
@@ -1720,7 +1720,7 @@ private fun moveTaskToDisplayReflect(taskId: Int, displayId: Int) {
             "moveStackToDisplay", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
         )
         atmMoveViaStack = true
-        android.util.Log.i("bydmate_helper", "atm compat: move via getAllStackInfos/moveStackToDisplay")
+        android.util.Log.i("bydmatecn_helper", "atm compat: move via getAllStackInfos/moveStackToDisplay")
     }
     moveTaskToDisplayViaStack(iAtm, taskId, displayId)
 }
@@ -1815,7 +1815,7 @@ private fun setFocusedTaskReflect(taskId: Int) {
         m = try {
             iAtm.javaClass.getMethod("setFocusedRootTask", Int::class.javaPrimitiveType)
         } catch (e: NoSuchMethodException) {
-            android.util.Log.i("bydmate_helper", "atm compat: setFocusedTask(int)")
+            android.util.Log.i("bydmatecn_helper", "atm compat: setFocusedTask(int)")
             iAtm.javaClass.getMethod("setFocusedTask", Int::class.javaPrimitiveType)
         }
         atmSetFocusedTaskMethod = m
@@ -1986,7 +1986,7 @@ internal fun split37MoveTaskCore(
     )
     if (out.contains("Error") || out.contains("Exception")) {
         android.util.Log.w(
-            "bydmate_helper",
+            "bydmatecn_helper",
             "split37 move-task task=$taskId root=$rootTaskId failed: ${out.take(200)}",
         )
         return HelperBinderProtocol.SPLIT37_FAILED
@@ -2137,7 +2137,7 @@ internal fun shExecBounded(
  * the log, under the daemon tag the app's log recorder already captures.
  */
 private fun logClusterDisplayDiag(): List<String> {
-    val tag = "bydmate_helper"
+    val tag = "bydmatecn_helper"
     val emitted = ArrayList<String>()
     var cmds = 0
     var errors = 0
@@ -2243,11 +2243,11 @@ internal fun setDisplayDensityCore(
         exec("wm density \"\$1\" -d \"\$2\"", listOf(density.toString(), displayId.toString()))
     }
     val label = if (density == 0) "reset" else density.toString()
-    android.util.Log.i("bydmate_helper", "wm density set display=$displayId density=$label " +
+    android.util.Log.i("bydmatecn_helper", "wm density set display=$displayId density=$label " +
         "rc=${set.code} out=\"${flattenOutput(set.stdout, 120, " / ")}\"")
     val readback = flattenOutput(
         exec("wm density -d \"\$1\"", listOf(displayId.toString())).stdout, 160, "; ")
-    android.util.Log.i("bydmate_helper", "wm density readback display=$displayId: $readback")
+    android.util.Log.i("bydmatecn_helper", "wm density readback display=$displayId: $readback")
     return DensityCommandResult(set.code == 0, readback)
 }
 
@@ -2305,7 +2305,7 @@ private fun enableAccessibilityService(): Boolean {
  * process) and finishes the sequence. Kept dumb and logged — the SDK gate lives in the app.
  */
 private fun recoverAccessibilityService(): Boolean {
-    val tag = "bydmate_helper"
+    val tag = "bydmatecn_helper"
     val pkg = HelperBinderProtocol.APP_PACKAGE
     android.util.Log.w(tag, "a11y recover: force-stopping $pkg (AOSP Q stuck binding)")
     try {
@@ -2365,7 +2365,7 @@ private fun logA11yFrameworkStateAsync(reassertOk: Boolean) {
 
 /** Diagnostics only; every dumpsys is time- and size-bounded so it can never wedge the daemon. */
 private fun logA11yFrameworkState(reassertOk: Boolean) {
-    val tag = "bydmate_helper"
+    val tag = "bydmatecn_helper"
     val a11y = shExecBounded("dumpsys accessibility").lines()
     val keep = a11y.filter { l ->
         l.contains("User state[") || l.contains("services:{") || l.contains("bydmate", ignoreCase = true)
@@ -2815,7 +2815,7 @@ internal fun dumpFidsCore(classResolver: (String) -> Class<*>?): String {
         val toScan = mutableListOf(rootClass)
         toScan.addAll(
             runCatching { rootClass.declaredClasses }.getOrElse {
-                android.util.Log.w("bydmate_helper", "dumpFids: declaredClasses failed for ${rootClass.name}", it)
+                android.util.Log.w("bydmatecn_helper", "dumpFids: declaredClasses failed for ${rootClass.name}", it)
                 emptyArray()
             }
         )
@@ -2834,7 +2834,7 @@ internal fun dumpFidsCore(classResolver: (String) -> Class<*>?): String {
                         "$prefix.${field.name}=${field.get(null)}"
                     }
             }.getOrElse {
-                android.util.Log.w("bydmate_helper", "dumpFids: skipping ${cls.name}", it)
+                android.util.Log.w("bydmatecn_helper", "dumpFids: skipping ${cls.name}", it)
                 emptyList()
             }
             lines += classLines
@@ -3020,7 +3020,7 @@ private fun launchAndForce(packageName: String, displayId: Int, width: Int, heig
         } catch (e: StackMoveRefused) {
             // Android 10 stack move the daemon refused: pinning bounds/focus on a task that never
             // left the main display would report a placement that did not happen.
-            android.util.Log.w("bydmate_helper", "launchAndForce: ${e.message}; aborting")
+            android.util.Log.w("bydmatecn_helper", "launchAndForce: ${e.message}; aborting")
             return false
         } catch (t: Throwable) {
             // Best-effort as before: AOSP 12 throws "already on display" on the second pass.
@@ -3083,23 +3083,23 @@ internal fun splitFallbackCore(
     if (before == null || before.windowingMode !in SPLIT_WINDOWING_MODES) return true
     val after = stateOf(taskId)
     if (!needsSplitFallback(before, after, displayId)) {
-        android.util.Log.i("bydmate_helper", "launchAndForce split: task=$taskId from=$before moved state=$after")
+        android.util.Log.i("bydmatecn_helper", "launchAndForce split: task=$taskId from=$before moved state=$after")
         return true
     }
     val component = resolveComponent()
     if (component == null) {
-        android.util.Log.w("bydmate_helper", "launchAndForce split: task=$taskId state=$after no launcher component")
+        android.util.Log.w("bydmatecn_helper", "launchAndForce split: task=$taskId state=$after no launcher component")
         return false
     }
     android.util.Log.i(
-        "bydmate_helper",
+        "bydmatecn_helper",
         "launchAndForce split: task=$taskId from=$before still state=$after → am start display=$displayId",
     )
     val out = runCatching {
         shell("am start --windowingMode $WINDOWING_MODE_FULLSCREEN --display $displayId -n \"\$1\"", listOf(component))
     }.getOrElse { "Exception ${it.message}" }
     if (out.contains("Error") || out.contains("Exception")) {
-        android.util.Log.w("bydmate_helper", "launchAndForce split: task=$taskId am failed: ${out.take(120)}")
+        android.util.Log.w("bydmatecn_helper", "launchAndForce split: task=$taskId am failed: ${out.take(120)}")
         return false
     }
     var last: TaskModeState? = null
@@ -3107,11 +3107,11 @@ internal fun splitFallbackCore(
         sleep(PULLBACK_POLL_MS)
         last = stateOf(taskId)
         if (last?.displayId == displayId) {
-            android.util.Log.i("bydmate_helper", "launchAndForce split: task=$taskId fallback ok state=$last")
+            android.util.Log.i("bydmatecn_helper", "launchAndForce split: task=$taskId fallback ok state=$last")
             return true
         }
     }
-    android.util.Log.w("bydmate_helper", "launchAndForce split: task=$taskId fallback failed state=$last")
+    android.util.Log.w("bydmatecn_helper", "launchAndForce split: task=$taskId fallback failed state=$last")
     return false
 }
 
@@ -3244,7 +3244,7 @@ internal fun setWindowingModeCompat(
         }
         // Log.i, not Log.d: this branch decision is the only record of why a pane was re-typed
         // (or not), and release dumps carry nothing below INFO.
-        android.util.Log.i("bydmate_helper", "setWindowingModeCompat task=$taskId mode=$windowingMode → $branch")
+        android.util.Log.i("bydmatecn_helper", "setWindowingModeCompat task=$taskId mode=$windowingMode → $branch")
         skipReflect = type != desiredActivityType
     } else {
         skipReflect = false
@@ -3283,17 +3283,17 @@ internal fun setWindowingModeCompat(
                 if (after != null && after.displayId == 0 &&
                     after.windowingMode == WINDOWING_MODE_FULLSCREEN
                 ) {
-                    android.util.Log.i("bydmate_helper", "pullback light path ok task=$taskId")
+                    android.util.Log.i("bydmatecn_helper", "pullback light path ok task=$taskId")
                     return
                 }
             }
             android.util.Log.i(
-                "bydmate_helper",
+                "bydmatecn_helper",
                 "pullback light path failed: task=$taskId state=$after → remove+relaunch",
             )
         } else {
             android.util.Log.i(
-                "bydmate_helper",
+                "bydmatecn_helper",
                 "pullback light path failed: task=$taskId am=${light?.take(120)} → remove+relaunch",
             )
         }
@@ -3569,7 +3569,7 @@ private fun launchFreeform(
         getActivityType = { ti -> taskActivityType(ti) },
         // android.util.Log reaches logcat from the app_process daemon; System.err goes nowhere.
         // Passing the throwable prints the full stack trace including the cause chain.
-        log = { msg, t -> android.util.Log.w("bydmate_helper", msg, t) },
+        log = { msg, t -> android.util.Log.w("bydmatecn_helper", msg, t) },
         // setMode recreates a STANDARD task (new id) — re-resolve by package, never by the old id.
         resolveCurrentTaskId = { findTaskState(packageName)?.taskId ?: -1 },
         deadlineMs = startMs + GRACE_DEADLINE_MS,

@@ -34,26 +34,55 @@ class LocalAudioPlayer(
     internal val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
 
-    fun play(file: File, device: AudioDeviceInfo?, playbackAttributes: AudioAttributes = attributes,
-             routeLabel: String = "普通媒体", maximumDurationMs: Long? = null) {
+    fun play(
+        file: File,
+        device: AudioDeviceInfo?,
+        playbackAttributes: AudioAttributes = attributes,
+        routeLabel: String = "普通媒体",
+        maximumDurationMs: Long? = null,
+        fallbackToOrdinaryMedia: Boolean = false,
+    ) {
         stop()
         boundedPlayback = maximumDurationMs != null
         policy.begin()
+
+        val exteriorReady = maximumDurationMs == null || startExteriorSession()
+        if (!exteriorReady && !fallbackToOrdinaryMedia) {
+            stop()
+            return
+        }
+        val effectiveMaximum = maximumDurationMs.takeIf { exteriorReady }
+        val effectiveAttributes = if (exteriorReady) playbackAttributes else attributes
+        val effectiveRouteLabel = if (exteriorReady) routeLabel else "普通媒体试听（车外路由不可用）"
+        if (!exteriorReady) {
+            boundedPlayback = false
+            report("车外路由不可用，已降级为普通媒体试听")
+            fileLog.record("audio/ordinary-fallback", "file=${file.name}; route=$routeLabel")
+        }
+
         val requestGeneration = generation
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-            .setAudioAttributes(playbackAttributes).setOnAudioFocusChangeListener({ change ->
+            .setAudioAttributes(effectiveAttributes).setOnAudioFocusChangeListener({ change ->
                 onFocusChanged(change, requestGeneration)
             }, Handler(Looper.getMainLooper())).build()
         focus = request
         if (audio.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            stop(); report("系统拒绝音频焦点，没有开始播放"); return
+            stop()
+            report("系统拒绝音频焦点，没有开始播放")
+            return
         }
         timeout = Runnable {
-            if (requestGeneration == generation && !prepared) { stop(); report("音频准备超时") }
+            if (requestGeneration == generation && !prepared) {
+                stop()
+                report("音频准备超时")
+            }
         }.also { handler.postDelayed(it, 10_000) }
-        if (maximumDurationMs != null && !startExteriorSession()) return
-        fileLog.record("audio/start", "file=${file.name}; route=$routeLabel; attrs=$playbackAttributes; preferred=${device?.id}; stream=$exteriorStreamType")
-        prepareMediaPlayer(file, device, playbackAttributes, routeLabel, maximumDurationMs)
+        fileLog.record(
+            "audio/start",
+            "file=${file.name}; route=$effectiveRouteLabel; attrs=$effectiveAttributes; " +
+                "preferred=${device?.id}; stream=$exteriorStreamType; exteriorReady=$exteriorReady",
+        )
+        prepareMediaPlayer(file, device, effectiveAttributes, effectiveRouteLabel, effectiveMaximum)
     }
 
     fun togglePause() {

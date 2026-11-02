@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.bydmatecn.app.data.vehicle.BatchReadItem
 import com.bydmatecn.app.data.vehicle.HelperClient
+import com.bydmatecn.app.data.vehicle.HelperBootstrap
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +31,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class LocalLockSoundService : Service() {
     @Inject lateinit var helper: HelperClient
+    @Inject lateinit var helperBootstrap: HelperBootstrap
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var job: Job? = null
     private lateinit var player: LocalAudioPlayer
@@ -37,6 +39,8 @@ class LocalLockSoundService : Service() {
     private var lastSampleSummary: String? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wakeLockAcquiredAt = 0L
+    private var consecutiveReadFailures = 0
+    private var lastHelperRecoveryAt = -HELPER_RECOVERY_INTERVAL_MS
 
     override fun onCreate() {
         super.onCreate()
@@ -66,7 +70,7 @@ class LocalLockSoundService : Service() {
         job?.cancel()
         player.stop()
         job = scope.launch {
-            val detector = LockSoundEventDetector()
+            val detector = LockSoundEventDetector(initialLock = prefs.getInt(KEY_LAST_LOCK, 0).takeIf { it in VALID_LOCK_CODES })
             try {
                 check(prefs.getBoolean("verified", false)) { "门锁状态与车外音频控制器尚未确认" }
                 val profile = ExteriorControllerProfile.selected(this@LocalLockSoundService)
@@ -129,14 +133,19 @@ class LocalLockSoundService : Service() {
             val now = SystemClock.elapsedRealtime()
             if (now - wakeLockAcquiredAt >= WAKE_LOCK_RENEW_MS) holdWakeLock()
             val sample = readSample()
-            val summary = "lockFL=${sample.lockFL}; flash=${sample.turnSignalFlash}; doorFL=${sample.doorFL}; power=${sample.powerState}; wake=${wakeLock?.isHeld == true}"
+            sample.lockFL?.takeIf { it in VALID_LOCK_CODES }?.let { prefs.edit().putInt(KEY_LAST_LOCK, it).apply() }
+            val summary = "lockFL=${sample.lockFL}; flash=${sample.turnSignalFlash}; doorFL=${sample.doorFL}; power=${sample.powerState}; gear=${sample.gear}; speed=${sample.speedKph}; motion=${sample.motion}; wake=${wakeLock?.isHeld == true}"
             if (summary != lastSampleSummary) {
                 note("状态：$summary")
                 lastSampleSummary = summary
             }
             detector.sample(sample, now)?.let { detection ->
-                note("事件确认：${detection.event}; reason=${detection.reason}; $summary")
-                playEvent(detection.event)
+                if (sample.motion == VehicleMotionState.MOVING) {
+                    note("事件抑制：${detection.event}; 行车状态不播放；reason=${detection.reason}; $summary")
+                } else {
+                    note("事件确认：${detection.event}; reason=${detection.reason}; $summary")
+                    playEvent(detection.event)
+                }
             }
             delay(POLL_MS)
         }
@@ -145,14 +154,30 @@ class LocalLockSoundService : Service() {
     private suspend fun readSample(): LockSoundSample {
         val pairs = withTimeoutOrNull(LOCK_READ_TIMEOUT_MS) { helper.readBatch(SAMPLE_ITEMS) }
         if (pairs != null && pairs.size == SAMPLE_ITEMS.size) {
+            consecutiveReadFailures = 0
             fun value(index: Int): Int? = pairs[index].let { (status, raw) -> raw.takeIf { status == 0 } }
-            return LockSoundSample(value(0), value(1), value(2), value(3))
+            val speed = value(5)?.let(VehicleSafetyProbe::decodeSpeed)
+            val gear = value(4)
+            val power = value(3)
+            val moving = (speed != null && kotlin.math.abs(speed) > 0.5f) ||
+                (gear != null && gear != VehicleSafetyProbe.PARK_GEAR)
+            val parked = gear == VehicleSafetyProbe.PARK_GEAR && speed != null && kotlin.math.abs(speed) <= 0.5f
+            val motion = when { moving -> VehicleMotionState.MOVING; parked -> VehicleMotionState.PARKED; else -> VehicleMotionState.UNKNOWN }
+            return LockSoundSample(value(0), value(1), value(2), power, gear, speed, motion)
+        }
+        consecutiveReadFailures++
+        val now = SystemClock.elapsedRealtime()
+        if (consecutiveReadFailures >= HELPER_RECOVERY_FAILURES && now - lastHelperRecoveryAt >= HELPER_RECOVERY_INTERVAL_MS) {
+            lastHelperRecoveryAt = now
+            val recovered = withTimeoutOrNull(HELPER_RECOVERY_TIMEOUT_MS) { helperBootstrap.ensureRunning() } == true
+            note("helper恢复：success=$recovered; consecutiveFailures=$consecutiveReadFailures")
+            if (recovered) consecutiveReadFailures = 0
         }
         // Keep a direct LockFL fallback for firmware whose helper does not expose batch reads.
         val lock = withTimeoutOrNull(LOCK_READ_TIMEOUT_MS) {
             helper.read(LOCK_DEVICE, LOCK_FID)?.toInt()?.takeIf { it in VALID_LOCK_CODES }
         }
-        return LockSoundSample(lock, null, null, null)
+        return LockSoundSample(lock, null, null, null, null, null, VehicleMotionState.UNKNOWN)
     }
 
     private fun playEvent(event: LockSoundEvent) {
@@ -177,6 +202,7 @@ class LocalLockSoundService : Service() {
         const val STOP = "com.bydmatecn.app.LOCK_STOP"
         const val PREFS = "local-lock-sound"
         const val KEY_ENABLED = "enabled"
+        private const val KEY_LAST_LOCK = "last_observed_lock"
         private const val CHANNEL = "local_lock_sound"
         private const val NOTIFICATION_ID = 5813
         private const val LOCK_DEVICE = 1032
@@ -185,6 +211,9 @@ class LocalLockSoundService : Service() {
         private const val POLL_MS = 250L
         private const val LOCK_READ_TIMEOUT_MS = 1_500L
         private const val EVENT_PLAY_MAX_MS = 15_000L
+        private const val HELPER_RECOVERY_FAILURES = 3
+        private const val HELPER_RECOVERY_INTERVAL_MS = 15_000L
+        private const val HELPER_RECOVERY_TIMEOUT_MS = 20_000L
         private const val WAKE_LOCK_TIMEOUT_MS = 30 * 60_000L
         private const val WAKE_LOCK_RENEW_MS = 25 * 60_000L
         private val SAMPLE_ITEMS = listOf(
@@ -192,6 +221,8 @@ class LocalLockSoundService : Service() {
             BatchReadItem(5, 1004, 950_009_900),   // turnSignal / flash confirmation
             BatchReadItem(5, 1001, 692_060_168),   // front-left door
             BatchReadItem(5, 1023, 315_621_408),   // vehicle power state
+            BatchReadItem(5, 1011, 555_745_336),   // gear
+            BatchReadItem(7, 1013, -1_807_745_016), // speed float bits
         )
 
         fun start(context: Context) {

@@ -2,7 +2,7 @@ package com.bydmatecn.app.helper
 
 import java.lang.reflect.InvocationTargetException
 
-private const val AUTO_VOICE_TAG = "bydmate_helper"
+private const val AUTO_VOICE_TAG = "bydmatecn_helper"
 
 /** External-amp type, read for the log only: the call works with and without the amp (#353). */
 internal const val EXT_AMP_TYPE_PROP = "sys.ext.amp.type"

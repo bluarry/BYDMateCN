@@ -518,9 +518,9 @@ internal object RuleShareJsonLimits {
     }
 }
 
-/** Where share files live: `bydmate_rule_<slug>.json` in the public Download folder. */
+/** Where share files live: `bydmatecn_rule_<slug>.json` in the public Download folder. */
 object RuleShareFiles {
-    const val FILE_PREFIX = "bydmate_rule_"
+    const val FILE_PREFIX = "bydmatecn_rule_"
     const val FILE_SUFFIX = ".json"
     private const val SLUG_MAX = 40
 
@@ -545,7 +545,7 @@ object RuleShareFiles {
         return slug.ifEmpty { "rule" }
     }
 
-    /** `bydmate_rule_<slug>.json` in [dir], or `_2`, `_3`... when that name is taken. */
+    /** `bydmatecn_rule_<slug>.json` in [dir], or `_2`, `_3`... when that name is taken. */
     fun freeFile(dir: File, name: String): File {
         val base = FILE_PREFIX + slug(name)
         var file = File(dir, base + FILE_SUFFIX)

@@ -54,7 +54,7 @@ class BackupManagerExportTest {
     @Before
     fun setUp() {
         every { appDatabase.openHelper.writableDatabase } returns supportDb
-        liveDb = BackupFixtures.createCurrentDb(context, "bydmate.db")
+        liveDb = BackupFixtures.createCurrentDb(context, "bydmatecn.db")
         BackupFixtures.withDb(liveDb) { BackupFixtures.seedCurrent(it, "live", 1L) }
     }
 
@@ -75,7 +75,7 @@ class BackupManagerExportTest {
     fun `export fails when wal grows back after checkpoint`() {
         every { appDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)", null) } answers { checkpointCursor(busy = 0) }
         // Non-empty WAL after a "successful" TRUNCATE = a writer slipped in.
-        File(context.getDatabasePath("bydmate.db").parentFile, "bydmate.db-wal").writeBytes(ByteArray(32))
+        File(context.getDatabasePath("bydmatecn.db").parentFile, "bydmatecn.db-wal").writeBytes(ByteArray(32))
         assertThrows(IllegalStateException::class.java) { manager().export() }
     }
 
@@ -86,8 +86,8 @@ class BackupManagerExportTest {
         val zip = manager().export(BackupPart.ALL)
 
         assertEquals(BackupPart.ALL, manifestParts(zip))
-        assertNull(BackupFixtures.entryBytes(zip, "bydmate.part.db"))
-        entryDb(zip, "bydmate.db") { db ->
+        assertNull(BackupFixtures.entryBytes(zip, "bydmatecn.part.db"))
+        entryDb(zip, "bydmatecn.db") { db ->
             for (table in BackupParts.TABLES_TABLES + BackupParts.SETTINGS_TABLES) {
                 assertEquals(table, 1, BackupFixtures.count(db, table))
             }
@@ -114,9 +114,9 @@ class BackupManagerExportTest {
         val zip = manager().export(setOf(BackupPart.TABLES))
 
         assertEquals(setOf(BackupPart.TABLES), manifestParts(zip))
-        assertNull(BackupFixtures.entryBytes(zip, "bydmate.db"))
+        assertNull(BackupFixtures.entryBytes(zip, "bydmatecn.db"))
         assertEquals("{}", BackupFixtures.entryBytes(zip, "prefs.json")!!.decodeToString())
-        entryDb(zip, "bydmate.part.db") { db ->
+        entryDb(zip, "bydmatecn.part.db") { db ->
             for (table in BackupParts.TABLES_TABLES) assertEquals(table, 1, BackupFixtures.count(db, table))
             for (table in BackupParts.SETTINGS_TABLES + BackupParts.RUNTIME_TABLES) {
                 assertEquals(table, 0, BackupFixtures.count(db, table))
@@ -134,7 +134,7 @@ class BackupManagerExportTest {
 
         val zip = manager().export(setOf(BackupPart.KEYS))
 
-        entryDb(zip, "bydmate.part.db") { db ->
+        entryDb(zip, "bydmatecn.part.db") { db ->
             for (table in BackupParts.TABLES_TABLES + BackupParts.SETTINGS_TABLES) {
                 assertEquals(table, 0, BackupFixtures.count(db, table))
             }
@@ -153,9 +153,9 @@ class BackupManagerExportTest {
         val withoutKeys = manager().export(setOf(BackupPart.TABLES, BackupPart.SETTINGS))
 
         // The check finds the token where it is: the raw database file of the full archive.
-        assertTrue(BackupFixtures.entryBytes(withKeys, "bydmate.db")!!.containsSequence(token))
+        assertTrue(BackupFixtures.entryBytes(withKeys, "bydmatecn.db")!!.containsSequence(token))
         // Raw file bytes, not a query: a deleted row left in a free page would still be found here.
-        assertFalse(BackupFixtures.entryBytes(withoutKeys, "bydmate.part.db")!!.containsSequence(token))
+        assertFalse(BackupFixtures.entryBytes(withoutKeys, "bydmatecn.part.db")!!.containsSequence(token))
         assertFalse(withoutKeys.readBytes().containsSequence(token))
     }
 
@@ -236,7 +236,7 @@ class BackupManagerExportTest {
 
         val zip = manager().export(BackupPart.ALL)
 
-        entryDb(zip, "bydmate.db") { db ->
+        entryDb(zip, "bydmatecn.db") { db ->
             assertNull(BackupFixtures.text(db, "SELECT last_triggered_at FROM automation_rules"))
             assertEquals("5", BackupFixtures.text(db, "SELECT trigger_count FROM automation_rules"))
         }
@@ -280,19 +280,19 @@ class BackupManagerExportTest {
         every { appDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)", null) } answers { checkpointCursor(busy = 0) }
         val first = manager().export()
         val firstBytes = first.readBytes()
-        upcomingNames("bydmate_backup_").forEach { if (!it.exists()) it.writeBytes(byteArrayOf(9)) }
+        upcomingNames("bydmatecn_backup_").forEach { if (!it.exists()) it.writeBytes(byteArrayOf(9)) }
 
         val second = manager().export()
 
         assertNotEquals(first.absolutePath, second.absolutePath)
-        assertTrue(second.name, second.name.startsWith("bydmate_backup_") && second.name.endsWith("_2.zip"))
+        assertTrue(second.name, second.name.startsWith("bydmatecn_backup_") && second.name.endsWith("_2.zip"))
         assertArrayEquals(firstBytes, first.readBytes())
     }
 
     @Test
     fun `export does not reuse a name the auto runner already renamed`() {
         every { appDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)", null) } answers { checkpointCursor(busy = 0) }
-        val autoCopies = upcomingNames("bydmate_backup_auto_").onEach { it.writeBytes(byteArrayOf(9)) }
+        val autoCopies = upcomingNames("bydmatecn_backup_auto_").onEach { it.writeBytes(byteArrayOf(9)) }
 
         val exported = manager().export()
 

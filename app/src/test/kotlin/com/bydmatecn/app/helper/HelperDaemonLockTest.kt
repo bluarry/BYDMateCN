@@ -1,5 +1,6 @@
 package com.bydmatecn.app.helper
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -13,6 +14,11 @@ import java.io.File
  * No Android runtime needed — java.nio.channels is enough.
  */
 class HelperDaemonLockTest {
+
+    @Test
+    fun `BYDMateCN helper lock is isolated from upstream app`() {
+        assertEquals("/data/local/tmp/bydmatecn_helper.lock", HELPER_LOCK_PATH)
+    }
 
     @get:Rule
     val tmp = TemporaryFolder()

@@ -195,4 +195,4 @@ class ChargerSearchClient @Inject constructor(private val http: OkHttpClient) {
 /** overpass-api.de answers 406 to OkHttp's default User-Agent (`okhttp/x.y.z`) and serves a
  *  client that names itself; Nominatim's usage policy asks for the same. Shared by every map
  *  and charging-station client. */
-internal const val MAP_USER_AGENT = "BYDMate/${BuildConfig.VERSION_NAME} (+https://github.com/AndyShaman/BYDMate)"
+internal const val MAP_USER_AGENT = "BYDMateCN/${BuildConfig.VERSION_NAME} (+https://github.com/bluarry/BYDMateCN)"

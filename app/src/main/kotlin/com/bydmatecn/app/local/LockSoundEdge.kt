@@ -6,6 +6,9 @@ data class LockSoundSample(
     val turnSignalFlash: Int?,
     val doorFL: Int?,
     val powerState: Int?,
+    val gear: Int? = null,
+    val speedKph: Float? = null,
+    val motion: VehicleMotionState = VehicleMotionState.UNKNOWN,
 )
 
 enum class LockSoundEvent(val rawLock: Int) { UNLOCK(1), LOCK(2) }
@@ -19,11 +22,12 @@ data class LockSoundDetection(val event: LockSoundEvent, val reason: String)
  */
 class LockSoundEventDetector(
     private val debounceMs: Long = 250,
-    private val recoveryWindowMs: Long = 3_000,
+    private val recoveryWindowMs: Long = 24 * 60 * 60_000L,
     private val sameEventGuardMs: Long = 4_000,
+    initialLock: Int? = null,
 ) {
-    private var stableLock: Int? = null
-    private var candidateLock: Int? = null
+    private var stableLock: Int? = initialLock?.takeIf { it in 1..2 }
+    private var candidateLock: Int? = stableLock
     private var candidateSince = 0L
     private var lastValidAt = -1L
     private var flashBurstActive = false
@@ -44,7 +48,7 @@ class LockSoundEventDetector(
         val lock = sample.lockFL?.takeIf { it in 1..2 } ?: return missingLockSample(sample, now)
         lastValidAt = now
         updateFlashBurst(sample.turnSignalFlash, now)
-        return flashConfirmation(lock, sample.turnSignalFlash, now) ?: debouncedEdge(lock, now)
+        return flashConfirmation(lock, sample.turnSignalFlash, sample.motion, now) ?: debouncedEdge(lock, sample.motion, now)
     }
 
     private fun expireBaseline(now: Long) {
@@ -65,16 +69,29 @@ class LockSoundEventDetector(
         if (flash == LOCK_FLASH_RAW) lastFlashAt = now
     }
 
-    private fun flashConfirmation(lock: Int, flash: Int?, now: Long): LockSoundDetection? {
+    private fun flashConfirmation(
+        lock: Int,
+        flash: Int?,
+        motion: VehicleMotionState,
+        now: Long,
+    ): LockSoundDetection? {
         if (flash != LOCK_FLASH_RAW || flashBurstActive) return null
         flashBurstActive = true
         val previous = stableLock
         stableLock = lock
         candidateLock = lock
-        return if (previous != null && previous != lock) emit(lock, now, "flash=9 confirmation") else null
+        return when {
+            previous != null && previous != lock && lock == LockSoundEvent.UNLOCK.rawLock ->
+                emit(lock, now, "flash=9 unlock confirmation")
+            previous != null && previous != lock && motion == VehicleMotionState.PARKED ->
+                emit(lock, now, "flash=9 parked lock confirmation")
+            previous == lock && lock == LockSoundEvent.LOCK.rawLock && motion == VehicleMotionState.PARKED ->
+                emit(lock, now, "flash=9 physical-lock confirmation")
+            else -> null
+        }
     }
 
-    private fun debouncedEdge(lock: Int, now: Long): LockSoundDetection? {
+    private fun debouncedEdge(lock: Int, motion: VehicleMotionState, now: Long): LockSoundDetection? {
         if (candidateLock != lock) {
             candidateLock = lock
             candidateSince = now
@@ -88,7 +105,11 @@ class LockSoundEventDetector(
         }
         if (previous == lock) return null
         stableLock = lock
-        return emit(lock, now, "LockFL $previous->$lock")
+        return when {
+            lock == LockSoundEvent.UNLOCK.rawLock -> emit(lock, now, "LockFL $previous->$lock")
+            motion == VehicleMotionState.PARKED -> emit(lock, now, "LockFL $previous->$lock; parked")
+            else -> null // A moving/unknown lock edge is usually speed auto-lock; wait for parked flash=9.
+        }
     }
     private fun emit(lock: Int, now: Long, reason: String): LockSoundDetection? {
         val event = if (lock == 2) LockSoundEvent.LOCK else LockSoundEvent.UNLOCK
@@ -109,6 +130,9 @@ class LockSoundEdge(private val debounceMs: Long = 250) {
     private val detector = LockSoundEventDetector(debounceMs = debounceMs)
     fun sample(lock: Int?, safe: Boolean, now: Long): Int? {
         if (!safe) { detector.reset(); return null }
-        return detector.sample(LockSoundSample(lock, null, null, null), now)?.event?.rawLock
+        return detector.sample(
+            LockSoundSample(lock, null, null, null, motion = VehicleMotionState.PARKED),
+            now,
+        )?.event?.rawLock
     }
 }

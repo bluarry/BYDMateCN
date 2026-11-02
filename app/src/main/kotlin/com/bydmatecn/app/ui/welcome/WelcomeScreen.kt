@@ -85,7 +85,7 @@ fun WelcomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "Welcome to BYDMate!",
+            "欢迎使用 BYDMateCN！",
             color = AccentGreen,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold

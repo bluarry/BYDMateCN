@@ -129,7 +129,7 @@ internal fun LocalCameraActivity.addCaptureControls() {
         }
         cameraButton("标记录像事件（保护上一段与当前段）") { bookmarkEvent("用户标记") }
         cameraButton("截图与录像相册") { startActivity(android.content.Intent(this, LocalMediaActivity::class.java)) }
-        cameraButton("导出全部帧 ZIP") { export.launch("BYDMate-local-frames.zip") }
+        cameraButton("导出全部帧 ZIP") { export.launch("BYDMateCN-local-frames.zip") }
         cameraButton("关闭") { closePreview("用户关闭") }
         installLocalContent(ui) { CameraLayout() }
         observeCamera()

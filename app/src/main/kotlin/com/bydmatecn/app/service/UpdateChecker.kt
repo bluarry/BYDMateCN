@@ -103,7 +103,7 @@ class UpdateChecker @Inject constructor(
         update: UpdateInfo,
         onProgress: (String) -> Unit = {}
     ) = withContext(Dispatchers.IO) {
-        check(GITHUB_API.isNotBlank()) { "独立本地版未配置更新源，不能下载原BYDMate的APK" }
+        check(GITHUB_API.isNotBlank()) { "独立本地版未配置更新源，不能下载非 BYDMateCN 的 APK" }
         ForkReleasePolicy.requireDownloadUrl(update.downloadUrl)
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 

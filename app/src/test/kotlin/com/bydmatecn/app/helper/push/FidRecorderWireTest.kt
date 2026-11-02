@@ -90,7 +90,7 @@ class FidRecorderWireTest {
             ),
             totalEvents = 380,
             top = listOf(FidRecTopRow(2000001, "Bodywork.BODYWORK_WINDOW_FL", 196, 43, 43.0)),
-            filePath = "/sdcard/Download/bydmate_fidrec_20260915_120000.txt",
+            filePath = "/sdcard/Download/bydmatecn_fidrec_20260915_120000.txt",
             fileBytes = 1_234_567L,
         )
         assertEquals(status, roundTrip({ writeRecStatus(it, status) }, ::readRecStatus))

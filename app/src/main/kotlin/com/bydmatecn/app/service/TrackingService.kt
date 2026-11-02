@@ -2252,7 +2252,7 @@ class TrackingService : Service(), LocationListener {
             PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, activeChannelId())
-            .setContentTitle("BYDMate")
+            .setContentTitle("BYDMateCN")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(pendingIntent)

@@ -13,6 +13,8 @@ import com.bydmatecn.app.cluster.ClusterProjectionManager
 import com.bydmatecn.app.data.automation.AutomationEngine
 import com.bydmatecn.app.data.autoservice.AdbRestorePreferencesImpl
 import com.bydmatecn.app.data.local.database.AppDatabase
+import com.bydmatecn.app.di.AppModule.DATABASE_NAME
+import com.bydmatecn.app.di.AppModule.LEGACY_DATABASE_NAME
 import com.bydmatecn.app.hud.HudAmapClusterLoop
 import com.bydmatecn.app.hud.HudController
 import com.bydmatecn.app.service.A11yRecoveryGate
@@ -48,7 +50,7 @@ internal class BackupEntries(
     val dbBytes: ByteArray,
     val prefsJson: String,
     val manifestJson: String,
-    /** The database came as `bydmate.part.db`: an archive without some of the parts. */
+    /** The database came as `bydmatecn.part.db` (or legacy `bydmate.part.db`): an archive without some of the parts. */
     val partial: Boolean = false,
 )
 
@@ -56,7 +58,7 @@ internal class BackupEntries(
  * Handles full-app config backup (export to zip) and restore (import from zip).
  *
  * The zip contains three entries:
- *   - bydmate.db     — Room database file (WAL folded in before copy); `bydmate.part.db` when the
+ *   - bydmate.db     — Room database file (WAL folded in before copy); `bydmatecn.part.db` (or legacy `bydmate.part.db`) when the
  *                      archive lacks some [BackupPart]s, so an older app refuses to swap it in whole
  *   - prefs.json     — whitelisted SharedPreferences with explicit type tags (`{}` without Settings)
  *   - manifest.json  — version/schema metadata and the `parts` it carries (absent = all of them)
@@ -151,13 +153,15 @@ class BackupManager(
         internal fun isExcluded(patterns: Set<String>, key: String): Boolean =
             patterns.any { if (it.endsWith('*')) key.startsWith(it.dropLast(1)) else key == it }
 
-        private const val ENTRY_DB = "bydmate.db"
-        private const val ENTRY_PART_DB = "bydmate.part.db"
+        private const val ENTRY_DB = "bydmatecn.db"
+        private const val LEGACY_ENTRY_DB = "bydmate.db"
+        private const val ENTRY_PART_DB = "bydmatecn.part.db"
+        private const val LEGACY_ENTRY_PART_DB = "bydmate.part.db"
         private const val MANIFEST_PARTS = "parts"
         private const val ENTRY_PREFS = "prefs.json"
         private const val ENTRY_MANIFEST = "manifest.json"
 
-        private const val BACKUP_FILE_PREFIX = "bydmate_backup_"
+        private const val BACKUP_FILE_PREFIX = "bydmatecn_backup_"
         private const val BACKUP_FILE_SUFFIX = ".zip"
 
         /** Export zips in [dir] (name mask used by export()), newest first. */
@@ -291,7 +295,7 @@ class BackupManager(
             strings: AppStrings,
             maxEntryBytes: Long = MAX_ENTRY_BYTES,
             maxTotalBytes: Long = MAX_TOTAL_BYTES,
-            dbEntryNames: Set<String> = setOf(ENTRY_DB, ENTRY_PART_DB),
+            dbEntryNames: Set<String> = setOf(ENTRY_DB, ENTRY_PART_DB, LEGACY_ENTRY_DB, LEGACY_ENTRY_PART_DB),
         ): BackupEntries {
             // Entry bytes by slot: ENTRY_DB for either database name, the entry name otherwise.
             val found = mutableMapOf<String, ByteArray>()
@@ -321,7 +325,7 @@ class BackupManager(
                 dbBytes = take(ENTRY_DB),
                 prefsJson = take(ENTRY_PREFS).toString(Charsets.UTF_8),
                 manifestJson = take(ENTRY_MANIFEST).toString(Charsets.UTF_8),
-                partial = dbEntryName == ENTRY_PART_DB,
+                partial = dbEntryName == ENTRY_PART_DB || dbEntryName == LEGACY_ENTRY_PART_DB,
             )
         }
 
@@ -478,8 +482,8 @@ class BackupManager(
      *    WAL file size (TRUNCATE leaves it at 0 bytes) and retried.
      */
     private fun <T> withLiveSnapshot(block: (ByteArray) -> T): T {
-        val dbFile = context.getDatabasePath("bydmate.db")
-        val walFile = File(dbFile.parentFile, "bydmate.db-wal")
+        val dbFile = context.getDatabasePath(DATABASE_NAME)
+        val walFile = File(dbFile.parentFile, "$DATABASE_NAME-wal")
         val supportDb = appDatabase.openHelper.writableDatabase
         for (attempt in 1..3) {
             if (!checkpointTruncate()) continue
@@ -583,10 +587,10 @@ class BackupManager(
             // 2d. Write the DB bytes to a temp file and verify it is a real, intact SQLite
             //     database. openDatabase rejects a non-SQLite file; quick_check catches
             //     structural corruption. Bad file -> throw, temp deleted, live DB untouched.
-            val targetDbFile = context.getDatabasePath("bydmate.db")
+            val targetDbFile = context.getDatabasePath(DATABASE_NAME)
             val dbDir = targetDbFile.parentFile
             dbDir?.mkdirs()
-            val tmpDbFile = File(dbDir, "bydmate.db.restore.tmp")
+            val tmpDbFile = File(dbDir, "$DATABASE_NAME.restore.tmp")
             BackupDatabaseFiles.deleteWithSideFiles(tmpDbFile)
             tmpDbFile.writeBytes(entries.dbBytes)
             val dbSchema = BackupDatabaseFiles.validate(tmpDbFile, strings)
@@ -619,7 +623,7 @@ class BackupManager(
      * then swaps the copy in. Room migrates an older archive first, so both sides share one schema.
      */
     private fun mergeAndSwap(archiveFile: File, selected: Set<BackupPart>, prefsMap: Map<String, Map<String, Any?>>?) {
-        val mergedFile = File(archiveFile.parentFile, "bydmate.db.merge.tmp")
+        val mergedFile = File(archiveFile.parentFile, "$DATABASE_NAME.merge.tmp")
         try {
             BackupDatabaseFiles.migrate(context, archiveFile, strings)
             synchronized(exportLock) {
@@ -646,7 +650,7 @@ class BackupManager(
      * [prefsMap] null = SharedPreferences stay as they are.
      */
     private fun swapIn(dbFile: File, prefsMap: Map<String, Map<String, Any?>>?) {
-        val targetDbFile = context.getDatabasePath("bydmate.db")
+        val targetDbFile = context.getDatabasePath(DATABASE_NAME)
         val dbDir = targetDbFile.parentFile
 
         // Mark the next start as the first one after a restore BEFORE anything is replaced,
@@ -656,7 +660,7 @@ class BackupManager(
         // 3. Close the database so we can safely replace the file.
         appDatabase.close()
 
-        // 4. Swap the validated temp file in via an atomic rename. The live bydmate.db
+        // 4. Swap the validated temp file in via an atomic rename. The live BYDMateCN database
         //    is never absent: it is replaced atomically. If rename fails the original is
         //    still in place and NOTHING has been mutated yet, so we abort (throw) rather
         //    than risk destroying it with a non-atomic delete+copy. This also closes the
@@ -672,8 +676,8 @@ class BackupManager(
         }
         // Drop stale WAL/SHM left from the old DB AFTER the swap. The restored file is
         // self-contained (WAL was folded in at export time).
-        File(dbDir, "bydmate.db-wal").delete()
-        File(dbDir, "bydmate.db-shm").delete()
+        File(dbDir, "$DATABASE_NAME-wal").delete()
+        File(dbDir, "$DATABASE_NAME-shm").delete()
 
         // 5. Restore SharedPreferences.
         // FULL REPLACE of every whitelisted file, except the per-device keys in

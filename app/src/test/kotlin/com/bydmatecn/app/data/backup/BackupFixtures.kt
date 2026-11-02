@@ -92,7 +92,7 @@ internal object BackupFixtures {
         parts: Set<BackupPart>?,
         schema: Int = AppDatabase.SCHEMA_VERSION,
         prefs: Map<String, Map<String, Any?>> = emptyMap(),
-        dbEntry: String = if (parts == null || parts == BackupPart.ALL) "bydmate.db" else "bydmate.part.db",
+        dbEntry: String = if (parts == null || parts == BackupPart.ALL) "bydmatecn.db" else "bydmatecn.part.db",
     ): File {
         val manifest = JSONObject().apply {
             put("appVersionCode", 1)

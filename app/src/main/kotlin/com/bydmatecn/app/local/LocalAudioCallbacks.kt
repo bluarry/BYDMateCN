@@ -75,7 +75,7 @@ internal fun LocalAudioPlayer.prepareMediaPlayer(file: File, device: android.med
         exteriorStreamType = exteriorSession.streamType
         true
     } catch (error: Exception) {
-        stop()
+        exteriorSession.release()
         report("车外路由启动失败：${error.message}")
         false
     }

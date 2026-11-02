@@ -129,7 +129,7 @@ internal fun RuleDeletedDialog(onSaveAsNew: () -> Unit, onClose: () -> Unit, onD
     )
 }
 
-/** Import step 1: `bydmate_rule_*.json` in Download, newest first, with the date. */
+/** Import step 1: `bydmatecn_rule_*.json` in Download, newest first, with the date. */
 @Composable
 internal fun ImportPickDialog(
     files: List<File>,

@@ -14,7 +14,7 @@ internal fun LocalToolsActivity.permissionForCamera() {
     }
 
 internal fun LocalToolsActivity.sentryControls() {
-        label("此开关复用 BYDMate 已有 helper 白名单：sentrymode_enabled_switch。它控制原厂模式，不是已经实现的 BYDMate 自定义事件录像。")
+        label("此开关复用 BYDMateCN 已有 helper 白名单：sentrymode_enabled_switch。它控制原厂模式，不是已经实现的 BYDMateCN 自定义事件录像。")
         button("读取原厂哨兵状态") { lifecycleScope.launch { status.text = "原始值：${helper.getGlobalSetting("sentrymode_enabled_switch") ?: "不可读"}" } }
         fun confirm(value: Int) {
             if (busy) return

@@ -55,7 +55,7 @@ class BackupManagerRestoreTest {
         }.toString()
         val zip = File(tmp.root, "bydmatecn_backup_$name.zip")
         ZipOutputStream(FileOutputStream(zip)).use { z ->
-            z.putNextEntry(ZipEntry("bydmate.db")); z.write(dbBytes); z.closeEntry()
+            z.putNextEntry(ZipEntry("bydmatecn.db")); z.write(dbBytes); z.closeEntry()
             z.putNextEntry(ZipEntry("prefs.json")); z.write(prefsJson.toByteArray()); z.closeEntry()
             z.putNextEntry(ZipEntry("manifest.json")); z.write(manifestJson.toByteArray()); z.closeEntry()
         }
@@ -75,7 +75,7 @@ class BackupManagerRestoreTest {
     private val liveBytes = "live database".toByteArray()
 
     /** The file a refused restore must leave as it was. */
-    private fun liveDbFile() = context.getDatabasePath("bydmate.db").apply {
+    private fun liveDbFile() = context.getDatabasePath("bydmatecn.db").apply {
         parentFile?.mkdirs()
         writeBytes(liveBytes)
     }
@@ -125,7 +125,7 @@ class BackupManagerRestoreTest {
 
         BackupManager(context, appDatabase, AppStrings(context), listOf("automation")).restore(zip)
 
-        assertArrayEquals(dbBytes, context.getDatabasePath("bydmate.db").readBytes())
+        assertArrayEquals(dbBytes, context.getDatabasePath("bydmatecn.db").readBytes())
         assertEquals("yes", prefs.getString("restored_key", null))
         assertTrue(!prefs.contains("stale_key"))
     }
@@ -168,7 +168,7 @@ class BackupManagerRestoreTest {
         b.join(5_000)
 
         assertEquals(emptyMap<String, Throwable>(), errors.toMap())
-        assertArrayEquals(secondBytes, context.getDatabasePath("bydmate.db").readBytes())
+        assertArrayEquals(secondBytes, context.getDatabasePath("bydmatecn.db").readBytes())
     }
 
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)

@@ -420,11 +420,29 @@ object AppModule {
             Room.databaseBuilder(
                 context,
                 AppDatabase::class.java,
-                "bydmate.db"
+                migrateLegacyDatabaseName(context)
             )
         )
             .build()
     }
+
+    /** Keeps existing BYDMateCN installs while moving the internal file away from the upstream name. */
+    internal fun migrateLegacyDatabaseName(context: Context): String {
+        val current = context.getDatabasePath(DATABASE_NAME)
+        if (current.exists()) return DATABASE_NAME
+        val legacy = context.getDatabasePath(LEGACY_DATABASE_NAME)
+        if (!legacy.exists()) return DATABASE_NAME
+        current.parentFile?.mkdirs()
+        if (!legacy.renameTo(current)) return LEGACY_DATABASE_NAME
+        listOf("-wal", "-shm", "-journal").forEach { suffix ->
+            val oldSidecar = java.io.File(legacy.path + suffix)
+            if (oldSidecar.exists()) oldSidecar.renameTo(java.io.File(current.path + suffix))
+        }
+        return DATABASE_NAME
+    }
+
+    internal const val DATABASE_NAME = "bydmatecn.db"
+    internal const val LEGACY_DATABASE_NAME = "bydmate.db"
 
     /** Every production migration: the app database and a restored archive of an older schema share them. */
     fun withMigrations(builder: RoomDatabase.Builder<AppDatabase>): RoomDatabase.Builder<AppDatabase> =

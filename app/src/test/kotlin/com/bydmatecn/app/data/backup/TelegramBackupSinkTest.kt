@@ -222,7 +222,7 @@ class TelegramBackupSinkTest {
 
     @Test fun `sendDocument uploads a multipart zip with chat id and caption`() = runTest {
         server.enqueue(MockResponse().setBody("""{"ok":true,"result":{}}"""))
-        val file = tmp.newFile("bydmate_backup_auto_20260923_100000.zip").apply { writeBytes(byteArrayOf(80, 75, 3, 4)) }
+        val file = tmp.newFile("bydmatecn_backup_auto_20260923_100000.zip").apply { writeBytes(byteArrayOf(80, 75, 3, 4)) }
 
         assertTrue(sink.sendDocument("123:abc", 42L, file, "BYDMate: бэкап").isSuccess)
 
@@ -234,7 +234,7 @@ class TelegramBackupSinkTest {
         assertTrue(body, body.contains("name=\"chat_id\"\r\nContent-Length: 2\r\n\r\n42"))
         assertTrue(body, body.contains("name=\"caption\""))
         assertTrue(body, body.contains("BYDMate: бэкап"))
-        assertTrue(body, body.contains("name=\"document\"; filename=\"bydmate_backup_auto_20260923_100000.zip\""))
+        assertTrue(body, body.contains("name=\"document\"; filename=\"bydmatecn_backup_auto_20260923_100000.zip\""))
         assertTrue(body, body.contains("Content-Type: application/zip"))
     }
 

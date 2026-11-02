@@ -19,4 +19,9 @@ class FirmwareAudioRouteTest {
         assertFalse(firmwareAudioAllowed(2, 0, true))
         assertFalse(firmwareAudioAllowed(1, 0, false))
     }
+    @Test fun vehicleSpeedFloatBitsDecode() {
+        assertEquals(0f, VehicleSafetyProbe.decodeSpeed(0f.toRawBits()))
+        assertEquals(32.5f, VehicleSafetyProbe.decodeSpeed(32.5f.toRawBits()))
+        assertEquals(null, VehicleSafetyProbe.decodeSpeed(Float.NaN.toRawBits()))
+    }
 }

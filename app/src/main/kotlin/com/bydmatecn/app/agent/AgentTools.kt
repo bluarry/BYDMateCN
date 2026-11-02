@@ -565,7 +565,7 @@ class AgentTools @Inject constructor(
                 "настройках (Навигатор/2ГИС/Карты), app=\"maps\" - явно в Яндекс Картах, если " +
                 "пользователь просит именно их. Команды поехали домой, до дома, " +
                 "на работу - ЭТОТ инструмент: передай destination \"Дом\" или \"Работа\", маршрут " +
-                "построится по Месту BYDMate или по адресу, сохранённому в самом Навигаторе. " +
+                "построится по Месту BYDMateCN или по адресу, сохранённому в самом Навигаторе. " +
                 "destination: имя сохранённого Места, город или населённый пункт (маршрут строится " +
                 "сразу) либо точный адрес (откроется поиск на карте, пользователь выберет точку). " +
                 "Ответ может содержать проверку запаса хода: если enough=false или есть charge_note, " +
@@ -1744,7 +1744,7 @@ class AgentTools @Inject constructor(
         val result = dispatchNavigate("Навигация",
             JSONObject().put("shortcut", target.shortcut).put("go", opts.go).putApp(opts.app))
         if (!result.success) return JSONObject().put("error",
-            result.reason ?: ("адрес не найден: добавь Место \"${target.placeName}\" в BYDMate " +
+            result.reason ?: ("адрес не найден: добавь Место \"${target.placeName}\" в BYDMateCN " +
                 "или сохрани точку \"${target.placeName}\" в Навигаторе")).toString()
         // A new route to a point we do not know: the previous destination is no longer the route.
         routeDestination = null

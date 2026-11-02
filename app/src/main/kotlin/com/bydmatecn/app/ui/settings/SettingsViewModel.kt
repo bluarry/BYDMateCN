@@ -1840,10 +1840,16 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
      * reachable.
      */
     private suspend fun writeDiagnosticHeader(file: File) = withContext(Dispatchers.IO) {
+        val localVerificationJournal = runCatching {
+            java.io.ByteArrayOutputStream().use { output ->
+                com.bydmatecn.app.local.LocalFileLog.get(appContext).export(output)
+                output.toString(Charsets.UTF_8.name())
+            }
+        }.getOrElse { error -> "(failed to export local verification journal: ${error.message})\n" }
         // Build the header. Each piece is independently caught so a single
         // failing getter doesn't drop the whole header.
         val header = buildString {
-            appendLine("=== BYDMate diagnostic dump ===")
+            appendLine("=== BYDMateCN diagnostic dump ===")
             try {
                 val pkg = appContext.packageName
                 val pi = appContext.packageManager.getPackageInfo(pkg, 0)
@@ -2588,6 +2594,10 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
                     .forEach { appendLine(it) }
             } catch (e: Exception) { appendLine("error: ${e.message}") }
 
+            appendLine("--- local verification journal ---")
+            append(localVerificationJournal)
+            if (!localVerificationJournal.endsWith('\n')) appendLine()
+
             appendLine("--- last crash ---")
             try {
                 val crashes = CrashLog.read(appContext)
@@ -3066,7 +3076,7 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
 
     /**
      * Reflects all static int/long constants out of the BYD SDK fid classes via the helper
-     * daemon, writes the result to the public Download/fid-dump-<timestamp>.txt, prepends a
+     * daemon, writes the result to the public Download/bydmatecn-fid-dump-<timestamp>.txt, prepends a
      * 3-line header, then fires the standard ACTION_SEND share sheet.
      *
      * The folder is public (W6-F4) because the previous private filesDir target was reachable
@@ -3112,7 +3122,7 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
             }
             try {
                 val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-                val fileName = "fid-dump-$timestamp.txt"
+                val fileName = "bydmatecn-fid-dump-$timestamp.txt"
                 // Same candidate chain and same target folder as startLogRecording(): straight
                 // into the public Download, no subfolder — CSV export, config backup and the APK
                 // update all land there too.
@@ -3127,7 +3137,7 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
                 }
                 // Keep only the most recent dump so a share still reading the previous URI
                 // can finish; the new file makes it the second, giving a two-file rolling window.
-                dir.listFiles { _, name -> name.startsWith("fid-dump-") && name.endsWith(".txt") }
+                dir.listFiles { _, name -> name.startsWith("bydmatecn-fid-dump-") && name.endsWith(".txt") }
                     ?.sortedByDescending { it.lastModified() }
                     ?.drop(1)
                     ?.forEach { it.delete() }
@@ -3142,14 +3152,14 @@ class SettingsViewModel @Inject @Suppress("LongParameterList") constructor( // H
                     val model = Build.MODEL
                     val buildId = Build.DISPLAY
                     val date = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
-                    out.appendLine("BYDMate $vName ($vCode), $date")
+                    out.appendLine("BYDMateCN $vName ($vCode), $date")
                     out.appendLine("model: $model  build: $buildId")
                     out.appendLine("---")
                     out.append(dump)
                 }
                 shareFile(file, "text/plain")
                 // Show the path the user actually sees in a file manager (storage root stripped),
-                // e.g. "Download/fid-dump-20260729-120000.txt".
+                // e.g. "Download/bydmatecn-fid-dump-20260729-120000.txt".
                 val storageRoot = Environment.getExternalStorageDirectory()?.absolutePath
                 val visiblePath = file.absolutePath.let { path ->
                     if (storageRoot != null && path.startsWith(storageRoot))

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 23,
-    "identityHash": "95ee8f34d881b993750501847465f6c6",
+    "identityHash": "9de62a654873dd6466d4327a4c5b5e7a",
     "entities": [
       {
         "tableName": "trips",
@@ -1213,13 +1213,19 @@
       },
       {
         "tableName": "trip_tombstones",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`byd_id` INTEGER NOT NULL, PRIMARY KEY(`byd_id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`byd_id` INTEGER NOT NULL, `start_ts` INTEGER, PRIMARY KEY(`byd_id`))",
         "fields": [
           {
             "fieldPath": "bydId",
             "columnName": "byd_id",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "startTs",
+            "columnName": "start_ts",
+            "affinity": "INTEGER",
+            "notNull": false
           }
         ],
         "primaryKey": {
@@ -1373,7 +1379,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '95ee8f34d881b993750501847465f6c6')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9de62a654873dd6466d4327a4c5b5e7a')"
     ]
   }
 }

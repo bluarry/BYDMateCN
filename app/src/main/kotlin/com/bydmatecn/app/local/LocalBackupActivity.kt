@@ -28,7 +28,7 @@ class LocalBackupActivity : ComponentActivity(), LocalComposeHost {
         ui.title = "媒体备份与恢复"
         ui.status = status
         ui.onBack = { finish() }
-        button("导出音频、截图和MP4备份") { export.launch("BYDMate-local-media.zip") }
+        button("导出音频、截图和MP4备份") { export.launch("BYDMateCN-local-media.zip") }
         button("从本地ZIP恢复") { restore.launch(arrayOf("application/zip", "application/octet-stream")) }
         installLocalContent(ui)
     }
