@@ -712,6 +712,36 @@ class TrackingService : Service(), LocationListener {
             try {
                 val ok = helperBootstrap.ensureRunning()
                 Log.i(TAG, "HelperBootstrap.ensureRunning → $ok")
+                // Package renames deliberately create a fresh AppOps namespace. The blind-spot
+                // preference can be restored or switched on while SYSTEM_ALERT_WINDOW still belongs
+                // only to the old package, so repair that grant on every service start. The camera
+                // loop already retries a failed window attach and will recover as soon as this lands.
+                val blindSpotEnabled = getSharedPreferences(
+                    com.bydmatecn.app.camera.BlindSpotPreferences.PREFS_NAME,
+                    Context.MODE_PRIVATE,
+                ).getBoolean(com.bydmatecn.app.camera.BlindSpotPreferences.KEY_ENABLED, false)
+                if (blindSpotEnabled) {
+                    val overlayBefore = android.provider.Settings.canDrawOverlays(this@TrackingService)
+                    // Unconditional while enabled: this operation grants both SYSTEM_ALERT_WINDOW
+                    // and PROJECT_MEDIA; only the former can be queried through canDrawOverlays().
+                    val helperGranted = ok &&
+                        runCatching { helperClient.grantOverlayPermission() }.getOrDefault(false)
+                    val overlayAfter = android.provider.Settings.canDrawOverlays(this@TrackingService)
+                    Log.i(
+                        TAG,
+                        "BlindSpot overlay self-heal: before=$overlayBefore " +
+                            "helper=$helperGranted after=$overlayAfter",
+                    )
+                    Trace.event(
+                        TraceArea.CAMERA,
+                        "overlay-grant",
+                        "stage" to "service-start",
+                        "daemon" to ok,
+                        "before" to overlayBefore,
+                        "helper" to helperGranted,
+                        "granted" to overlayAfter,
+                    )
+                }
                 // First start after a backup restore: re-grant the overlay through the daemon
                 // that is now up, report the rest to the dialog in MainActivity.
                 serviceScope.launch {

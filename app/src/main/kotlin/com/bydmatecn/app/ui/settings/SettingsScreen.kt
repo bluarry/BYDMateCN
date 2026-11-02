@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -278,46 +279,132 @@ fun SettingsScreen(
             selected
         }
 
-        Row(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            SettingsRail(
-                selected = safeSelected,
-                smartHomeUnlocked = state.devModeUnlocked,
-                appVersion = state.appVersion,
-                onSelect = { selected = it },
-                onVersionTap = { viewModel.onVersionTap() },
-                modifier = Modifier.width(260.dp).fillMaxSize(),
-            )
+        val sectionContent: @Composable ColumnScope.() -> Unit = {
+            when (safeSelected) {
+                SettingsSection.BATTERY -> BatterySection(state, viewModel, onNavigateToTariffPeriods)
+                SettingsSection.INTEGRATIONS -> IntegrationsSection(state, viewModel)
+                SettingsSection.VOICE -> VoiceSettingsContent(
+                    state, viewModel, onNavigateToVoiceJournal, onNavigateToAgentChat, onNavigateToVoiceUserPhrases,
+                )
+                SettingsSection.WIDGET -> WidgetSection()
+                SettingsSection.DISPLAY -> DisplaySection()
+                SettingsSection.SPLIT -> SplitSection(viewModel)
+                SettingsSection.SERVICE -> ServiceSection(state, viewModel)
+                SettingsSection.APP -> AppSection(state, viewModel)
+                SettingsSection.SMART_HOME -> SmartHomeSection(state, viewModel)
+            }
+        }
 
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardSurface),
-                modifier = Modifier.weight(1f).fillMaxSize(),
-            ) {
+        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            val compact = maxWidth < 760.dp
+            if (compact) {
                 Column(
-                    modifier = Modifier
-                        .padding(20.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    when (safeSelected) {
-                        SettingsSection.BATTERY -> BatterySection(state, viewModel, onNavigateToTariffPeriods)
-                        SettingsSection.INTEGRATIONS -> IntegrationsSection(state, viewModel)
-                        SettingsSection.VOICE -> VoiceSettingsContent(
-                            state, viewModel, onNavigateToVoiceJournal, onNavigateToAgentChat, onNavigateToVoiceUserPhrases,
-                        )
-                        SettingsSection.WIDGET -> WidgetSection()
-                        SettingsSection.DISPLAY -> DisplaySection()
-                        SettingsSection.SPLIT -> SplitSection(viewModel)
-                        SettingsSection.SERVICE -> ServiceSection(state, viewModel)
-                        SettingsSection.APP -> AppSection(state, viewModel)
-                        SettingsSection.SMART_HOME -> SmartHomeSection(state, viewModel)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SettingsSection.entries.forEach { section ->
+                            val hidden = section == SettingsSection.SMART_HOME
+                            if (!hidden || state.devModeUnlocked) {
+                                CompactSettingsTab(
+                                    section = section,
+                                    selected = section == safeSelected,
+                                    hidden = hidden,
+                                    onClick = { selected = section },
+                                )
+                            }
+                        }
                     }
+                    SettingsContentCard(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        compact = true,
+                        content = sectionContent,
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    SettingsRail(
+                        selected = safeSelected,
+                        smartHomeUnlocked = state.devModeUnlocked,
+                        appVersion = state.appVersion,
+                        onSelect = { selected = it },
+                        onVersionTap = { viewModel.onVersionTap() },
+                        modifier = Modifier.width(260.dp).fillMaxSize(),
+                    )
+                    SettingsContentCard(
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                        compact = false,
+                        content = sectionContent,
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsContentCard(
+    modifier: Modifier,
+    compact: Boolean,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardSurface),
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(if (compact) 12.dp else 20.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun CompactSettingsTab(
+    section: SettingsSection,
+    selected: Boolean,
+    hidden: Boolean,
+    onClick: () -> Unit,
+) {
+    val accent = if (hidden) AccentOrange else AccentGreen
+    Row(
+        modifier = Modifier
+            .background(
+                if (selected) accent.copy(alpha = 0.16f) else CardSurface,
+                RoundedCornerShape(10.dp),
+            )
+            .border(
+                width = 1.dp,
+                color = if (selected) accent.copy(alpha = 0.55f) else CardBorder,
+                shape = RoundedCornerShape(10.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = section.icon,
+            contentDescription = null,
+            tint = if (selected) accent else TextSecondary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = stringResource(section.labelRes),
+            color = if (selected) accent else TextSecondary,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 
@@ -1476,6 +1563,13 @@ private fun DisplaySection() {
 @Composable
 private fun BlindSpotCard() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val clusterEntryPoint = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            ClusterEntryPoint::class.java,
+        )
+    }
     val prefs = remember {
         context.getSharedPreferences(BlindSpotPreferences.PREFS_NAME, Context.MODE_PRIVATE)
     }
@@ -1528,6 +1622,54 @@ private fun BlindSpotCard() {
         ActivityResultContracts.RequestPermission()
     ) { /* denial is answered by the pipeline itself: the camera simply never opens */ }
 
+    fun ensureOverlayPermission() {
+        val grantedBefore = AndroidSettings.canDrawOverlays(context)
+        Trace.event(
+            TraceArea.CAMERA,
+            "overlay-grant",
+            "stage" to "requested",
+            "granted" to grantedBefore,
+        )
+        scope.launch {
+            // Always call the helper even when SYSTEM_ALERT_WINDOW is already allowed: the same
+            // narrow daemon operation also grants PROJECT_MEDIA, for which Android exposes no
+            // app-side query API. Skipping on canDrawOverlays() would leave cluster projection
+            // inaccessible after a package rename or a partial manual grant.
+            val daemonReady = runCatching {
+                clusterEntryPoint.helperBootstrap().ensureRunning()
+            }.getOrDefault(false)
+            val helperGranted = daemonReady && runCatching {
+                clusterEntryPoint.helperClient().grantOverlayPermission()
+            }.getOrDefault(false)
+            val grantedAfter = AndroidSettings.canDrawOverlays(context)
+            Trace.event(
+                TraceArea.CAMERA,
+                "overlay-grant",
+                "stage" to "helper-result",
+                "daemon" to daemonReady,
+                "helper" to helperGranted,
+                "granted" to grantedAfter,
+            )
+            if (!grantedAfter) {
+                runCatching {
+                    context.startActivity(
+                        Intent(
+                            AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:${context.packageName}"),
+                        ),
+                    )
+                }.onFailure {
+                    Trace.event(
+                        TraceArea.CAMERA,
+                        "overlay-grant",
+                        "stage" to "settings-failed",
+                        "error" to it.javaClass.simpleName,
+                    )
+                }
+            }
+        }
+    }
+
     SettingCollapsibleCard(
         title = stringResource(R.string.settings_blindspot_header),
         subtitle = stringResource(
@@ -1541,10 +1683,13 @@ private fun BlindSpotCard() {
         onCheckedChange = {
             enabled = it
             BlindSpotPreferences.setEnabled(prefs, it)
-            if (it && ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                cameraPermLauncher.launch(Manifest.permission.CAMERA)
+            if (it) {
+                ensureOverlayPermission()
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                    != PackageManager.PERMISSION_GRANTED
+                ) {
+                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
+                }
             }
             // Switching off disables the "Готово" row too, so the overlay has to be taken
             // down here or nothing on screen can dismiss it.
@@ -1613,7 +1758,13 @@ private fun BlindSpotCard() {
                 // tap on the same row must close the window, not reopen it.
                 val closing = placing == side
                 positionOverlay.hide()
-                if (!closing && positionOverlay.show(context, side)) placing = side
+                if (!closing) {
+                    if (AndroidSettings.canDrawOverlays(context)) {
+                        if (positionOverlay.show(context, side)) placing = side
+                    } else {
+                        ensureOverlayPermission()
+                    }
+                }
             },
             enabled = enabled,
         )
@@ -4836,31 +4987,40 @@ private fun VehicleToolPage(
     onBack: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(CardSurface)
-            .padding(horizontal = 28.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().background(CardSurface),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onBack) { Text("返回", color = PrimaryColor) }
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(title, color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = TextSecondary, fontSize = 14.sp)
-            }
-        }
+        val compact = maxWidth < 600.dp
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = if (compact) 12.dp else 28.dp, vertical = if (compact) 12.dp else 20.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp),
         ) {
-            content()
-            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onBack) { Text("返回", color = PrimaryColor) }
+                Column(modifier = Modifier.padding(start = if (compact) 4.dp else 12.dp)) {
+                    Text(
+                        title,
+                        color = TextPrimary,
+                        fontSize = if (compact) 20.sp else 28.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(subtitle, color = TextSecondary, fontSize = if (compact) 12.sp else 14.sp)
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp),
+            ) {
+                content()
+                Spacer(Modifier.height(8.dp))
+            }
         }
     }
 }

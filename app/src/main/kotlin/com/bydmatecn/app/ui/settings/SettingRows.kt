@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -145,36 +146,55 @@ fun SettingSliderRow(
     enabled: Boolean = true,
     onValueChangeFinished: (() -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RowLabel(title, description, enabled, Modifier.weight(1f))
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps,
-            enabled = enabled,
-            onValueChangeFinished = onValueChangeFinished,
-            colors = SliderDefaults.colors(
-                thumbColor = AccentGreen,
-                activeTrackColor = AccentGreen,
-                inactiveTrackColor = CardBorder,
-            ),
-            modifier = Modifier.width(280.dp),
-        )
-        Text(
-            text = valueLabel,
-            color = if (enabled) AccentGreen else TextMuted,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(64.dp),
-        )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 600.dp
+        val slider: @Composable (Modifier) -> Unit = { modifier ->
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = valueRange,
+                steps = steps,
+                enabled = enabled,
+                onValueChangeFinished = onValueChangeFinished,
+                colors = SliderDefaults.colors(
+                    thumbColor = AccentGreen,
+                    activeTrackColor = AccentGreen,
+                    inactiveTrackColor = CardBorder,
+                ),
+                modifier = modifier,
+            )
+        }
+        val valueText: @Composable () -> Unit = {
+            Text(
+                text = valueLabel,
+                color = if (enabled) AccentGreen else TextMuted,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.End,
+                modifier = Modifier.width(64.dp),
+            )
+        }
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                RowLabel(title, description, enabled)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    slider(Modifier.weight(1f))
+                    valueText()
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RowLabel(title, description, enabled, Modifier.weight(1f))
+                slider(Modifier.width(280.dp))
+                valueText()
+            }
+        }
     }
 }
 
@@ -192,19 +212,36 @@ fun SettingActionRow(
     secondButtonEnabled: Boolean = enabled,
     onHelp: (() -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RowLabel(title, description, enabled, Modifier.weight(1f), onHelp)
-        if (secondButtonLabel != null && onSecondClick != null) {
-            SettingRowButton(secondButtonLabel, onSecondClick, SettingButtonStyle.Secondary, secondButtonEnabled)
-            Spacer(modifier = Modifier.width(8.dp))
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 600.dp
+        val buttons: @Composable () -> Unit = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (secondButtonLabel != null && onSecondClick != null) {
+                    SettingRowButton(secondButtonLabel, onSecondClick, SettingButtonStyle.Secondary, secondButtonEnabled)
+                }
+                SettingRowButton(buttonLabel, onClick, style, enabled)
+            }
         }
-        SettingRowButton(buttonLabel, onClick, style, enabled)
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RowLabel(title, description, enabled, onHelp = onHelp)
+                buttons()
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RowLabel(title, description, enabled, Modifier.weight(1f), onHelp)
+                buttons()
+            }
+        }
     }
 }
 
@@ -289,25 +326,37 @@ fun SettingChipRow(
     enabled: Boolean = true,
     onHelp: (() -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RowLabel(title, description, enabled, Modifier.weight(1f))
-        if (onHelp != null) SettingHelpBadge(onHelp)
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            options.forEachIndexed { index, label ->
-                UnitChip(
-                    label = label,
-                    selected = index == selectedIndex,
-                    onClick = { if (enabled) onSelect(index) },
-                )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 600.dp
+        val chips: @Composable () -> Unit = {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                options.forEachIndexed { index, label ->
+                    UnitChip(
+                        label = label,
+                        selected = index == selectedIndex,
+                        onClick = { if (enabled) onSelect(index) },
+                    )
+                }
+            }
+        }
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RowLabel(title, description, enabled, onHelp = onHelp)
+                chips()
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RowLabel(title, description, enabled, Modifier.weight(1f), onHelp)
+                chips()
             }
         }
     }
@@ -338,24 +387,43 @@ fun SettingStatusRow(
     buttonLabel: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(if (ok) AccentGreen else AccentOrange, CircleShape),
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        RowLabel(title, description, enabled = true, Modifier.weight(1f))
-        if (buttonLabel != null && onClick != null) {
-            SettingRowButton(buttonLabel, onClick, SettingButtonStyle.Secondary, enabled = true)
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 600.dp && buttonLabel != null && onClick != null
+        if (compact) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StatusDot(ok)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    RowLabel(title, description, enabled = true, Modifier.weight(1f))
+                }
+                SettingRowButton(buttonLabel!!, onClick!!, SettingButtonStyle.Secondary, enabled = true)
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusDot(ok)
+                Spacer(modifier = Modifier.width(10.dp))
+                RowLabel(title, description, enabled = true, Modifier.weight(1f))
+                if (buttonLabel != null && onClick != null) {
+                    SettingRowButton(buttonLabel, onClick, SettingButtonStyle.Secondary, enabled = true)
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun StatusDot(ok: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(8.dp)
+            .background(if (ok) AccentGreen else AccentOrange, CircleShape),
+    )
 }
 
 /** Muted multi-line hint inside a card (replaces ad-hoc Text hints). */
