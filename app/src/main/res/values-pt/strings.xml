@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BYDMate</string>
+    <string name="app_name">BYDMateCN</string>
     <string name="settings_language_title">Idioma</string>
     <string name="settings_font_scale_title">Tamanho do texto</string>
     <string name="settings_font_scale_desc">Aplica-se às telas do aplicativo e às janelas do agente de voz. O widget e o painel não mudam.</string>

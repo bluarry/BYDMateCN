@@ -11,11 +11,14 @@ internal class LocalLogFile(private val directory: File, private val maxBytes: L
     init { require(maxBytes >= 1024) }
     private val current get() = File(directory, "local-events.log")
     private val previous get() = File(directory, "local-events.previous.log")
-    @Synchronized fun append(module: String, message: String, time: Long = System.currentTimeMillis()) {
+
+    @Synchronized
+    fun append(module: String, message: String, time: Long = System.currentTimeMillis(), retentionDays: Int = 1) {
+        require(retentionDays > 0)
         check(directory.isDirectory || directory.mkdirs())
-        val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).format(Date(time))
+        prune(time, retentionDays)
+        val timestamp = formatter().format(Date(time))
         val text = "$timestamp [${clean(module).take(40)}] ${clean(message)}\n"
-        // Truncate on Unicode code-point boundaries, including the newline in the cap.
         val body = text.dropLast(1)
         val bounded = StringBuilder()
         var used = 1L
@@ -34,14 +37,35 @@ internal class LocalLogFile(private val directory: File, private val maxBytes: L
         }
         current.appendBytes(bytes)
     }
-    @Synchronized fun export(output: OutputStream) {
-        output.write("BYDMateCN journal v1; oldest retained file first; not a full system log\n".toByteArray())
+
+    @Synchronized
+    fun prune(now: Long = System.currentTimeMillis(), retentionDays: Int = 1) {
+        require(retentionDays > 0)
+        val cutoff = now - retentionDays * DAY_MS
+        listOf(previous, current).forEach { file ->
+            if (!file.isFile) return@forEach
+            val retained = file.readLines().filter { line ->
+                val timestamp = line.substringBefore(" [", "")
+                runCatching { formatter().parse(timestamp)?.time ?: Long.MAX_VALUE }.getOrDefault(Long.MAX_VALUE) >= cutoff
+            }
+            if (retained.isEmpty()) file.delete()
+            else file.writeText(retained.joinToString(separator = "\n", postfix = "\n"), Charsets.UTF_8)
+        }
+    }
+
+    @Synchronized
+    fun export(output: OutputStream, now: Long = System.currentTimeMillis(), retentionDays: Int? = null) {
+        retentionDays?.let { prune(now, it) }
+        output.write("BYDMateCN verification journal v2; oldest retained file first; not a full system log\n".toByteArray())
         for (file in listOf(previous, current)) if (file.isFile) {
             output.write(("--- ${file.name} ---\n").toByteArray())
             file.inputStream().use { it.copyTo(output) }
         }
     }
+
     companion object {
+        private const val DAY_MS = 24 * 60 * 60 * 1000L
+        private fun formatter() = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).apply { isLenient = false }
         private val secret = Regex("""(?i)(["']?(?:[a-z0-9_]*token|authorization|password|secret|vin)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)""")
         private val bearer = Regex("(?i)Bearer\\s+[^\\s,;]+")
         internal fun clean(value: String): String = bearer.replace(secret.replace(value, "$1[redacted]"), "Bearer [redacted]")

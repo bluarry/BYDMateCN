@@ -58,6 +58,19 @@ next""")
         assertTrue(dump(LocalLogFile(dir)).contains("not a full system log"))
         assertFalse(dir.exists())
     }
+    @Test fun prunesEntriesOlderThanConfiguredRetention() {
+        val dir = temporary.newFolder()
+        val log = LocalLogFile(dir)
+        val day = 24 * 60 * 60 * 1000L
+        log.append("test", "old", day, retentionDays = 3)
+        log.append("test", "new", 4 * day, retentionDays = 3)
+        val out = ByteArrayOutputStream()
+        log.export(out, now = 4 * day, retentionDays = 1)
+        val text = out.toString("UTF-8")
+        assertFalse(text.contains("[test] old\n"))
+        assertTrue(text.contains("[test] new\n"))
+    }
+
     @Test fun concurrentAppendsRemainWholeLines() {
         val dir = temporary.newFolder()
         val log = LocalLogFile(dir)

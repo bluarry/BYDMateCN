@@ -123,7 +123,7 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
         }
 
         ui.section("锁车与解锁")
-        label("自动锁 / 解锁音效 · 手动布防 · 不修改原厂资源")
+        label("自动锁 / 解锁音效 · 持续观察门锁状态 · 不修改原厂资源")
         val lockPrefs = getSharedPreferences("local-lock-sound", Context.MODE_PRIVATE)
         fun configuredSound(key: String): String {
             val path = lockPrefs.getString(key, null) ?: return "未设置"
@@ -131,9 +131,9 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
         }
         val lockSoundLabel = label("当前锁车音效：${configuredSound("lock_file")}")
         val unlockSoundLabel = label("当前解锁音效：${configuredSound("unlock_file")}")
-        ui.toggle("已实车确认11001事件路由与LockFL门锁原始码", lockPrefs.getBoolean("verified", false)) { checked ->
+        ui.toggle("已实车确认门锁状态读取与车外音频控制器", lockPrefs.getBoolean("verified", false)) { checked ->
             lockPrefs.edit().putBoolean("verified", checked).apply()
-            if (!checked) stopService(Intent(this, LocalLockSoundService::class.java))
+            if (!checked) LocalLockSoundService.stop(this)
         }
         button("设置锁车音效") {
             showAudioPicker("选择锁车音效") { file ->
@@ -149,17 +149,25 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
                 status.text = "解锁音效已设置：${file.name}"
             }
         }
-        button("手动布防锁车音效（最多2小时）") {
-            if (!lockPrefs.getBoolean("verified", false)) status.text = "需要先完成实车路由与门锁验证"
-            else {
+        ui.toggle("启用锁车与解锁音效", lockPrefs.getBoolean(LocalLockSoundService.KEY_ENABLED, false)) { enabled ->
+            if (enabled && !lockPrefs.getBoolean("verified", false)) {
+                lockPrefs.edit().putBoolean(LocalLockSoundService.KEY_ENABLED, false).apply()
+                status.text = "请先确认门锁状态读取与车外音频控制器"
+                recreate()
+            } else if (enabled) {
                 lockPrefs.edit().putInt("volume", audioPrefs.getInt("volume", 25).coerceIn(0, 50)).apply()
-                runCatching { androidx.core.content.ContextCompat.startForegroundService(this,
-                    Intent(this, LocalLockSoundService::class.java).setAction(LocalLockSoundService.ARM)) }
-                    .onFailure { status.text = "布防启动失败：${it.message}" }
+                runCatching { LocalLockSoundService.start(this) }
+                    .onSuccess { status.text = "锁车与解锁音效已启用，将持续观察门锁状态" }
+                    .onFailure {
+                        lockPrefs.edit().putBoolean(LocalLockSoundService.KEY_ENABLED, false).apply()
+                        status.text = "启动失败：${it.message}"
+                    }
+            } else {
+                LocalLockSoundService.stop(this)
+                status.text = "锁车与解锁音效已关闭"
             }
         }
-        button("停止锁车布防") { stopService(Intent(this, LocalLockSoundService::class.java)); status.text = "已请求停止布防" }
-        button("读取布防状态") { status.text = lockPrefs.getString("last_status", "未布防") ?: "未布防" }
+        button("读取运行状态") { status.text = lockPrefs.getString("last_status", "尚未运行") ?: "尚未运行" }
 
     }
 
@@ -208,9 +216,36 @@ internal fun LocalToolsActivity.playFirmwareAudio(route: FirmwareAudioRoute, req
 
 internal fun LocalToolsActivity.stopAudio() { audioRequestGeneration++; talkRequestGeneration++; micRelay?.stop(); firmwarePlayback = false; localPlayer.stop() }
 
+
+private fun LocalToolsActivity.verificationLogControls() {
+    ui.section("验证日志")
+    val log = LocalFileLog.get(this)
+    ui.toggle("记录验证日志到文件", LocalLogSettings.enabled(this)) { enabled ->
+        log.setEnabled(enabled)
+        status.text = if (enabled) {
+            "日志已开启，将自动记录并保留${LocalLogSettings.retentionDays(this)}天"
+        } else {
+            "日志已关闭，已有日志仍可导出"
+        }
+    }
+    val retention = label("当前保留时间：${LocalLogSettings.retentionDays(this)}天")
+    button("设置日志保留时间") {
+        val days = intArrayOf(1, 3, 7)
+        LocalDialogBuilder(this).setTitle("日志保留时间")
+            .setItems(days.map { "保留${it}天" }.toTypedArray()) { _, index ->
+                log.setRetentionDays(days[index])
+                retention.text = "当前保留时间：${days[index]}天"
+                status.text = "日志最长保留${days[index]}天，过期记录已清理"
+            }.show()
+    }
+    label("开启后自动写入应用私有文件；不记录音频内容。卸载或清除数据会删除日志。")
+    button("导出验证日志 TXT") {
+        exportLocalLog.launch("BYDMateCN-verification-log-${System.currentTimeMillis()}.txt")
+    }
+}
+
 internal fun LocalToolsActivity.diagnosticControls() {
-        label("本地日志自动保存，最多两份各1MiB；不含音频内容。卸载/清除数据会删除日志。")
-        button("导出本地问题日志 TXT") { exportLocalLog.launch("BYDMateCN-local-log-${System.currentTimeMillis()}.txt") }
+        verificationLogControls()
         label("固件包用于确认接口；实车还必须提供运行时类、Binder 服务、HAL 路由和权限。此检测只读，不自动授权，不改系统设置。")
         button("相机权限") { permissionForCamera() }
         button("使用情况访问权限") { openSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS) }

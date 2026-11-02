@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BYDMate</string>
+    <string name="app_name">BYDMateCN</string>
     <string name="cluster_a11y_description">Перахоп кнопак руля для праекцыі навігацыі на прыборную панэль. Уключаецца ўручную, працуе толькі пры ўключанай функцыі.</string>
     <string name="settings_language_title">Мова</string>
     <string name="settings_font_scale_title">Памер тэксту</string>
