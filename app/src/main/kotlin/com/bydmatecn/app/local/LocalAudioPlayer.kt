@@ -34,6 +34,7 @@ class LocalAudioPlayer(
     internal val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
 
+    @Suppress("LongParameterList") // Route policy is explicit at the playback boundary.
     fun play(
         file: File,
         device: AudioDeviceInfo?,

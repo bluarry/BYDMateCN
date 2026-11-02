@@ -183,6 +183,7 @@ internal fun LocalToolsActivity.playLocalAudio(requested: File) {
         localPlayer.play(file, selectedOutput)
     }
 
+@Suppress("CyclomaticComplexMethod") // Recovery, safety gating and media fallback are one playback transaction.
 internal fun LocalToolsActivity.playFirmwareAudio(route: FirmwareAudioRoute, requested: File) {
         if (busy) return
         val file = audioLibrary.resolve(requested.path) ?: run {

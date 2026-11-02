@@ -151,6 +151,7 @@ class LocalLockSoundService : Service() {
         }
     }
 
+    @Suppress("CyclomaticComplexMethod") // Batch decode, motion classification and helper recovery stay atomic.
     private suspend fun readSample(): LockSoundSample {
         val pairs = withTimeoutOrNull(LOCK_READ_TIMEOUT_MS) { helper.readBatch(SAMPLE_ITEMS) }
         if (pairs != null && pairs.size == SAMPLE_ITEMS.size) {

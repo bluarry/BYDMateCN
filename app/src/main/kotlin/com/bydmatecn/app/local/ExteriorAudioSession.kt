@@ -112,6 +112,7 @@ internal class ExteriorAudioSession(
         }
     }
 
+    @Suppress("NestedBlockDepth", "TooGenericExceptionCaught") // Vendor fallbacks preserve both helper and app-service errors.
     private fun write(command: ExteriorAudioCommand) {
         log.record("exterior/setInt", "device=${command.device}; fid=${command.featureId}; value=${command.value}")
         try {
