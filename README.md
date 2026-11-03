@@ -200,12 +200,6 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 `bydauto-stubs` 是编译期接口签名，不提供车机硬件实现；执行时由固件上的 BYD 类、Binder 服务、HAL 和权限提供实现。源码原来使用反射的路径继续用反射，已有可确认接口复用 stub。普通 Android SDK 不能凭空生成 OEM 服务，APK 内也不打包厂商固件运行实现。
 
 
-### 默认中文与捐赠开关
-
-`LocalePreferences.DEFAULT_LANGUAGE` 为 `zh`，默认 `values` 与 `values-zh` 使用中文，俄语保留在 `values-ru`。显式选过语言的用户保留选择，不因升级强制覆盖。
-
-`app/build.gradle.kts` 中 `DONATIONS_ENABLED=false` 隐藏设置捐赠卡片、启动提醒和 DonateDialog，二维码/收款资源不删除。以后启用前必须核对收款信息和来源归属，不能直接沿用原作者收款信息作为本分支收款方式。
-
 更新仅检查 `bluarry/BYDMateCN` 的三段版本正式 Release；四段版本预发布版只供手动安装，不参与应用内自动更新，只接受与发布标签一致的 `BYDMateCN-<版本号>.apk`。安装前校验应用 ID、版本及签名；覆盖更新必须使用同一签名且递增 versionCode，不会下载原项目的安装包。
 
 ## 开源来源与许可证
