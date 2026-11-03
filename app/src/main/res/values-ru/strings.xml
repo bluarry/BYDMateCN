@@ -2320,4 +2320,10 @@
         <item quantity="many">Ещё %1$d кодов не поместились, все в окне «Диагностика»</item>
         <item quantity="other">Ещё %1$d кода не поместились, все в окне «Диагностика»</item>
     </plurals>
+
+    <string name="settings_blindspot_keep_signal_title">Показывать, пока включён поворотник</string>
+    <string name="settings_blindspot_keep_signal_desc">Не закрывать электронное боковое зеркало, пока поворотник включён или мигает, в том числе между вспышками</string>
+    <string name="settings_blindspot_close_delay_title">Задержка закрытия</string>
+    <string name="settings_blindspot_close_delay_desc">Оставлять изображение на короткое время после выключения поворотника, чтобы оно не исчезало сразу</string>
+    <string name="settings_blindspot_close_delay_value">%.1f с</string>
 </resources>

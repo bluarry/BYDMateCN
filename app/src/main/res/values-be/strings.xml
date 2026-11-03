@@ -2305,4 +2305,10 @@
     <string name="automation_learned_key_label">Клавіша %1$d</string>
     <string name="settings_fork_description">Супольны форк BYDMate, арыентаваны на DiLink і лакальныя функцыі аўтамабіля. Неафіцыйная праграма BYD.</string>
     <string name="tech_card_climate">Клімат</string>
+
+    <string name="settings_blindspot_keep_signal_title">Паказваць, пакуль уключаны паваротнік</string>
+    <string name="settings_blindspot_keep_signal_desc">Не закрываць электроннае бакавое люстэрка, пакуль паваротнік уключаны або міргае, у тым ліку паміж успышкамі</string>
+    <string name="settings_blindspot_close_delay_title">Затрымка закрыцця</string>
+    <string name="settings_blindspot_close_delay_desc">Пакідаць выяву на кароткі час пасля выключэння паваротніка, каб яна не знікала адразу</string>
+    <string name="settings_blindspot_close_delay_value">%.1f с</string>
 </resources>

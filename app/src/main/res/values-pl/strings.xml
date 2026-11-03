@@ -2305,4 +2305,10 @@
     <string name="automation_learned_key_label">Przycisk %1$d</string>
     <string name="settings_fork_description">Społecznościowy fork BYDMate skoncentrowany na systemie DiLink i lokalnych funkcjach pojazdu. Nie jest to oficjalna aplikacja BYD.</string>
     <string name="tech_card_climate">Klimatyzacja</string>
+
+    <string name="settings_blindspot_keep_signal_title">Pokazuj, gdy kierunkowskaz jest aktywny</string>
+    <string name="settings_blindspot_keep_signal_desc">Nie zamykaj elektronicznego lusterka bocznego, gdy kierunkowskaz jest włączony lub miga, również pomiędzy mignięciami</string>
+    <string name="settings_blindspot_close_delay_title">Opóźnienie zamknięcia</string>
+    <string name="settings_blindspot_close_delay_desc">Pozostaw obraz na krótko po wyłączeniu kierunkowskazu, aby nie znikał natychmiast</string>
+    <string name="settings_blindspot_close_delay_value">%.1f s</string>
 </resources>

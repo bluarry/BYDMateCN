@@ -2143,4 +2143,10 @@
     <string name="automation_learned_key_label">Key %1$d</string>
     <string name="settings_fork_description">A community fork of BYDMate focused on the DiLink experience and local vehicle capabilities. Not an official BYD application.</string>
     <string name="tech_card_climate">Climate</string>
+
+    <string name="settings_blindspot_keep_signal_title">Keep visible while turn signal is active</string>
+    <string name="settings_blindspot_keep_signal_desc">Keep the electronic side mirror visible while the turn signal is active or flashing, without closing it between flashes</string>
+    <string name="settings_blindspot_close_delay_title">Close delay</string>
+    <string name="settings_blindspot_close_delay_desc">Keep the view visible briefly after the turn signal turns off to prevent it from disappearing immediately</string>
+    <string name="settings_blindspot_close_delay_value">%.1f s</string>
 </resources>

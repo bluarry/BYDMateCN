@@ -2144,4 +2144,10 @@
     <string name="automation_learned_key_label">Tecla %1$d</string>
     <string name="settings_fork_description">Fork comunitário do BYDMate focado na experiência DiLink e em recursos locais do veículo. Não é um aplicativo oficial da BYD.</string>
     <string name="tech_card_climate">Climatização</string>
+
+    <string name="settings_blindspot_keep_signal_title">Manter visível enquanto o pisca estiver ativo</string>
+    <string name="settings_blindspot_keep_signal_desc">Manter o retrovisor lateral eletrónico visível enquanto o pisca estiver ligado ou intermitente, sem o fechar entre piscadelas</string>
+    <string name="settings_blindspot_close_delay_title">Atraso ao fechar</string>
+    <string name="settings_blindspot_close_delay_desc">Manter a imagem visível por alguns instantes depois de desligar o pisca, evitando que desapareça imediatamente</string>
+    <string name="settings_blindspot_close_delay_value">%.1f s</string>
 </resources>
