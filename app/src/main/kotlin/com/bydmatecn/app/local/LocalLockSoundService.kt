@@ -140,11 +140,15 @@ class LocalLockSoundService : Service() {
                 lastSampleSummary = summary
             }
             detector.sample(sample, now)?.let { detection ->
-                if (sample.motion == VehicleMotionState.MOVING) {
-                    note("事件抑制：${detection.event}; 行车状态不播放；reason=${detection.reason}; $summary")
-                } else {
-                    note("事件确认：${detection.event}; reason=${detection.reason}; $summary")
-                    playEvent(detection.event)
+                when {
+                    detection.suppressed ->
+                        note("事件抑制：${detection.event}; reason=${detection.reason}; $summary")
+                    sample.motion == VehicleMotionState.MOVING ->
+                        note("事件抑制：${detection.event}; 行车状态不播放；reason=${detection.reason}; $summary")
+                    else -> {
+                        note("事件确认：${detection.event}; reason=${detection.reason}; $summary")
+                        playEvent(detection.event)
+                    }
                 }
             }
             delay(POLL_MS)

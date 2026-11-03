@@ -13,7 +13,11 @@ data class LockSoundSample(
 
 enum class LockSoundEvent(val rawLock: Int) { UNLOCK(1), LOCK(2) }
 
-data class LockSoundDetection(val event: LockSoundEvent, val reason: String)
+data class LockSoundDetection(
+    val event: LockSoundEvent,
+    val reason: String,
+    val suppressed: Boolean = false,
+)
 
 /**
  * Recognises body lock operations from a debounced lock edge and the vehicle flash pulse.
@@ -32,6 +36,8 @@ class LockSoundEventDetector(
     private var lastValidAt = -1L
     private var flashBurstActive = false
     private var lastFlashAt = -1L
+    private var lastPowerState: Int? = null
+    private var ignitionOffUnlockUntil = -1L
     private val lastEventAt = mutableMapOf<LockSoundEvent, Long>()
 
     fun reset() {
@@ -40,15 +46,28 @@ class LockSoundEventDetector(
         lastValidAt = -1L
         flashBurstActive = false
         lastFlashAt = -1L
+        lastPowerState = null
+        ignitionOffUnlockUntil = -1L
         lastEventAt.clear()
     }
 
     fun sample(sample: LockSoundSample, now: Long): LockSoundDetection? {
+        observePowerState(sample.powerState, now)
         expireBaseline(now)
         val lock = sample.lockFL?.takeIf { it in 1..2 } ?: return missingLockSample(sample, now)
         lastValidAt = now
         updateFlashBurst(sample.turnSignalFlash, now)
         return flashConfirmation(lock, sample.turnSignalFlash, sample.motion, now) ?: debouncedEdge(lock, sample.motion, now)
+    }
+
+    private fun observePowerState(powerState: Int?, now: Long) {
+        val current = powerState?.takeIf { it in 0..2 } ?: return
+        val previous = lastPowerState
+        val ignitionJustTurnedOff = current == POWER_OFF && previous?.let { it != POWER_OFF } == true
+        if (ignitionJustTurnedOff && stableLock == LockSoundEvent.LOCK.rawLock) {
+            ignitionOffUnlockUntil = now + IGNITION_OFF_UNLOCK_GUARD_MS
+        }
+        lastPowerState = current
     }
 
     private fun expireBaseline(now: Long) {
@@ -113,6 +132,19 @@ class LockSoundEventDetector(
     }
     private fun emit(lock: Int, now: Long, reason: String): LockSoundDetection? {
         val event = if (lock == 2) LockSoundEvent.LOCK else LockSoundEvent.UNLOCK
+        if (event == LockSoundEvent.LOCK) {
+            // A deliberate lock inside the guard window proves the following unlock is a new action.
+            ignitionOffUnlockUntil = -1L
+        } else if (ignitionOffUnlockUntil >= 0 && now <= ignitionOffUnlockUntil) {
+            ignitionOffUnlockUntil = -1L
+            return LockSoundDetection(
+                event,
+                "$reason; ignition-off automatic unlock within ${IGNITION_OFF_UNLOCK_GUARD_MS}ms",
+                suppressed = true,
+            )
+        } else if (ignitionOffUnlockUntil >= 0) {
+            ignitionOffUnlockUntil = -1L
+        }
         val previousAt = lastEventAt[event]
         if (previousAt != null && now >= previousAt && now - previousAt < sameEventGuardMs) return null
         lastEventAt[event] = now
@@ -122,6 +154,8 @@ class LockSoundEventDetector(
     private companion object {
         const val LOCK_FLASH_RAW = 9
         const val FLASH_BURST_GAP_MS = 2_000L
+        const val POWER_OFF = 0
+        const val IGNITION_OFF_UNLOCK_GUARD_MS = 2_000L
     }
 }
 

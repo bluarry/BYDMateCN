@@ -147,4 +147,64 @@ class LockSoundEdgeTest {
             detector.sample(LockSoundSample(1, null, null, null), 250)?.event,
         )
     }
+    @Test fun ignitionOffAutomaticUnlockIsSuppressedForTwoSeconds() {
+        val detector = LockSoundEventDetector(initialLock = 2)
+        detector.sample(LockSoundSample(2, null, 0, 2, motion = VehicleMotionState.PARKED), 0)
+        detector.sample(LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED), 250)
+        val result = detector.sample(
+            LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED),
+            500,
+        )
+        assertEquals(LockSoundEvent.UNLOCK, result?.event)
+        assertTrue(result?.suppressed == true)
+    }
+
+    @Test fun ignitionOffFlashUnlockIsAlsoSuppressed() {
+        val detector = LockSoundEventDetector(initialLock = 2)
+        detector.sample(LockSoundSample(2, null, 0, 2, motion = VehicleMotionState.PARKED), 0)
+        val result = detector.sample(
+            LockSoundSample(1, 9, 0, 0, motion = VehicleMotionState.PARKED),
+            250,
+        )
+        assertEquals(LockSoundEvent.UNLOCK, result?.event)
+        assertTrue(result?.suppressed == true)
+    }
+
+    @Test fun unlockAfterIgnitionOffGuardStillPlays() {
+        val detector = LockSoundEventDetector(initialLock = 2)
+        detector.sample(LockSoundSample(2, null, 0, 2, motion = VehicleMotionState.PARKED), 0)
+        detector.sample(LockSoundSample(2, null, 0, 0, motion = VehicleMotionState.PARKED), 100)
+        detector.sample(LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED), 2_500)
+        val result = detector.sample(
+            LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED),
+            2_750,
+        )
+        assertEquals(LockSoundEvent.UNLOCK, result?.event)
+        assertFalse(result?.suppressed == true)
+    }
+
+    @Test fun lockInsideIgnitionOffGuardAllowsFollowingUnlock() {
+        val detector = LockSoundEventDetector(initialLock = 2)
+        detector.sample(LockSoundSample(2, null, 0, 2, motion = VehicleMotionState.PARKED), 0)
+        detector.sample(LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED), 100)
+        val automaticUnlock = detector.sample(
+            LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED),
+            350,
+        )
+        assertTrue(automaticUnlock?.suppressed == true)
+
+        detector.sample(LockSoundSample(2, null, 0, 0, motion = VehicleMotionState.PARKED), 500)
+        assertEquals(
+            LockSoundEvent.LOCK,
+            detector.sample(LockSoundSample(2, null, 0, 0, motion = VehicleMotionState.PARKED), 750)?.event,
+        )
+        detector.sample(LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED), 800)
+        val realUnlock = detector.sample(
+            LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED),
+            1_050,
+        )
+        assertEquals(LockSoundEvent.UNLOCK, realUnlock?.event)
+        assertFalse(realUnlock?.suppressed == true)
+    }
+
 }
