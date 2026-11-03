@@ -317,3 +317,93 @@ class BlindSpotMainScreenCoverageTest {
         assertFalse(blindSpotCoversMainScreen(BlindSpotSide.NONE, leftOnMainScreen = true, rightOnMainScreen = true))
     }
 }
+
+
+class BlindSpotSignalHoldTest {
+    private val hold = BlindSpotSignalHold()
+
+    @Test fun `delay is allowed only for a normal signal-off phase`() {
+        val off = BlindSpotSample(blink = 1, speedKmh = 40f, gear = 4)
+        assertTrue(blindSpotHoldAllowed(BlindSpotSide.NONE, off, 0L, 20))
+        assertFalse(blindSpotHoldAllowed(
+            BlindSpotSide.NONE, off.copy(blink = 6), 0L, 20,
+        ))
+        assertFalse(blindSpotHoldAllowed(
+            BlindSpotSide.NONE, off.copy(speedKmh = 19f), 0L, 20,
+        ))
+        assertFalse(blindSpotHoldAllowed(
+            BlindSpotSide.NONE, off, BLIND_SPOT_WATCHDOG_MS + 1, 20,
+        ))
+    }
+
+    @Test fun `signal off keeps the last side until the configured delay expires`() {
+        assertEquals(
+            BlindSpotSide.LEFT,
+            hold.update(BlindSpotSide.LEFT, now = 1_000, enabled = true, closeDelayMs = 1_500).side,
+        )
+        val armed = hold.update(
+            BlindSpotSide.NONE, now = 1_100, enabled = true, closeDelayMs = 1_500,
+        )
+        assertEquals(BlindSpotSide.LEFT, armed.side)
+        assertEquals(BlindSpotHoldTransition.ARMED, armed.transition)
+        assertEquals(
+            BlindSpotSide.LEFT,
+            hold.update(BlindSpotSide.NONE, now = 2_599, enabled = true, closeDelayMs = 1_500).side,
+        )
+        val fired = hold.update(
+            BlindSpotSide.NONE, now = 2_600, enabled = true, closeDelayMs = 1_500,
+        )
+        assertEquals(BlindSpotSide.NONE, fired.side)
+        assertEquals(BlindSpotHoldTransition.FIRED, fired.transition)
+    }
+
+    @Test fun `next pulse cancels delayed close and keeps the same side`() {
+        hold.update(BlindSpotSide.RIGHT, now = 100, enabled = true, closeDelayMs = 1_500)
+        hold.update(BlindSpotSide.NONE, now = 200, enabled = true, closeDelayMs = 1_500)
+        val resumed = hold.update(
+            BlindSpotSide.RIGHT, now = 500, enabled = true, closeDelayMs = 1_500,
+        )
+        assertEquals(BlindSpotSide.RIGHT, resumed.side)
+        assertEquals(BlindSpotHoldTransition.CANCELLED, resumed.transition)
+        assertEquals(
+            BlindSpotHoldTransition.ARMED,
+            hold.update(
+                BlindSpotSide.NONE, now = 600, enabled = true, closeDelayMs = 1_500,
+            ).transition,
+        )
+    }
+
+    @Test fun `switching sides is immediate and discards the old deadline`() {
+        hold.update(BlindSpotSide.LEFT, now = 100, enabled = true, closeDelayMs = 1_500)
+        hold.update(BlindSpotSide.NONE, now = 200, enabled = true, closeDelayMs = 1_500)
+        val switched = hold.update(
+            BlindSpotSide.RIGHT, now = 300, enabled = true, closeDelayMs = 1_500,
+        )
+        assertEquals(BlindSpotSide.RIGHT, switched.side)
+        assertEquals(BlindSpotHoldTransition.CANCELLED, switched.transition)
+    }
+
+    @Test fun `zero delay and disabled hold close immediately`() {
+        hold.update(BlindSpotSide.LEFT, now = 100, enabled = true, closeDelayMs = 1_500)
+        assertEquals(
+            BlindSpotSide.NONE,
+            hold.update(BlindSpotSide.NONE, now = 200, enabled = true, closeDelayMs = 0).side,
+        )
+
+        hold.update(BlindSpotSide.RIGHT, now = 300, enabled = true, closeDelayMs = 1_500)
+        assertEquals(
+            BlindSpotSide.NONE,
+            hold.update(BlindSpotSide.NONE, now = 400, enabled = false, closeDelayMs = 1_500).side,
+        )
+    }
+
+    @Test fun `safety reset cancels a pending delayed close`() {
+        hold.update(BlindSpotSide.LEFT, now = 100, enabled = true, closeDelayMs = 1_500)
+        hold.update(BlindSpotSide.NONE, now = 200, enabled = true, closeDelayMs = 1_500)
+        assertTrue(hold.reset())
+        assertEquals(
+            BlindSpotSide.NONE,
+            hold.update(BlindSpotSide.NONE, now = 300, enabled = true, closeDelayMs = 1_500).side,
+        )
+    }
+}

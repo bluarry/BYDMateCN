@@ -2141,6 +2141,6 @@
 
     <string name="nav_tab_local">Tools</string>
     <string name="automation_learned_key_label">Key %1$d</string>
-    <string name="settings_fork_description">An independent community fork of BYDMate. Volunteer testing while parked is welcome; please report issues with logs. Not an official BYD application.</string>
+    <string name="settings_fork_description">A community fork of BYDMate focused on the DiLink experience and local vehicle capabilities. Not an official BYD application.</string>
     <string name="tech_card_climate">Climate</string>
 </resources>

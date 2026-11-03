@@ -2142,6 +2142,6 @@
 
     <string name="nav_tab_local">Ferramentas</string>
     <string name="automation_learned_key_label">Tecla %1$d</string>
-    <string name="settings_fork_description">Fork comunitário independente do BYDMate. Testes voluntários apenas com o veículo estacionado; envie relatos de problemas com os logs. Não é um aplicativo oficial da BYD.</string>
+    <string name="settings_fork_description">Fork comunitário do BYDMate focado na experiência DiLink e em recursos locais do veículo. Não é um aplicativo oficial da BYD.</string>
     <string name="tech_card_climate">Climatização</string>
 </resources>

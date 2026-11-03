@@ -2176,7 +2176,7 @@
     <string name="settings_fuel_price_hint">за литр, на поездки с этой даты</string>
     <string name="nav_tab_local">Инструменты</string>
     <string name="automation_learned_key_label">Клавиша %1$d</string>
-    <string name="settings_fork_description">Независимый общественный форк BYDMate. Добровольное тестирование только на стоянке; сообщайте о проблемах и прикладывайте журналы. Неофициальное приложение BYD.</string>
+    <string name="settings_fork_description">Общественный форк BYDMate, ориентированный на DiLink и локальные функции автомобиля. Неофициальное приложение BYD.</string>
 
     <string name="automation_steering_key_occupied_split">Эта клавиша переключает разделение экрана. Освободите её в Настройках, раздел Разделение экрана, или выберите другую.</string>
     <string name="rear_seat_heat_not_equipped">На этой машине нет подогрева задних сидений</string>

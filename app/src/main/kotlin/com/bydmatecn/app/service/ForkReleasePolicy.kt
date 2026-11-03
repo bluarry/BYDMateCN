@@ -3,7 +3,7 @@ package com.bydmatecn.app.service
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Automatic updates accept only stable three-part releases; four-part WIP builds are manual installs. */
+/** Automatic updates accept only stable three-part releases; four-part prereleases are manual installs. */
 internal object ForkReleasePolicy {
     private val versionPattern = Regex("^v?(\\d+)\\.(\\d+)\\.(\\d+)(?:\\.(\\d+))?$")
     private val stableVersionPattern = Regex("^v?\\d+\\.\\d+\\.\\d+$")

@@ -61,9 +61,10 @@ private fun toolIcon(id: String): ImageVector = when (id) {
     "recorder", "mirror" -> Icons.Outlined.Videocam
     "files" -> Icons.Outlined.Folder
     "diagnostics" -> Icons.Outlined.Info
-    "automation" -> Icons.Outlined.AutoAwesome
-    "cast" -> Icons.Outlined.DisplaySettings
+    "automation", "voice" -> Icons.Outlined.AutoAwesome
+    "cast", "split" -> Icons.Outlined.DisplaySettings
     "desktop" -> Icons.Outlined.Dashboard
+    "battery", "integrations", "service", "app_settings" -> Icons.Outlined.Settings
     else -> Icons.Outlined.Settings
 }
 
@@ -100,7 +101,7 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
                     Text("车机工具", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                     Text("常用能力集中管理", color = MutedText, fontSize = 15.sp, modifier = Modifier.padding(top = 3.dp))
                 }
-                Text("BYDMateCN  ·  WIP", color = Cyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text("BYDMateCN  ·  DiLink 车机工具", color = Cyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
 
             if (compact) {
@@ -118,7 +119,7 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("全部功能", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(10.dp))
-                Text("${localTools.size} 项", color = MutedText, fontSize = 14.sp)
+                Text("${localTools.size} 项 · 所有功能配置均从此处进入", color = MutedText, fontSize = 14.sp)
             }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(columns),

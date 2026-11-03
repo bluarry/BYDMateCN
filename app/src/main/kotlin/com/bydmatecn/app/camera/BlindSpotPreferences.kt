@@ -29,6 +29,15 @@ class BlindSpotPreferences @Inject constructor(
     val thresholdKmh: Int get() = prefs.getInt(KEY_THRESHOLD_KMH, DEFAULT_THRESHOLD_KMH)
     val pipWidthPct: Int get() = prefs.getInt(KEY_PIP_WIDTH_PCT, DEFAULT_PIP_WIDTH_PCT)
 
+    /** Keeps the requested side visible across the off phase of a flashing turn signal. */
+    val keepWhileSignalOn: Boolean
+        get() = prefs.getBoolean(KEY_KEEP_WHILE_SIGNAL_ON, DEFAULT_KEEP_WHILE_SIGNAL_ON)
+
+    /** Time to keep the last side visible after the final turn-signal pulse. */
+    val closeDelayMs: Long
+        get() = prefs.getInt(KEY_CLOSE_DELAY_MS, DEFAULT_CLOSE_DELAY_MS).toLong()
+            .coerceIn(MIN_CLOSE_DELAY_MS.toLong(), MAX_CLOSE_DELAY_MS.toLong())
+
     /** Top-left corner in real display pixels; [UNSET_PX] until the user drags the window. */
     val pipXPx: Int get() = prefs.getInt(KEY_PIP_X_PX, UNSET_PX)
     val pipYPx: Int get() = prefs.getInt(KEY_PIP_Y_PX, UNSET_PX)
@@ -62,12 +71,16 @@ class BlindSpotPreferences @Inject constructor(
         const val KEY_BOTH_ON_MAIN = "both_on_main"
         const val KEY_BOTH_ON_CLUSTER = "both_on_cluster"
         const val KEY_PIP_ROTATE_90 = "pip_rotate_90"
+        const val KEY_KEEP_WHILE_SIGNAL_ON = "keep_while_signal_on"
+        const val KEY_CLOSE_DELAY_MS = "close_delay_ms"
 
         /** Position is stored in absolute pixels, so "never placed" needs its own value. */
         const val UNSET_PX = -1
 
         const val DEFAULT_THRESHOLD_KMH = 20
         const val DEFAULT_PIP_WIDTH_PCT = 36
+        const val DEFAULT_KEEP_WHILE_SIGNAL_ON = true
+        const val DEFAULT_CLOSE_DELAY_MS = 1_500
 
         /** 0 = show from standstill: the fast loop and the warm camera then stay armed whenever the
          *  car is on and out of reverse, which is what a driver who picks 0 is asking for. */
@@ -75,6 +88,9 @@ class BlindSpotPreferences @Inject constructor(
         const val MAX_THRESHOLD_KMH = 60
         const val MIN_PIP_WIDTH_PCT = 20
         const val MAX_PIP_WIDTH_PCT = 60
+        const val MIN_CLOSE_DELAY_MS = 0
+        const val MAX_CLOSE_DELAY_MS = 5_000
+        const val CLOSE_DELAY_STEP_MS = 500
 
         /** The settings card's main switch: writes it and traces the flip, old to new. */
         fun setEnabled(prefs: SharedPreferences, on: Boolean) {

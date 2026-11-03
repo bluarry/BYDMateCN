@@ -77,6 +77,85 @@ fun blindSpotSignalSide(blink: Int?): BlindSpotSide = when (blink) {
 private const val BLINK_LEFT = 2
 private const val BLINK_RIGHT = 4
 
+/** Delay is allowed only for a normal signal-off phase; every safety gate closes immediately. */
+fun blindSpotHoldAllowed(
+    requestedSide: BlindSpotSide,
+    sample: BlindSpotSample?,
+    telemetryAgeMs: Long,
+    thresholdKmh: Int,
+): Boolean = requestedSide != BlindSpotSide.NONE || (
+    telemetryAgeMs <= BLIND_SPOT_WATCHDOG_MS &&
+        sample?.speedKmh != null &&
+        sample.speedKmh >= thresholdKmh &&
+        sample.blink != 6
+    )
+
+/** Observable state changes of [BlindSpotSignalHold], used for field diagnostics. */
+enum class BlindSpotHoldTransition { NONE, ARMED, CANCELLED, FIRED }
+
+data class BlindSpotHoldResult(
+    val side: BlindSpotSide,
+    val transition: BlindSpotHoldTransition = BlindSpotHoldTransition.NONE,
+)
+
+/**
+ * Latches one requested camera side across the dark phase of a flashing turn signal and closes it
+ * [closeDelayMs] after the final pulse. The controller resets this state before every safety close
+ * (reverse, native camera, stale telemetry, speed gate, feature disable), so the delay can never
+ * keep our overlay above a factory camera or an untrusted vehicle state.
+ */
+class BlindSpotSignalHold {
+    private var heldSide = BlindSpotSide.NONE
+    private var closeAt = 0L
+
+    fun update(
+        requestedSide: BlindSpotSide,
+        now: Long,
+        enabled: Boolean,
+        closeDelayMs: Long,
+    ): BlindSpotHoldResult {
+        if (!enabled) {
+            val transition = if (closeAt > 0L) BlindSpotHoldTransition.CANCELLED
+                else BlindSpotHoldTransition.NONE
+            heldSide = requestedSide
+            closeAt = 0L
+            return BlindSpotHoldResult(requestedSide, transition)
+        }
+
+        if (requestedSide != BlindSpotSide.NONE) {
+            val transition = if (closeAt > 0L) BlindSpotHoldTransition.CANCELLED
+                else BlindSpotHoldTransition.NONE
+            heldSide = requestedSide
+            closeAt = 0L
+            return BlindSpotHoldResult(requestedSide, transition)
+        }
+
+        if (heldSide == BlindSpotSide.NONE) return BlindSpotHoldResult(BlindSpotSide.NONE)
+        val delay = closeDelayMs.coerceAtLeast(0L)
+        if (delay == 0L) {
+            heldSide = BlindSpotSide.NONE
+            closeAt = 0L
+            return BlindSpotHoldResult(BlindSpotSide.NONE, BlindSpotHoldTransition.FIRED)
+        }
+        if (closeAt == 0L) {
+            closeAt = now + delay
+            return BlindSpotHoldResult(heldSide, BlindSpotHoldTransition.ARMED)
+        }
+        if (now < closeAt) return BlindSpotHoldResult(heldSide)
+
+        heldSide = BlindSpotSide.NONE
+        closeAt = 0L
+        return BlindSpotHoldResult(BlindSpotSide.NONE, BlindSpotHoldTransition.FIRED)
+    }
+
+    fun reset(): Boolean {
+        val hadState = heldSide != BlindSpotSide.NONE || closeAt > 0L
+        heldSide = BlindSpotSide.NONE
+        closeAt = 0L
+        return hadState
+    }
+}
+
 /** Gear value that means R (DiParsData: 1=P, 2=R, 3=N, 4=D). */
 const val BLIND_SPOT_GEAR_REVERSE = 2
 

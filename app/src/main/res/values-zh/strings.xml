@@ -1579,6 +1579,11 @@
     <string name="settings_blindspot_header">盲区</string>
     <string name="settings_blindspot_title">转向灯触发摄像头</string>
     <string name="settings_blindspot_desc">左转向灯 - 仪表盘显示左侧摄像头，右转向灯 - 主屏幕上显示小窗。默认关闭。</string>
+    <string name="settings_blindspot_keep_signal_title">转向灯亮期间持续显示</string>
+    <string name="settings_blindspot_keep_signal_desc">转向灯保持开启或闪烁时持续显示电子后视镜，不随灯光闪烁间隔关闭</string>
+    <string name="settings_blindspot_close_delay_title">延迟关闭</string>
+    <string name="settings_blindspot_close_delay_desc">转向灯关闭后继续显示一段时间，可避免画面立即消失</string>
+    <string name="settings_blindspot_close_delay_value">%.1f 秒</string>
     <string name="settings_blindspot_threshold_title">速度阈值</string>
     <string name="settings_blindspot_threshold_desc">低于该速度时不显示摄像头</string>
     <string name="settings_blindspot_pip_width_title">小窗宽度</string>
@@ -2250,6 +2255,6 @@
 
     <string name="nav_tab_local">工具</string>
     <string name="automation_learned_key_label">按键 %1$d</string>
-    <string name="settings_fork_description">Fork 自 BYDMate 的独立社区分支。自愿驻车测试后反馈问题与日志；非比亚迪官方应用。</string>
+    <string name="settings_fork_description">面向比亚迪 DiLink 车机应用，提供行程能耗、车辆状态、自动化、多屏与盲区显示(电子后视镜)、解锁车音效、哨兵模式等。需启用并授权 ADB 的功能包括：实时车辆数据、车窗与空调等车辆控制、自动化车辆动作、分屏与多窗口、仪表投屏与 HUD、方向盘按键、盲区显示(电子后视镜)、车外喊话、锁车/解锁音效、哨兵模式及车辆诊断。本项目 Fork 自 BYDMate，是独立社区分支，非比亚迪官方应用。</string>
     <string name="tech_card_climate">空调</string>
 </resources>

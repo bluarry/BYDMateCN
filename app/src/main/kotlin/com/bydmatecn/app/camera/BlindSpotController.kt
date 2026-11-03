@@ -104,6 +104,19 @@ fun blindSpotClusterDisplay(context: Context): Display? {
     return projection.firstOrNull { it.name.endsWith("_1") } ?: projection.firstOrNull()
 }
 
+private fun traceSignalHold(result: BlindSpotHoldResult, delayMs: Long) {
+    if (result.transition == BlindSpotHoldTransition.NONE) return
+    val action = result.transition.name.lowercase()
+    Log.i("BlindSpot", "signal hold $action side=${result.side} delay=${delayMs}ms")
+    Trace.event(
+        TraceArea.CAMERA,
+        "signal-hold",
+        "action" to action,
+        "side" to result.side.name.lowercase(),
+        "delay_ms" to delayMs,
+    )
+}
+
 /**
  * Turn signal → blind-spot camera.
  *
@@ -195,6 +208,7 @@ class BlindSpotController @Inject constructor(
     /** elapsedRealtime of the last transition to a shown side; the stall watchdog counts from here. */
     private var shownAt = 0L
     private val backoff = BlindSpotBackoff()
+    private val signalHold = BlindSpotSignalHold()
     /** Last seen state of the factory 360 view, so only the transition is logged. */
     private var lastNativeCameraForeground = false
     /** Last raw turn-signal mask seen on the push channel, for the dump; null until one arrives. */
@@ -281,6 +295,7 @@ class BlindSpotController @Inject constructor(
         return listOf(
             "enabled=${prefs.enabled}",
             "threshold_kmh=${prefs.thresholdKmh}",
+            "keep_while_signal_on=${prefs.keepWhileSignalOn} close_delay_ms=${prefs.closeDelayMs}",
             "both_on_main=${prefs.bothOnMain} both_on_cluster=${prefs.bothOnCluster}",
             "armed=$lastArmed",
             "reason=$lastArmedReason",
@@ -388,6 +403,7 @@ class BlindSpotController @Inject constructor(
                         "gear=${sample?.gear} readFailures=${telemetry.readFailures}",
                 )
             }
+            signalHold.reset()
             if (anythingUp()) awaitTeardown("telemetry lost")
             return
         }
@@ -418,29 +434,43 @@ class BlindSpotController @Inject constructor(
         )
 
         if (gearIsReverse) {
+            signalHold.reset()
             if (anythingUp()) awaitTeardown("reverse")
             return
         }
         // The factory 360 owns the screen like reverse does, and a camera kept warm under it
         // streams two previews nobody sees: the 360 stuttered (tester dump 2026-10-03).
         if (nativeCameraForeground) {
+            signalHold.reset()
             if (anythingUp()) awaitTeardown("native 360")
             return
         }
 
+        val askedSide = blindSpotSignalSide(sample?.blink)
+        val held = signalHold.update(
+            requestedSide = decision.show,
+            now = now,
+            enabled = prefs.keepWhileSignalOn && blindSpotHoldAllowed(
+                decision.show, sample, state.ageMs, prefs.thresholdKmh,
+            ),
+            closeDelayMs = prefs.closeDelayMs,
+        )
+        traceSignalHold(held, prefs.closeDelayMs)
+        val finalSide = held.side
+        val cameraWarm = finalSide != BlindSpotSide.NONE
+
         // A fresh signal cancels the error backoff once: the driver is asking for the view now.
         // Edge, not level — otherwise a held blinker would retry the camera every tick.
-        backoff.request(decision.show)
+        backoff.request(finalSide)
 
         // Looked up once the loop is armed rather than on the first blinker, so the first show
         // of the drive does not wait for the vendor lookup on top of the open.
         if (!discovered) discoverCamera()
 
-        val askedSide = blindSpotSignalSide(sample?.blink)
-        if (decision.cameraWarm && !cameraWanted) showLog.requested(askedSide, cameraOpen, now)
-        cameraWanted = decision.cameraWarm
+        if (cameraWarm && !cameraWanted) showLog.requested(finalSide, cameraOpen, now)
+        cameraWanted = cameraWarm
 
-        if (decision.cameraWarm) {
+        if (cameraWarm) {
             coolingSince = 0L
             ensureWarm(now)
         } else {
@@ -452,7 +482,7 @@ class BlindSpotController @Inject constructor(
         }
 
         applyPipGeometry()
-        applyShow(if (cameraOpen) decision.show else BlindSpotSide.NONE)
+        applyShow(if (cameraOpen) finalSide else BlindSpotSide.NONE)
         if (glow && pairs != null) {
             clusterWindow?.setGlow(
                 shownSide == BlindSpotSide.LEFT && pairs.intAt(INDEX_BSD_LEFT) == BSD_OBJECT)
@@ -879,6 +909,7 @@ class BlindSpotController @Inject constructor(
     }
 
     private suspend fun teardownNow(reason: String) {
+        signalHold.reset()
         if (!anythingUp()) return
         if (tearingDown) return
         tearingDown = true

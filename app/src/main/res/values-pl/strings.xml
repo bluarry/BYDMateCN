@@ -2303,6 +2303,6 @@
 
     <string name="nav_tab_local">Narzędzia</string>
     <string name="automation_learned_key_label">Przycisk %1$d</string>
-    <string name="settings_fork_description">Niezależny społecznościowy fork BYDMate. Dobrowolne testy wyłącznie na postoju; zgłaszaj problemy wraz z logami. Nie jest to oficjalna aplikacja BYD.</string>
+    <string name="settings_fork_description">Społecznościowy fork BYDMate skoncentrowany na systemie DiLink i lokalnych funkcjach pojazdu. Nie jest to oficjalna aplikacja BYD.</string>
     <string name="tech_card_climate">Klimatyzacja</string>
 </resources>

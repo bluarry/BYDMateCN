@@ -2303,6 +2303,6 @@
 
     <string name="nav_tab_local">Інструменты</string>
     <string name="automation_learned_key_label">Клавіша %1$d</string>
-    <string name="settings_fork_description">Незалежны супольны форк BYDMate. Добраахвотнае тэставанне толькі на стаянцы; паведамляйце пра праблемы і дадавайце журналы. Неафіцыйная праграма BYD.</string>
+    <string name="settings_fork_description">Супольны форк BYDMate, арыентаваны на DiLink і лакальныя функцыі аўтамабіля. Неафіцыйная праграма BYD.</string>
     <string name="tech_card_climate">Клімат</string>
 </resources>

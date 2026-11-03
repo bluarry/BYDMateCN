@@ -101,8 +101,6 @@ import kotlin.math.ceil
 @Composable
 fun DashboardScreen(
     onOpenTechPanel: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenTariffPeriods: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -143,7 +141,7 @@ fun DashboardScreen(
                 restoreSupported = viewModel.adbRestoreSupported,
                 onCheck = { viewModel.recheckAdb() },
                 onEnableRestore = { viewModel.enableAdbRestore() },
-                onOpenDiagnostics = onOpenSettings,
+                onOpenDiagnostics = null,
                 onDismiss = { openAdbVerdict = null },
             )
         }
@@ -412,7 +410,6 @@ fun DashboardScreen(
                     if (fuelExpanded) {
                         FuelDetailDialog(
                             state = state,
-                            onEditPrice = { fuelExpanded = false; onOpenTariffPeriods() },
                             onDismiss = { fuelExpanded = false },
                         )
                     }
@@ -957,7 +954,7 @@ private fun FuelCell(value: String, label: String, color: Color) {
 
 /** Popup of the «Топливо» card: the car's own readings only, nothing computed by the app. */
 @Composable
-private fun FuelDetailDialog(state: DashboardUiState, onEditPrice: () -> Unit, onDismiss: () -> Unit) {
+private fun FuelDetailDialog(state: DashboardUiState, onDismiss: () -> Unit) {
     val km = stringResource(R.string.dashboard_unit_km)
     CardDetailDialog(title = null, borderColor = AccentOrange, onDismiss = onDismiss) {
         TripDetailRow(stringResource(R.string.dashboard_fuel_popup_tank),
@@ -976,18 +973,10 @@ private fun FuelDetailDialog(state: DashboardUiState, onEditPrice: () -> Unit, o
         TripDetailRow(stringResource(R.string.dashboard_fuel_popup_mileage_ev), state.mileageEvKm?.let { "$it $km" } ?: "—")
         TripDetailRow(stringResource(R.string.dashboard_fuel_popup_fuel_total),
             state.fuelTotalL?.let { stringResource(R.string.dashboard_fuel_liters_value, it) } ?: "—")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.dashboard_fuel_popup_price), color = TextSecondary, fontSize = 13.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(state.fuelPricePerLiter?.let { "%.2f %s".format(it, state.currencySymbol) } ?: "—",
-                    color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace)
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.dashboard_fuel_price_edit), color = AccentGreen, fontSize = 13.sp,
-                    modifier = Modifier.clickable { onEditPrice() })
-            }
-        }
+        TripDetailRow(
+            stringResource(R.string.dashboard_fuel_popup_price),
+            state.fuelPricePerLiter?.let { "%.2f %s".format(it, state.currencySymbol) } ?: "—",
+        )
         Text(stringResource(R.string.dashboard_fuel_footer), color = TextMuted, fontSize = 11.sp)
     }
 }

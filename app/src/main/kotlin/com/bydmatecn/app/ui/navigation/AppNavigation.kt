@@ -34,10 +34,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.BatteryChargingFull
-import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,7 +60,6 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.bydmatecn.app.R
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -78,12 +75,10 @@ import com.bydmatecn.app.diagnostics.Trace
 import com.bydmatecn.app.diagnostics.TraceArea
 import com.bydmatecn.app.service.UpdateChecker
 import com.bydmatecn.app.ui.charges.ChargesScreen
-import com.bydmatecn.app.ui.automation.AutomationScreen
 import com.bydmatecn.app.ui.dashboard.DashboardScreen
 import com.bydmatecn.app.ui.settings.DonateDialog
 import com.bydmatecn.app.ui.settings.DonateEntry
 import com.bydmatecn.app.ui.settings.DonationReminder
-import com.bydmatecn.app.ui.settings.SettingsScreen
 import com.bydmatecn.app.ui.settings.UpdateDialog
 import com.bydmatecn.app.ui.settings.UpdateState
 import com.bydmatecn.app.ui.theme.*
@@ -105,9 +100,7 @@ enum class Screen(val route: String, val labelRes: Int, val icon: ImageVector) {
     Dashboard("dashboard", R.string.nav_tab_dashboard, Icons.Outlined.Home),
     Trips("trips", R.string.nav_tab_trips, Icons.Outlined.DirectionsCar),
     Charges("charges", R.string.nav_tab_charges, Icons.Outlined.BatteryChargingFull),
-    Automation("automation", R.string.nav_tab_automation, Icons.Outlined.Bolt),
     Local("local_capabilities", R.string.nav_tab_local, Icons.Outlined.DirectionsCar),
-    Settings("settings", R.string.nav_tab_settings, Icons.Outlined.Settings)
 }
 
 @Composable
@@ -232,7 +225,15 @@ fun AppNavigation(
     var sideNavigationCollapsed by rememberSaveable {
         mutableStateOf(navigationPrefs.getBoolean(KEY_SIDE_NAV_COLLAPSED, false))
     }
-    val localChildRoutes = setOf("blind_spot", "tool_settings/{section}")
+    val localChildRoutes = setOf(
+        "blind_spot",
+        "tool_settings/{section}",
+        "automation",
+        "tariff_periods",
+        "agent_chat",
+        "voice_journal",
+        "voice_user_phrases",
+    )
     fun isSelected(screen: Screen): Boolean {
         val exact = currentDestination?.hierarchy?.any { it.route == screen.route } == true
         return exact || (screen == Screen.Local && currentDestination?.route in localChildRoutes)
@@ -320,33 +321,15 @@ fun AppNavigation(
                 )
             }
             composable(Screen.Dashboard.route) {
-                // Same tab switch as the bottom bar's Settings item.
-                val openSettingsTab = {
-                    navController.navigate(Screen.Settings.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
                 DashboardScreen(
                     onOpenTechPanel = { navController.navigate("tech_panel") },
-                    onOpenSettings = openSettingsTab,
-                    // Settings first: the periods screen takes its view model from that entry,
-                    // and Back lands on Settings.
-                    onOpenTariffPeriods = {
-                        openSettingsTab()
-                        // The restored Settings stack may already end on the periods screen.
-                        navController.navigate("tariff_periods") { launchSingleTop = true }
-                    },
                 )
             }
             composable(Screen.Trips.route) {
                 TripsScreen(onOpenTemperature = { navController.navigate("trip_temperature") })
             }
             composable(Screen.Charges.route) {
-                ChargesScreen(onNavigateSettings = { navController.navigate(Screen.Settings.route) })
+                ChargesScreen()
             }
             composable(Screen.Local.route) {
                 com.bydmatecn.app.local.LocalCapabilitiesScreen(onNavigate = { navController.navigate(it) })
@@ -356,30 +339,24 @@ fun AppNavigation(
             }
             composable("tool_settings/{section}") { entry ->
                 com.bydmatecn.app.ui.settings.VehicleToolSettingsScreen(
-                    section = entry.arguments?.getString("section") ?: "", onBack = { navController.popBackStack() })
-            }
-            composable(Screen.Automation.route) { AutomationScreen() }
-            composable(Screen.Settings.route) {
-                SettingsScreen(
+                    section = entry.arguments?.getString("section") ?: "",
+                    onBack = { navController.popBackStack() },
                     onNavigateToAgentChat = { navController.navigate("agent_chat") },
                     onNavigateToVoiceJournal = { navController.navigate("voice_journal") },
                     onNavigateToVoiceUserPhrases = { navController.navigate("voice_user_phrases") },
                     onNavigateToTariffPeriods = { navController.navigate("tariff_periods") },
                 )
             }
+            composable("automation") { com.bydmatecn.app.ui.automation.AutomationScreen() }
             composable("trip_temperature") {
                 com.bydmatecn.app.ui.trips.TripTemperatureScreen(onBack = { navController.popBackStack() })
             }
             composable("tech_panel") {
                 com.bydmatecn.app.ui.tech.TechPanelScreen(onBack = { navController.popBackStack() })
             }
-            composable("tariff_periods") { entry ->
-                // The settings entry's own view model: the periods list, the recalc status and
-                // the summary line under the «Открыть» button all live in that one instance.
-                val settingsEntry = remember(entry) { navController.getBackStackEntry(Screen.Settings.route) }
+            composable("tariff_periods") {
                 com.bydmatecn.app.ui.settings.TariffPeriodsScreen(
                     onBack = { navController.popBackStack() },
-                    viewModel = hiltViewModel(settingsEntry),
                 )
             }
             composable("agent_chat") {

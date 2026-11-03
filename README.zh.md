@@ -1,24 +1,43 @@
+<div align="center">
+
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="120" alt="BYDMateCN 图标">
+
 # BYDMateCN
 
-> **WIP（开发与适配中）**：尚未完成实车验证，不保证所有车型及固件可用。欢迎自愿测试后通过 [Issues](https://github.com/bluarry/BYDMateCN/issues) 反馈问题与日志。仅在安全驻车时测试，勿在驾驶中调试；分享日志前请检查并遮盖隐私信息。
+### 面向比亚迪 DiLink 的车机应用
 
-面向比亚迪 DiLink 车机的中文优先版本：行程与能耗分析、车辆状态、自动化、多屏/盲区显示，以及本地音频、驻车录像和问题日志。
+[![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](https://developer.android.com)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Jetpack Compose](https://img.shields.io/badge/Jetpack_Compose-Material3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![License](https://img.shields.io/badge/License-PolyForm_Noncommercial-blue?style=flat-square)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/bluarry/BYDMateCN?style=flat-square)](https://github.com/bluarry/BYDMateCN/releases)
+
+**默认中文、以本地能力为主，为 DiLink 横屏车机优化。**
+
+面向比亚迪 DiLink 车机应用，提供行程能耗、车辆状态、自动化、多屏与盲区显示(电子后视镜)、解锁车音效、哨兵模式等。需启用并授权 ADB 的功能包括：实时车辆数据、车窗与空调等车辆控制、自动化车辆动作、分屏与多窗口、仪表投屏与 HUD、方向盘按键、盲区显示(电子后视镜)、车外喊话、锁车/解锁音效、哨兵模式及车辆诊断。
+
+[主要能力](#继承自-bydmate-的能力) · [本地工具](#本分支新增补齐的本地能力) · [安装说明](#安装与使用) · [构建](#构建) · [发布版本](https://github.com/bluarry/BYDMateCN/releases)
+
+</div>
+
+---
 
 ## 项目来源与定位
 
 **BYDMateCN fork 自 [BYDMate](https://github.com/AndyShaman/BYDMate)**，本工作目录基于 [bluarry/BYDMate](https://github.com/bluarry/BYDMate) 分支继续开发。保留原项目版权、贡献者署名与 [LICENSE](LICENSE)，本项目为独立社区分支，不代表比亚迪官方适配。
 
-在继承 BYDMate 功能的基础上，本分支结合车机固件接口分析，新增离线、本地可执行能力。**有入口不等于功能已完成，接口调用成功不等于实车已经出声或显示。** 当前主要适配目标为宋 L DM-i / DiLink；必须按实际固件、权限和硬件验证，不能照搬原项目支持车型列表作为本分支兼容承诺。
+在继承 BYDMate 功能的基础上，本分支面向中文用户和 DiLink 横屏车机，扩展车外音频、本地媒体、驻车影像与诊断等本地能力。当前主要适配目标为宋 L DM-i / DiLink；具体功能可用性取决于车型、DiLink 版本、固件权限和硬件配置。
 
 - 应用显示名：**BYDMateCN**
 - applicationId / namespace：`com.bydmatecn.app`
 - Android：最低及目标 API 29；编译 API 35（编译版本不等于运行最低版本）
+- ADB 依赖功能：实时车辆数据、车窗与空调等车辆控制、自动化车辆动作、分屏与多窗口、仪表投屏与 HUD、方向盘按键、盲区显示（电子后视镜）、车外喊话、锁车/解锁音效、哨兵模式及车辆诊断。未启用 ADB 时仍可查看已有行程历史和使用不依赖车辆接口的本地功能。
 - 首次启动、未保存语言与资源回退：**简体中文**；设置 → 应用 → 语言可显式切换英语、俄语等。
 - 原捐赠入口、自动弹窗与二维码默认隐藏，源码及资源保留，可通过构建开关重新启用。
 
 ## 继承自 BYDMate 的能力
 
-下表为继承的代码能力；不同车型/固件需要不同权限与系统接口，未逐项完成宋 L DM-i 实车验收。
+BYDMateCN 完整保留 BYDMate 的核心能力，并在独立应用数据空间内提供以下功能：
 
 | 分类 | 能力 |
 |---|---|
@@ -38,7 +57,8 @@
 
 ### 音频（工具 → 音频）
 
-- 本地音频导入、播放/暂停/停止、进度、音量、循环和可用输出设备选择；设备断开时停止，不偷偷换扬声器。
+- 本地音频仅从用户选择的目录扫描，支持多个路径（最多32个）、浏览或输入绝对路径、移除目录与手动刷新；只读取目录直接包含的音频，不递归、不复制、不删除原文件。支持播放/暂停/停止、进度、音量、循环和可用输出设备选择。
+- 锁车/解锁音效与本地媒体规则按完整路径引用扫描结果，支持不同目录下同名文件；目录移除、U盘拔出或文件删除后不自动替换，重新配置旧导入副本的音效。车机需授予存储读取权限；不可读目录会显示扫描状态。
 - LRC 歌词导入与时间同步；仅使用本地资源。
 - 麦克风录音：AAC，单次上限 60 秒。
 - 本地 TTS 播放与 WAV 导出，依赖车机安装的可用 TTS 引擎/音色；使用车机本地能力。
@@ -70,26 +90,26 @@
 - 导出：**工具 → 固件与权限 → 导出本地问题日志 TXT**。目录为 `/data/user/0/com.bydmatecn.app/files/local-logs`；普通文件管理器无需访问私有目录，直接使用导出入口。
 - 日志不主动记录音频或 TTS 输入，对常见敏感字段脱敏，不上传服务器；分享前仍需检查个人信息。强杀/断电可能丢尾部，卸载/清数据会删除，不等于完整系统 logcat。
 
-## 尚未完成 / 不纳入本地版的能力
+## 适用范围与兼容性
 
-| 能力 | 当前边界 |
+| 能力 | 兼容性说明 |
 |---|---|
-| 前车提醒/识别 | 插件、识别源和厂商协议未补齐；入口提示不可用，不宣称本地已实现 |
-| 实时红绿灯倒计时/领航 | 没有合法实时信号源，本地版不提供 |
-| 米篓宝专用蓝牙功能 | 标准蓝牙入口不代表已实现厂商协议 |
-| 仪表触控板 | 输入注入/厂商协议未补齐 |
-| 熄火全天守护/后台 DVR | 尚未完成可靠供电、后台唤醒及厂商链路；现有 12V 状态/原厂哨兵入口不是全天运行保障 |
-| 云端服务 | 当前新增能力不提供云端账号、支付或配置服务；车外资源使用本地文件 |
-| 中文离线语音识别 | 中文 UI 与本地 TTS 可用性独立；原俄语 ASR 模型不因此转换成中文模型 |
+| 前车提醒/识别 | 需要兼容的识别插件、数据源与车型协议 |
+| 实时红绿灯倒计时/领航 | 需要合规的实时信号数据源，当前发行版不包含该服务 |
+| 米篓宝专用蓝牙功能 | 需要对应设备及厂商协议支持 |
+| 仪表触控板 | 依赖车型输入接口和厂商协议支持 |
+| 熄火全天守护/后台 DVR | 受车机休眠、供电和后台唤醒机制限制；驻车录像按前台工作模式提供 |
+| 云端服务 | 本分支新增能力以本地运行和本地文件为主，不依赖专属云端账号 |
+| 中文离线语音识别 | 本地 TTS 取决于车机已安装引擎；离线语音识别需另行配置兼容的中文模型 |
 
 
-## 安装与实车验收
+## 安装与使用
 
-1. 安装 `app/build/outputs/apk/debug/BYDMateCN.apk`，仅用于已获授权的车机测试。
+1. 从 [Releases](https://github.com/bluarry/BYDMateCN/releases) 下载与版本对应的 APK，或安装本地构建产物。
 2. 独立包名与原 BYDMate 可并存，但**不继承旧包数据或权限**。重新授权相机/麦克风、悬浮窗、通知访问、辅助功能等实际需要项。厂商包名白名单可能需合法固件配置。
-3. 停用旧应用的相机、自动化与常驻服务，避免竞争车辆硬件。先 P 挡驻车、低音量、单路相机标定，再逐项测试。
-4. 逐项记录实车测试结果。出现问题：导出 TXT，附发生时间、权限、车机版本、操作顺序和实际现象；必要时另附已授权采集的系统日志/视频。
-5. 硬件接口调用不保证实车功能已经成功。禁止驾驶员行驶中操作；相机/车外音频未验收前不要投入日常使用。
+3. 首次使用车外音频、相机和自动化功能时，请保持 P 挡驻车并从低音量、单路相机开始配置，避免多个应用同时占用车辆硬件。
+4. 遇到问题可在工具页开启文件日志并导出 TXT；反馈时请附发生时间、车机版本、操作步骤与实际现象，并在分享前检查隐私信息。
+5. 车辆控制、相机和车外音频功能应在安全驻车状态下完成配置；驾驶员请勿在行驶中操作应用。
 
 ## 构建
 
@@ -100,7 +120,7 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 & "$env:JAVA_HOME\bin\java.exe" -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain :app:assembleDebug
 ```
 
-输出：`app/build/outputs/apk/debug/BYDMateCN.apk`。测试可按 `com.bydmatecn.app.*` 包选择运行。没有发布签名配置时不能把 debug 包当正式签名发布版本。
+输出：`app/build/outputs/apk/debug/BYDMateCN-<版本号>.apk`。测试可按 `com.bydmatecn.app.*` 包选择运行。没有发布签名配置时不能把 debug 包当正式签名发布版本。
 
 ### 车机 SDK 与权限
 
@@ -113,12 +133,16 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 `app/build.gradle.kts` 中 `DONATIONS_ENABLED=false` 隐藏设置捐赠卡片、启动提醒和 DonateDialog，二维码/收款资源不删除。以后启用前必须核对收款信息和来源归属，不能直接沿用原作者收款信息作为本分支收款方式。
 
-原 BYDMate 更新源已禁用，独立更新 URL 未配置前请手动安装开发者提供的 APK，不会用原版 APK 更新 BYDMateCN。
+更新仅检查 `bluarry/BYDMateCN` 的三段版本正式 Release；四段版本预发布版只供手动安装，不参与应用内自动更新，只接受与发布标签一致的 `BYDMateCN-<版本号>.apk`。安装前校验应用 ID、版本及签名；覆盖更新必须使用同一签名且递增 versionCode，不会下载原项目的安装包。
 
 ## 开源来源与许可证
 
 感谢 BYDMate 原作者、贡献者与所基于分支的维护者；本分支保留原项目版权与许可证约束。请阅读 [LICENSE](LICENSE)，尤其非商业使用及再分发条件；fork 和功能扩展不改变原许可证，不意味着获得商业发布授权。
 
-## GitHub 自动预发布
+## GitHub 自动发布
 
-推送与应用版本一致的 `v1.0.0` 等标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN.apk`，创建 **WIP 预发布版**并附 SHA-256 校验文件。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
+推送与应用版本一致的标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN-<版本号>.apk`，并附 SHA-256 校验文件。三段数字标签（如 `v1.0.0`）创建 **正式 Release**；四段数字标签（如 `v1.0.0.1`）创建 **Pre-release**，不会被设置为最新正式版。应用版本只在根目录 `version.properties` 配置；每个标签必须与其中的 `VERSION_NAME` 一致，并提供 `release-notes/<标签>.md` 发布说明；覆盖安装必须保持原发布签名且递增 `versionCode`。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
+
+## 界面实现
+
+主界面与本地工具、音频、相机控制、相册、备份页面统一使用 **Jetpack Compose + Material 3**，复用应用主题和字体缩放。按钮、输入框、开关、滑块和确认/文件选择弹窗均由 Compose 渲染，不使用 XML 或动态拼接传统布局。相机 `TextureView` 与视频播放器 `VideoView` 仅作为底层显示组件通过 `AndroidView` 接入；权限申请仍使用系统界面。

@@ -1582,6 +1582,18 @@ private fun BlindSpotCard() {
         mutableStateOf(prefs.getInt(
             BlindSpotPreferences.KEY_PIP_WIDTH_PCT, BlindSpotPreferences.DEFAULT_PIP_WIDTH_PCT))
     }
+    var keepWhileSignalOn by remember {
+        mutableStateOf(prefs.getBoolean(
+            BlindSpotPreferences.KEY_KEEP_WHILE_SIGNAL_ON,
+            BlindSpotPreferences.DEFAULT_KEEP_WHILE_SIGNAL_ON,
+        ))
+    }
+    var closeDelayMs by remember {
+        mutableStateOf(prefs.getInt(
+            BlindSpotPreferences.KEY_CLOSE_DELAY_MS,
+            BlindSpotPreferences.DEFAULT_CLOSE_DELAY_MS,
+        ))
+    }
     var bsdGlow by remember { mutableStateOf(prefs.getBoolean(BlindSpotPreferences.KEY_BSD_GLOW, true)) }
     var rotate90 by remember {
         mutableStateOf(prefs.getBoolean(BlindSpotPreferences.KEY_PIP_ROTATE_90, false))
@@ -1711,6 +1723,52 @@ private fun BlindSpotCard() {
                     BlindSpotPreferences.KEY_THRESHOLD_KMH, BlindSpotPreferences.DEFAULT_THRESHOLD_KMH)
                 prefs.edit().putInt(BlindSpotPreferences.KEY_THRESHOLD_KMH, thresholdKmh).apply()
                 Trace.event(TraceArea.USER, "slider", "id" to "blindspot_threshold", "value" to thresholdKmh, "was" to was)
+            },
+        )
+        SettingDivider()
+        SettingToggleRow(
+            title = stringResource(R.string.settings_blindspot_keep_signal_title),
+            traceId = "blindspot_keep_signal",
+            description = stringResource(R.string.settings_blindspot_keep_signal_desc),
+            checked = keepWhileSignalOn,
+            onCheckedChange = {
+                keepWhileSignalOn = it
+                prefs.edit().putBoolean(BlindSpotPreferences.KEY_KEEP_WHILE_SIGNAL_ON, it).apply()
+            },
+            enabled = enabled,
+        )
+        SettingDivider()
+        SettingSliderRow(
+            title = stringResource(R.string.settings_blindspot_close_delay_title),
+            description = stringResource(R.string.settings_blindspot_close_delay_desc),
+            value = closeDelayMs.toFloat(),
+            onValueChange = { value ->
+                closeDelayMs = (value.roundToInt() / BlindSpotPreferences.CLOSE_DELAY_STEP_MS) *
+                    BlindSpotPreferences.CLOSE_DELAY_STEP_MS
+            },
+            valueRange = BlindSpotPreferences.MIN_CLOSE_DELAY_MS.toFloat()..
+                BlindSpotPreferences.MAX_CLOSE_DELAY_MS.toFloat(),
+            valueLabel = stringResource(
+                R.string.settings_blindspot_close_delay_value,
+                closeDelayMs / 1000f,
+            ),
+            steps = (BlindSpotPreferences.MAX_CLOSE_DELAY_MS -
+                BlindSpotPreferences.MIN_CLOSE_DELAY_MS) /
+                BlindSpotPreferences.CLOSE_DELAY_STEP_MS - 1,
+            enabled = enabled && keepWhileSignalOn,
+            onValueChangeFinished = {
+                val was = prefs.getInt(
+                    BlindSpotPreferences.KEY_CLOSE_DELAY_MS,
+                    BlindSpotPreferences.DEFAULT_CLOSE_DELAY_MS,
+                )
+                prefs.edit().putInt(BlindSpotPreferences.KEY_CLOSE_DELAY_MS, closeDelayMs).apply()
+                Trace.event(
+                    TraceArea.USER,
+                    "slider",
+                    "id" to "blindspot_close_delay",
+                    "value" to closeDelayMs,
+                    "was" to was,
+                )
             },
         )
         SettingDivider()
@@ -3688,6 +3746,12 @@ private fun AppSection(state: SettingsUiState, viewModel: SettingsViewModel) {
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Text(
+                text = stringResource(R.string.settings_fork_description),
+                color = TextPrimary,
+                fontSize = 14.sp,
+                lineHeight = 21.sp,
+            )
             Text(stringResource(R.string.settings_copyright), color = TextSecondary, fontSize = 14.sp)
             Text(
                 text = "github.com/bluarry/BYDMateCN",
@@ -4963,19 +5027,32 @@ fun BlindSpotSettingsScreen(onBack: () -> Unit) {
 fun VehicleToolSettingsScreen(
     section: String,
     onBack: () -> Unit,
+    onNavigateToAgentChat: () -> Unit = {},
+    onNavigateToVoiceJournal: () -> Unit = {},
+    onNavigateToVoiceUserPhrases: () -> Unit = {},
+    onNavigateToTariffPeriods: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val title = when (section) {
-        "SPLIT" -> "分屏"
-        "DISPLAY" -> "投屏"
-        "WIDGET" -> "桌面"
-        else -> "车机工具"
-    }
-    VehicleToolPage(title, "显示与车辆联动设置", onBack) {
-        when (section) {
-            "SPLIT" -> SplitSection(viewModel)
-            "DISPLAY" -> DisplaySection()
-            "WIDGET" -> WidgetSection()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val destination = runCatching { SettingsSection.valueOf(section) }.getOrDefault(SettingsSection.APP)
+    val title = stringResource(destination.labelRes)
+    VehicleToolPage(title, "功能配置", onBack) {
+        when (destination) {
+            SettingsSection.BATTERY -> BatterySection(state, viewModel, onNavigateToTariffPeriods)
+            SettingsSection.INTEGRATIONS -> IntegrationsSection(state, viewModel)
+            SettingsSection.VOICE -> VoiceSettingsContent(
+                state,
+                viewModel,
+                onNavigateToVoiceJournal,
+                onNavigateToAgentChat,
+                onNavigateToVoiceUserPhrases,
+            )
+            SettingsSection.WIDGET -> WidgetSection()
+            SettingsSection.DISPLAY -> DisplaySection()
+            SettingsSection.SPLIT -> SplitSection(viewModel)
+            SettingsSection.SERVICE -> ServiceSection(state, viewModel)
+            SettingsSection.APP -> AppSection(state, viewModel)
+            SettingsSection.SMART_HOME -> SmartHomeSection(state, viewModel)
         }
     }
 }

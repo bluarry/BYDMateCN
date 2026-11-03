@@ -139,12 +139,12 @@ jobs:
         run: |
           set -euo pipefail
           # 已有同名 Release 时失败，不覆盖已发布安装包。
-          # 三段数字版本为正式版；四段数字版本为 WIP 预发布版。
+          # 三段数字版本为正式版；四段数字版本为预发布版。
           release_flags=()
           title="BYDMateCN $RELEASE_TAG"
           if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             release_flags+=(--prerelease --latest=false)
-            title+=" · WIP"
+            title+=" · Pre-release"
           elif [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "不支持的版本标签：$RELEASE_TAG" >&2
             exit 1
