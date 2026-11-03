@@ -14,7 +14,7 @@ val localTools = listOf(
     LocalTool("cast", "投屏", "仪表输出 · HUD · 显示联动", "tool_settings/DISPLAY", 3),
     LocalTool("desktop", "桌面", "桌面卡片 · 悬浮组件 · 媒体显示", "tool_settings/WIDGET", 0),
     LocalTool("service", "车辆服务", "后台服务 · 备份恢复 · 诊断维护", "tool_settings/SERVICE", 1),
-    LocalTool("recorder", "驻车录像", "MP4 分段 · 事件保护 · 本地相册", "camera", 3),
+    LocalTool("recorder", "行车记录仪与驻车哨兵", "自动启停 · 循环录像 · 事件保护", "camera", 3),
     LocalTool("files", "本地媒体", "目录选择 · 扫描媒体 · 相册备份", "native:files", 0),
     LocalTool("diagnostics", "固件与权限", "只读检测 · 适配报告导出", "native:diagnostics", 1),
     LocalTool("app_settings", "应用设置", "语言 · 日志 · 更新 · 应用信息", "tool_settings/APP", 2),

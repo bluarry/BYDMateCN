@@ -1,5 +1,7 @@
 package com.bydmatecn.app.local
 
+import com.bydmatecn.app.camera.AvmFrameShare
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -34,37 +36,33 @@ internal fun LocalCameraActivity.createCameraViews() {
             surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                 override fun onSurfaceTextureAvailable(value: SurfaceTexture, width: Int, height: Int) {
                     secondSurface = Surface(value)
+                    AvmFrameShare.publish(3, secondTexture)
                     applyViewConfig()
                     restartPreviewIfReady()
                 }
                 override fun onSurfaceTextureSizeChanged(value: SurfaceTexture, width: Int, height: Int) { applyViewConfig() }
-                override fun onSurfaceTextureUpdated(value: SurfaceTexture) = Unit
+                override fun onSurfaceTextureUpdated(value: SurfaceTexture) {
+                    AvmFrameShare.frame(3, secondTexture)
+                }
                 override fun onSurfaceTextureDestroyed(value: SurfaceTexture): Boolean {
+                    AvmFrameShare.unpublish(secondTexture)
                     closePreview("第二路 Surface 销毁")
                     secondSurface?.release(); secondSurface = null
                     return true
                 }
             }
         }
-        ui.title = "驻车录像"
-        ui.subtitle = "实时预览 · 分段录像 · 事件保护"
+        ui.title = "行车记录仪与驻车哨兵"
+        ui.subtitle = "自动启停 · 循环分段 · 事件保护 · 本地回看"
         ui.status = status
         ui.onBack = { finish() }
-        ui.section("相机与权限")
+        addAutomaticRecorderControls()
+        ui.section("手动预览与标定")
 
         cameraButton("打开使用情况访问设置") {
             runCatching { startActivity(android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
                 .onFailure { status.text = "固件没有使用情况访问设置：${it.message}" }
         }
-        cameraButton("启用 / 关闭行驶录像模式（需已验证原厂相机优先）") {
-            if (driving) { closePreview("关闭行驶模式"); driving = false }
-            else LocalDialogBuilder(this).setTitle("行驶录像测试模式")
-                .setMessage("必须先完成驻车通道标定及倒车/原厂360抢占测试。仅D挡允许录像；不保证熄屏/后台持续录制，不能作为安全后视镜。启用后隐藏预览并自动开始MP4。")
-                .setNegativeButton("取消", null).setPositiveButton("已验证，启用") { _, _ ->
-                    closePreview("切换行驶模式"); driving = true; status.text = "行驶录像已启用，请打开预览（画面隐藏）"
-                }.show()
-        }
-
         addMirrorControls()
     }
 
@@ -75,6 +73,7 @@ internal fun LocalCameraActivity.addMirrorControls() {
             LocalDialogBuilder(this).setTitle("通道号不等于左/右方位")
                 .setItems(arrayOf("VIEW_CHANNEL_1", "VIEW_CHANNEL_2", "VIEW_CHANNEL_3", "VIEW_CHANNEL_4")) { _, which ->
                     val reopen = open
+                    AvmFrameShare.unpublish(texture)
                     closePreview("切换通道")
                     index = which + 1
                     dual = false
@@ -86,6 +85,8 @@ internal fun LocalCameraActivity.addMirrorControls() {
         }
         cameraButton("单路 / 双路（索引 2 + 3）") {
             val reopen = open
+            AvmFrameShare.unpublish(texture)
+            AvmFrameShare.unpublish(secondTexture)
             closePreview("切换布局")
             dual = !dual
             secondTexture.visibility = if (dual) View.VISIBLE else View.GONE
@@ -181,7 +182,7 @@ internal fun LocalCameraActivity.observeCamera() {
 
     }
 
-private fun LocalCameraActivity.cameraButton(label: String, action: () -> Unit) {
+internal fun LocalCameraActivity.cameraButton(label: String, action: () -> Unit) {
     ui.button(label) { LocalFileLog.get(this).record("camera/action", label); action() }
 }
 

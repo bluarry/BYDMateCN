@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.START_ACTIVITIES_FROM_BACKGROUND" />
@@ -208,6 +209,7 @@
 
         <activity android:name=".local.LocalToolsActivity" android:exported="false" />
         <service android:name=".local.LocalLockSoundService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".local.VehicleRecorderService" android:exported="false" android:foregroundServiceType="camera" />
         <activity android:name=".local.LocalBackupActivity" android:exported="false" />
         <activity android:name=".local.LocalMediaActivity" android:exported="false" />
         <activity android:name=".local.LocalCameraActivity" android:exported="false" />

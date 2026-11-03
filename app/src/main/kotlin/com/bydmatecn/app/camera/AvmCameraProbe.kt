@@ -55,12 +55,15 @@ class AvmCameraProbe(
     private val jarLoader: (String) -> ClassLoader = { PathClassLoader(it, AvmCameraProbe::class.java.classLoader) },
     /** Optional bounded file sink; failure must never change vendor camera behaviour. */
     private val eventSink: ((String) -> Unit)? = null,
+    /** Background consumers opt in so an interactive camera session can synchronously preempt them. */
+    private val yieldToForeground: Boolean = false,
 ) {
     private val _log = MutableStateFlow<List<String>>(emptyList())
     val log: StateFlow<List<String>> = _log.asStateFlow()
     private val stamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
 
     private var camera: Any? = null
+    val isOpen: Boolean get() = synchronized(this) { camera != null }
     /** Preview index → surface currently bound to the open camera; close() unbinds every entry. */
     private val bound = linkedMapOf<Int, Surface>()
     var cameraId: Int = -1; private set
@@ -179,10 +182,19 @@ class AvmCameraProbe(
             return false
         }
         if (camera != null) close("reopen")
-        // All in-process users (blind-spot and manual preview) share exclusive ownership.
+        // The vendor AVM handle is exclusive in-process. A background recorder marks its handle
+        // yieldable; its encoder then consumes frames shared by the foreground TextureView.
+        val previous = synchronized(ownershipLock) { owner?.takeIf { it !== this } }
+        if (previous != null) {
+            if (!previous.yieldToForeground) {
+                append("open refused: another BYDMateCN camera session owns AVM")
+                return false
+            }
+            previous.close("higher-priority camera session requested AVM")
+        }
         synchronized(ownershipLock) {
             if (owner != null && owner !== this) {
-                append("open refused: another BYDMateCN camera session owns AVM")
+                append("open refused: AVM ownership changed while yielding")
                 return false
             }
             owner = this

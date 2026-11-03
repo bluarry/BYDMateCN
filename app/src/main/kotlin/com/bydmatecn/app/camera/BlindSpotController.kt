@@ -1011,6 +1011,9 @@ class BlindSpotController @Inject constructor(
         var surface: Surface? = null
             private set
 
+        private val previewIndex: Int
+            get() = if (side == BlindSpotSide.LEFT) PREVIEW_INDEX_LEFT else PREVIEW_INDEX_RIGHT
+
         val hasValidFrame: Boolean get() = frames >= 2
 
         fun attach(
@@ -1137,6 +1140,7 @@ class BlindSpotController @Inject constructor(
                 return false
             }
             if (error != null) Log.i(TAG, "$label window was already detached")
+            textureView?.let { AvmFrameShare.unpublish(previewIndex, it) }
             container = null
             surface?.release()
             surface = null
@@ -1155,6 +1159,7 @@ class BlindSpotController @Inject constructor(
         override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
             surface?.release()
             surface = Surface(texture)
+            AvmFrameShare.publish(previewIndex, textureView ?: return)
             frames = 0
             lastFrameAt = 0L
             validFrameAt = 0L
@@ -1168,6 +1173,7 @@ class BlindSpotController @Inject constructor(
         }
 
         override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+            textureView?.let { AvmFrameShare.unpublish(previewIndex, it) }
             // We keep ownership (false) and release the buffer ourselves only after the vendor
             // stack is closed — returning true would free it while the camera may still write.
             ownScope.launch {
@@ -1178,6 +1184,7 @@ class BlindSpotController @Inject constructor(
         }
 
         override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {
+            textureView?.let { AvmFrameShare.frame(previewIndex, it) }
             val now = SystemClock.elapsedRealtime()
             if (frames < 2 && ++frames == 2) validFrameAt = now
             lastFrameAt = now

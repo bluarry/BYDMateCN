@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import com.bydmatecn.app.camera.AvmCameraProbe
+import com.bydmatecn.app.camera.AvmFrameShare
 import com.bydmatecn.app.data.camera.CameraStateMonitor
 import com.bydmatecn.app.data.vehicle.VehicleApi
 import dagger.hilt.android.AndroidEntryPoint
@@ -112,15 +113,26 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
             }
         }
     }
-    override fun onPause() { LocalMediaCommands.camera = null; resumed = false; closePreview("页面不可见，释放相机"); super.onPause() }
+    override fun onPause() {
+        LocalMediaCommands.camera = null
+        resumed = false
+        closePreview("页面不可见，释放相机")
+        super.onPause()
+    }
     override fun onSurfaceTextureAvailable(value: SurfaceTexture, width: Int, height: Int) {
         surface = Surface(value)
+        AvmFrameShare.publish(if (dual) 2 else index, texture)
         applyViewConfig()
         restartPreviewIfReady()
     }
     override fun onSurfaceTextureSizeChanged(value: SurfaceTexture, width: Int, height: Int) { applyViewConfig() }
-    override fun onSurfaceTextureUpdated(value: SurfaceTexture) { lastFrameMs = android.os.SystemClock.elapsedRealtime() }
+    override fun onSurfaceTextureUpdated(value: SurfaceTexture) {
+        AvmFrameShare.publish(if (dual) 2 else index, texture)
+        AvmFrameShare.frame(if (dual) 2 else index, texture)
+        lastFrameMs = android.os.SystemClock.elapsedRealtime()
+    }
     override fun onSurfaceTextureDestroyed(value: SurfaceTexture): Boolean {
+        AvmFrameShare.unpublish(texture)
         closePreview("Surface 销毁")
         surface?.release(); surface = null
         return true

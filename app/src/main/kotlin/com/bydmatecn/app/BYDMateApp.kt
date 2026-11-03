@@ -29,6 +29,7 @@ import com.bydmatecn.app.diagnostics.Trace
 import com.bydmatecn.app.diagnostics.TraceArea
 import com.bydmatecn.app.diagnostics.TraceJournal
 import com.bydmatecn.app.local.LocalLockSoundService
+import com.bydmatecn.app.local.VehicleRecorderService
 import com.bydmatecn.app.ui.widget.WidgetController
 import com.bydmatecn.app.ui.widget.WidgetPreferences
 import com.bydmatecn.app.util.CrashLog
@@ -92,6 +93,7 @@ class BYDMateApp : Application(), Configuration.Provider {
         }
         installCrashHandler()
         LocalLockSoundService.restoreIfEnabled(this)
+        VehicleRecorderService.restoreIfEnabled(this)
         bootstrapLocale()
         initOsmdroid()
         appScope.launch {
