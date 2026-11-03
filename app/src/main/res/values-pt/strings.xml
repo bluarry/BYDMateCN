@@ -284,6 +284,7 @@
     <string name="settings_charge_connector_label">Conector de carregamento</string>
     <string name="settings_charge_connector_desc">O assistente procura carregadores com este conector</string>
     <string name="settings_map_tile_source_label">Fonte dos mapas</string>
+    <string name="settings_map_tile_source_amap">Amap (Gaode Maps)</string>
     <string name="settings_app_data_header">Dados</string>
     <string name="settings_log_recording_start_button">Gravar logs</string>
     <string name="settings_log_recording_stop_button">Parar gravação</string>

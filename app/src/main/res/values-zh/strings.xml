@@ -207,6 +207,7 @@
     <string name="settings_charge_connector_label">充电接口</string>
     <string name="settings_charge_connector_desc">语音助手按此接口查找充电站</string>
     <string name="settings_map_tile_source_label">地图源</string>
+    <string name="settings_map_tile_source_amap">高德地图</string>
     <string name="settings_app_data_header">数据</string>
     <string name="settings_log_recording_start_button">录制日志</string>
     <string name="settings_log_recording_stop_button">停止录制</string>

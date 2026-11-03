@@ -304,6 +304,7 @@
     <string name="settings_charge_connector_label">Раз’ём для зарадкі</string>
     <string name="settings_charge_connector_desc">Памочнік шукае зарадкі з гэтым раз’ёмам</string>
     <string name="settings_map_tile_source_label">Крыніца карты</string>
+    <string name="settings_map_tile_source_amap">Amap (Gaode Maps)</string>
     <string name="settings_app_data_header">Даныя</string>
     <string name="settings_log_recording_start_button">Запіс логаў</string>
     <string name="settings_log_recording_stop_button">Спыніць запіс</string>

@@ -31,11 +31,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.MenuOpen
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -409,8 +409,8 @@ private fun VehicleSideNavigation(
             }
             IconButton(onClick = { onCollapsedChange(!collapsed) }) {
                 Icon(
-                    imageVector = if (collapsed) Icons.AutoMirrored.Outlined.ArrowForward
-                    else Icons.AutoMirrored.Outlined.ArrowBack,
+                    imageVector = if (collapsed) Icons.Outlined.Menu
+                    else Icons.AutoMirrored.Outlined.MenuOpen,
                     contentDescription = if (collapsed) "展开主导航" else "折叠主导航",
                     tint = Color(0xFF9CB1C5),
                 )
