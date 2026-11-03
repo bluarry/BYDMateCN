@@ -785,7 +785,6 @@
     <string name="nav_tab_dashboard">Główna</string>
     <string name="nav_tab_trips">Przejazdy</string>
     <string name="nav_tab_charges">Ładowania</string>
-    <string name="nav_tab_automation">Automatyzacja</string>
     <string name="nav_tab_settings">Ustawienia</string>
 
     <!-- Post-install autostart hint dialog -->

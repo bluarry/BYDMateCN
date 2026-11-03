@@ -1,8 +1,10 @@
 package com.bydmatecn.app.local
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,7 +19,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,26 +39,34 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 
 private val PageBackground = Color(0xFF081321)
 private val Panel = Color(0xFF101F31)
-private val PanelRaised = Color(0xFF162A40)
 private val MutedText = Color(0xFF8DA3BC)
 private val Cyan = Color(0xFF19D3D6)
 private val Orange = Color(0xFFFFA928)
 private val Purple = Color(0xFFB788FF)
 private val Blue = Color(0xFF4DA9FF)
 private val toolAccents = listOf(Cyan, Orange, Purple, Blue)
+private const val TOOL_ORDER_PREFS = "local-tool-order"
+private const val TOOL_ORDER_KEY = "ordered_ids"
 
 private fun toolIcon(id: String): ImageVector = when (id) {
     "audio" -> Icons.AutoMirrored.Outlined.VolumeUp
@@ -71,6 +83,31 @@ private fun toolIcon(id: String): ImageVector = when (id) {
 @Composable
 fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
     val context = LocalContext.current
+    val orderPrefs = remember(context) {
+        context.getSharedPreferences(TOOL_ORDER_PREFS, Context.MODE_PRIVATE)
+    }
+    var orderedTools by remember {
+        mutableStateOf(restoreToolOrder(orderPrefs.getString(TOOL_ORDER_KEY, null)))
+    }
+    val gridState = rememberLazyGridState()
+    var draggedId by remember { mutableStateOf<String?>(null) }
+    var dragX by remember { mutableStateOf(0f) }
+    var dragY by remember { mutableStateOf(0f) }
+
+    fun finishDrag(commit: Boolean) {
+        val sourceId = draggedId
+        if (commit && sourceId != null) {
+            val targetId = gridState.dragTarget(sourceId, dragX, dragY)
+            if (targetId != null && targetId != sourceId) {
+                orderedTools = orderedTools.move(sourceId, targetId)
+                orderPrefs.edit().putString(TOOL_ORDER_KEY, orderedTools.joinToString(",") { it.id }).apply()
+            }
+        }
+        draggedId = null
+        dragX = 0f
+        dragY = 0f
+    }
+
     fun open(tool: LocalTool) {
         when {
             tool.route == "camera" -> context.startActivity(Intent(context, LocalCameraActivity::class.java))
@@ -79,16 +116,11 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
             else -> onNavigate(tool.route)
         }
     }
-    val audio = localTools.first { it.id == "audio" }
-    val mirror = localTools.first { it.id == "mirror" }
-    val remaining = localTools.filterNot { it.id == "audio" || it.id == "mirror" }
-
     BoxWithConstraints(
         Modifier.fillMaxSize().background(
             Brush.verticalGradient(listOf(Color(0xFF0B1A2B), PageBackground))
         ).padding(horizontal = 28.dp, vertical = 22.dp)
     ) {
-        val compact = maxWidth < 760.dp
         val columns = when {
             maxWidth >= 1180.dp -> 4
             maxWidth >= 820.dp -> 3
@@ -104,31 +136,52 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
                 Text("BYDMateCN  ·  DiLink 车机工具", color = Cyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
 
-            if (compact) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    FeaturedToolCard(audio, Cyan, Modifier.fillMaxWidth(), ::open)
-                    FeaturedToolCard(mirror, Orange, Modifier.fillMaxWidth(), ::open)
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    FeaturedToolCard(audio, Cyan, Modifier.weight(1.35f), ::open)
-                    FeaturedToolCard(mirror, Orange, Modifier.weight(1f), ::open)
-                }
-            }
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("全部功能", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(10.dp))
-                Text("${localTools.size} 项 · 所有功能配置均从此处进入", color = MutedText, fontSize = 14.sp)
+                Text("${orderedTools.size} 项 · 长按卡片拖拽排序", color = MutedText, fontSize = 14.sp)
             }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(columns),
+                state = gridState,
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                items(remaining, key = { it.id }) { tool ->
-                    StandardToolCard(tool, toolAccents[tool.accent], ::open)
+                items(orderedTools, key = { it.id }) { tool ->
+                    val held = draggedId == tool.id
+                    StandardToolCard(
+                        tool = tool,
+                        accent = toolAccents[tool.accent],
+                        open = ::open,
+                        modifier = Modifier
+                            .zIndex(if (held) 1f else 0f)
+                            .graphicsLayer {
+                                if (held) {
+                                    translationX = dragX
+                                    translationY = dragY
+                                    scaleX = 1.03f
+                                    scaleY = 1.03f
+                                    shadowElevation = 16.dp.toPx()
+                                }
+                            }
+                            .pointerInput(tool.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggedId = tool.id
+                                        dragX = 0f
+                                        dragY = 0f
+                                    },
+                                    onDragCancel = { finishDrag(commit = false) },
+                                    onDragEnd = { finishDrag(commit = true) },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragX += amount.x
+                                        dragY += amount.y
+                                    },
+                                )
+                            },
+                    )
                 }
             }
         }
@@ -136,43 +189,15 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
 }
 
 @Composable
-private fun FeaturedToolCard(tool: LocalTool, accent: Color, modifier: Modifier, open: (LocalTool) -> Unit) {
+private fun StandardToolCard(
+    tool: LocalTool,
+    accent: Color,
+    open: (LocalTool) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(
         onClick = { open(tool) },
-        modifier = modifier.height(154.dp),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = .36f)),
-        colors = CardDefaults.cardColors(containerColor = PanelRaised),
-        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
-    ) {
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(listOf(accent.copy(alpha = .18f), Color.Transparent))
-            ).padding(22.dp)
-        ) {
-            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier.size(74.dp).background(accent.copy(alpha = .18f), RoundedCornerShape(22.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(toolIcon(tool.id), contentDescription = null, tint = accent, modifier = Modifier.size(40.dp))
-                }
-                Column(Modifier.weight(1f).padding(start = 20.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text(tool.title, color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                    Text(tool.subtitle, color = MutedText, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(if (tool.id == "audio") "本地音频 · 车外播放 · 实时喊话" else "快速进入设置", color = accent, fontSize = 13.sp)
-                }
-                Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "进入", tint = accent, modifier = Modifier.size(28.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun StandardToolCard(tool: LocalTool, accent: Color, open: (LocalTool) -> Unit) {
-    Card(
-        onClick = { open(tool) },
-        modifier = Modifier.fillMaxWidth().height(116.dp),
+        modifier = modifier.fillMaxWidth().height(116.dp),
         shape = RoundedCornerShape(18.dp),
         border = BorderStroke(1.dp, Color(0xFF263D55)),
         colors = CardDefaults.cardColors(containerColor = Panel),
@@ -191,4 +216,32 @@ private fun StandardToolCard(tool: LocalTool, accent: Color, open: (LocalTool) -
             Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, tint = Color(0xFF647E99), modifier = Modifier.size(20.dp))
         }
     }
+}
+
+
+private fun restoreToolOrder(saved: String?): List<LocalTool> {
+    val byId = localTools.associateBy { it.id }
+    val restored = saved.orEmpty().split(',').mapNotNull(byId::get).distinctBy { it.id }
+    return restored + localTools.filterNot { candidate -> restored.any { it.id == candidate.id } }
+}
+
+private fun List<LocalTool>.move(sourceId: String, targetId: String): List<LocalTool> {
+    val from = indexOfFirst { it.id == sourceId }
+    val to = indexOfFirst { it.id == targetId }
+    if (from < 0 || to < 0 || from == to) return this
+    return toMutableList().apply { add(to, removeAt(from)) }
+}
+
+private fun LazyGridState.dragTarget(sourceId: String, deltaX: Float, deltaY: Float): String? {
+    val visible = layoutInfo.visibleItemsInfo
+    val source = visible.firstOrNull { it.key == sourceId } ?: return null
+    val centreX = source.offset.x + source.size.width / 2f + deltaX
+    val centreY = source.offset.y + source.size.height / 2f + deltaY
+    return visible.minByOrNull { item ->
+        val itemX = item.offset.x + item.size.width / 2f
+        val itemY = item.offset.y + item.size.height / 2f
+        val dx = itemX - centreX
+        val dy = itemY - centreY
+        dx * dx + dy * dy
+    }?.key as? String
 }

@@ -785,7 +785,6 @@
     <string name="nav_tab_dashboard">Галоўная</string>
     <string name="nav_tab_trips">Паездкі</string>
     <string name="nav_tab_charges">Зарадкі</string>
-    <string name="nav_tab_automation">Аўтаматызацыя</string>
     <string name="nav_tab_settings">Налады</string>
 
     <!-- Post-install autostart hint dialog -->

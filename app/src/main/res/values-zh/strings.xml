@@ -631,7 +631,6 @@
     <string name="nav_tab_dashboard">首页</string>
     <string name="nav_tab_trips">行程</string>
     <string name="nav_tab_charges">充电</string>
-    <string name="nav_tab_automation">自动化</string>
     <string name="nav_tab_settings">设置</string>
 
     <!-- Post-install autostart hint dialog -->

@@ -661,7 +661,6 @@
     <string name="nav_tab_dashboard">Painel</string>
     <string name="nav_tab_trips">Viagens</string>
     <string name="nav_tab_charges">Carregamento</string>
-    <string name="nav_tab_automation">Automação</string>
     <string name="nav_tab_settings">Configurações</string>
     <string name="nav_autostart_dialog_title">BYDMateCN atualizado para v%1$s</string>
     <string name="nav_autostart_dialog_body">Verifique se o trabalho em segundo plano não está bloqueado:\n\nConfigurações do DiLink - Geral - Desativar aplicativos em segundo plano - BYDMateCN - DESLIGADO\n\nSe o interruptor estiver LIGADO, o DiLink pode encerrar o serviço do BYDMateCN - e as viagens e o GPS não serão gravados.</string>
