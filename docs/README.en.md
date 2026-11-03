@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="120" alt="BYDMate icon">
+<img src="../app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="120" alt="BYDMate icon">
 
 # BYDMate
 
@@ -9,9 +9,9 @@
 [![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack_Compose-Material3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![License](https://img.shields.io/badge/License-PolyForm_Noncommercial-blue?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-PolyForm_Noncommercial-blue?style=flat-square)](../LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/AndyShaman/BYDMate?style=flat-square)](https://github.com/AndyShaman/BYDMate/releases)
-[![Sponsor](https://img.shields.io/badge/Sponsor-FF69B4?style=flat-square&logo=githubsponsors&logoColor=white)](SUPPORT.md)
+[![Sponsor](https://img.shields.io/badge/Sponsor-FF69B4?style=flat-square&logo=githubsponsors&logoColor=white)](../SUPPORT.md)
 
 **English** | [中文](README.zh.md)
 
@@ -21,7 +21,7 @@ Split screen 1/3 and 2/3, navigation on the instrument cluster, Yandex Navigator
 
 Tested on Leopard 3 (Fangchengbao Tai 3), with support for Sea Lion 07, Song, Atto 3, Seal, Han and the DM-i and DM-o hybrids (Song Pro DM-i, Leopard 5, Leopard 8, Sealion 06). DiLink 3.0, 4.0, 5.0, 5.1, and firmware with the new UI7 interface (OTA V1.6).
 
-[Features](#features) | [Screenshots](#screenshots) | [Automation](#automation) | [Projection to cluster](#projection-to-cluster) | [HUD](#hud) | [Split screen](#split-screen) | [Voice AI Agent](#voice-ai-agent) | [AI Insights](#ai-insights) | [ABRP](#abrp-live-telemetry) | [Install](#install) | [Build](#build-from-source) | [Releases](https://github.com/AndyShaman/BYDMate/releases) | [Sponsor](SUPPORT.md)
+[Features](#features) | [Screenshots](#screenshots) | [Automation](#automation) | [Projection to cluster](#projection-to-cluster) | [HUD](#hud) | [Split screen](#split-screen) | [Voice AI Agent](#voice-ai-agent) | [AI Insights](#ai-insights) | [ABRP](#abrp-live-telemetry) | [Install](#install) | [Build](#build-from-source) | [Releases](https://github.com/AndyShaman/BYDMate/releases) | [Sponsor](../SUPPORT.md)
 
 </div>
 
@@ -1136,13 +1136,13 @@ Common cases:
 
 ## Sponsor the Project
 
-The project is non-commercial, built as a hobby. If you want to say thanks, the details are in [SUPPORT.md](SUPPORT.md). If not, thanks anyway for your trust.
+The project is non-commercial, built as a hobby. If you want to say thanks, the details are in [SUPPORT.md](../SUPPORT.md). If not, thanks anyway for your trust.
 
 ---
 
 ## License
 
 **PolyForm Noncommercial 1.0.0**: source-available, noncommercial use only.
-See [LICENSE](LICENSE) for details.
+See [LICENSE](../LICENSE) for details.
 
 Copyright (C) 2026 [AndyShaman](https://github.com/AndyShaman)

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="120" alt="BYDMateCN 图标">
+<img src="../app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="120" alt="BYDMateCN 图标">
 
 # BYDMateCN
 
@@ -9,7 +9,7 @@
 [![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack_Compose-Material3-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![License](https://img.shields.io/badge/License-PolyForm_Noncommercial-blue?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-PolyForm_Noncommercial-blue?style=flat-square)](../LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/bluarry/BYDMateCN?style=flat-square)](https://github.com/bluarry/BYDMateCN/releases)
 
 **默认中文、以本地能力为主，为 DiLink 横屏车机优化。**
@@ -24,7 +24,7 @@
 
 ## 项目来源与定位
 
-**BYDMateCN fork 自 [BYDMate](https://github.com/AndyShaman/BYDMate)**，本工作目录基于 [bluarry/BYDMate](https://github.com/bluarry/BYDMate) 分支继续开发。保留原项目版权、贡献者署名与 [LICENSE](LICENSE)，本项目为独立社区分支，不代表比亚迪官方适配。
+**BYDMateCN fork 自 [BYDMate](https://github.com/AndyShaman/BYDMate)**，本工作目录基于 [bluarry/BYDMate](https://github.com/bluarry/BYDMate) 分支继续开发。保留原项目版权、贡献者署名与 [LICENSE](../LICENSE)，本项目为独立社区分支，不代表比亚迪官方适配。
 
 在继承 BYDMate 功能的基础上，本分支面向中文用户和 DiLink 横屏车机，扩展车外音频、本地媒体、驻车影像与诊断等本地能力。当前主要适配目标为宋 L DM-i / DiLink；具体功能可用性取决于车型、DiLink 版本、固件权限和硬件配置。
 
@@ -137,12 +137,4 @@ $env:JAVA_HOME = 'E:\JDK_other\openjdk\jdk-24.0.2+12'
 
 ## 开源来源与许可证
 
-感谢 BYDMate 原作者、贡献者与所基于分支的维护者；本分支保留原项目版权与许可证约束。请阅读 [LICENSE](LICENSE)，尤其非商业使用及再分发条件；fork 和功能扩展不改变原许可证，不意味着获得商业发布授权。
-
-## GitHub 自动发布
-
-推送与应用版本一致的标签后，独立发布工作流构建固定密钥签名的 `BYDMateCN-<版本号>.apk`，并附 SHA-256 校验文件。三段数字标签（如 `v1.0.0`）创建 **正式 Release**；四段数字标签（如 `v1.0.0.1`）创建 **Pre-release**，不会被设置为最新正式版。应用版本只在根目录 `version.properties` 配置；每个标签必须与其中的 `VERSION_NAME` 一致，并提供 `release-notes/<标签>.md` 发布说明；覆盖安装必须保持原发布签名且递增 `versionCode`。须先在仓库 Actions Secrets 中配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。普通推送和 PR 不会发布。
-
-## 界面实现
-
-主界面与本地工具、音频、相机控制、相册、备份页面统一使用 **Jetpack Compose + Material 3**，复用应用主题和字体缩放。按钮、输入框、开关、滑块和确认/文件选择弹窗均由 Compose 渲染，不使用 XML 或动态拼接传统布局。相机 `TextureView` 与视频播放器 `VideoView` 仅作为底层显示组件通过 `AndroidView` 接入；权限申请仍使用系统界面。
+感谢 BYDMate 原作者、贡献者与所基于分支的维护者；本分支保留原项目版权与许可证约束。请阅读 [LICENSE](../LICENSE)，尤其非商业使用及再分发条件；fork 和功能扩展不改变原许可证，不意味着获得商业发布授权。
