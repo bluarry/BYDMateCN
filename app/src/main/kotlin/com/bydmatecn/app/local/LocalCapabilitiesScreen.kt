@@ -67,7 +67,7 @@ private const val TOOL_ORDER_KEY = "ordered_ids"
 
 private fun toolIcon(id: String): ImageVector = when (id) {
     "audio" -> Icons.AutoMirrored.Outlined.VolumeUp
-    "recorder", "mirror" -> Icons.Outlined.Videocam
+    "dashcam", "sentry", "mirror" -> Icons.Outlined.Videocam
     "files" -> Icons.Outlined.Folder
     "diagnostics" -> Icons.Outlined.Info
     "automation", "voice" -> Icons.Outlined.AutoAwesome
@@ -104,7 +104,10 @@ fun LocalCapabilitiesScreen(onNavigate: (String) -> Unit = {}) {
 
     fun open(tool: LocalTool) {
         when {
-            tool.route == "camera" -> context.startActivity(Intent(context, LocalCameraActivity::class.java))
+            tool.route.startsWith("camera:") -> context.startActivity(
+                Intent(context, LocalCameraActivity::class.java)
+                    .putExtra(LocalCameraActivity.EXTRA_MODE, tool.route.substringAfter(":")),
+            )
             tool.route.startsWith("native:") -> context.startActivity(
                 Intent(context, LocalToolsActivity::class.java).putExtra("tool", tool.id))
             else -> onNavigate(tool.route)

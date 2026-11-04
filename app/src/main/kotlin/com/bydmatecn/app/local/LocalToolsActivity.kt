@@ -7,6 +7,8 @@ import android.media.AudioManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import com.bydmatecn.app.data.vehicle.HelperClient
 import com.bydmatecn.app.data.vehicle.HelperBootstrap
@@ -43,6 +45,9 @@ class LocalToolsActivity : ComponentActivity(), LocalComposeHost {
         else status.text = "未授予存储读取权限，无法扫描音频目录"
     }
     internal var currentAudio: File? = null
+    internal val recognizedAudioFiles = androidx.compose.runtime.mutableStateListOf<File>()
+    internal val recognizedAudioDirectories = androidx.compose.runtime.mutableStateListOf<File>()
+    internal var audioScanMessage by androidx.compose.runtime.mutableStateOf("正在扫描本地音频…")
     internal var selectedOutput: AudioDeviceInfo? = null
     internal var resumed = false
     internal var busy = false

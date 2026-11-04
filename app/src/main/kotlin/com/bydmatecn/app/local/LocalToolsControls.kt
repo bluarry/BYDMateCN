@@ -74,24 +74,13 @@ internal fun LocalToolsActivity.fileControls() {
     }
 
 internal fun LocalToolsActivity.audioControls() {
-        ui.section("播放控制")
-        label("音频目录在“本地媒体”中管理；每次播放都在当前设置项中选择文件。")
-        button("选择系统输出设备") {
-            val devices = (getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_OUTPUTS).filter { ordinaryAudioOutput(it.type) }
-            val names = arrayOf("系统默认") + devices.map { "${it.productName} (type=${it.type}, id=${it.id})" }.toTypedArray()
-            LocalDialogBuilder(this).setTitle("输出设备（不等于外扬声器路由）").setItems(names) { _, which ->
-                selectedOutput = if (which == 0) null else devices[which - 1]
-                status.text = names[which]
-            }.show()
-        }
-        button("选择音频并播放") {
-            showAudioPicker("选择要播放的音频") { file -> playLocalAudio(file) }
-        }
-        button("暂停 / 继续") { localPlayer.togglePause() }
-        button("停止") { stopAudio(); status.text = "已停止" }
-        val audioPrefs = audioPreferences()
-        playbackPreferences(audioPrefs)
-    }
+    ui.topTabs = true
+    ui.visualStyle = LocalVisualStyle.EXTERIOR_AUDIO
+    ui.section("本地音效")
+    audioFileGallery()
+    val audioPrefs = audioPreferences()
+    playbackPreferences(audioPrefs)
+}
 
 private fun LocalToolsActivity.audioPreferences() = getSharedPreferences("local-audio", Context.MODE_PRIVATE)
 

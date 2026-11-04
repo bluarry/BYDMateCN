@@ -198,7 +198,9 @@ class LocalLockSoundService : Service() {
         player.setVolume(prefs.getInt("volume", 25).coerceIn(0, 50))
         player.play(
             file, null, FirmwareAudioBridge(this).focusAttributes(FirmwareAudioRoute.LOCK_EVENT),
-            if (locked) "锁车事件车外播放" else "解锁事件车外播放", EVENT_PLAY_MAX_MS,
+            if (locked) "锁车事件车外播放" else "解锁事件车外播放",
+            EVENT_PLAY_MAX_MS,
+            startDelayMs = EVENT_ROUTE_WARMUP_MS,
         )
     }
 
@@ -216,6 +218,7 @@ class LocalLockSoundService : Service() {
         private const val POLL_MS = 250L
         private const val LOCK_READ_TIMEOUT_MS = 1_500L
         private const val EVENT_PLAY_MAX_MS = 15_000L
+        private const val EVENT_ROUTE_WARMUP_MS = 1_500L
         private const val HELPER_RECOVERY_FAILURES = 3
         private const val HELPER_RECOVERY_INTERVAL_MS = 15_000L
         private const val HELPER_RECOVERY_TIMEOUT_MS = 20_000L

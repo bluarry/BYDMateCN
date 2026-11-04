@@ -57,7 +57,19 @@ class LockSoundEventDetector(
         val lock = sample.lockFL?.takeIf { it in 1..2 } ?: return missingLockSample(sample, now)
         lastValidAt = now
         updateFlashBurst(sample.turnSignalFlash, now)
-        return flashConfirmation(lock, sample.turnSignalFlash, sample.motion, now) ?: debouncedEdge(lock, sample.motion, now)
+        val detection = flashConfirmation(lock, sample.turnSignalFlash, sample.motion, now)
+            ?: debouncedEdge(lock, sample.motion, now)
+        if (
+            detection?.event == LockSoundEvent.UNLOCK &&
+            sample.powerState != null &&
+            sample.powerState != POWER_OFF
+        ) {
+            return detection.copy(
+                reason = "${detection.reason}; unlock sound requires powerState=0, actual=${sample.powerState}",
+                suppressed = true,
+            )
+        }
+        return detection
     }
 
     private fun observePowerState(powerState: Int?, now: Long) {

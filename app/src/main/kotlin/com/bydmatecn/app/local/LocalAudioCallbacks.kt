@@ -4,22 +4,65 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import java.io.File
 
-internal fun LocalAudioPlayer.onPrepared(ready: MediaPlayer, file: File, routeLabel: String, maximumDurationMs: Long?, requestGeneration: Int) {
-                if (player === ready) {
-                    timeout?.let { handler.removeCallbacks(it) }; timeout = null
-                    prepared = true
-                    ready.isLooping = looping && !boundedPlayback
-                    applyVolume()
-                    if (policy.mayPlay) ready.start()
-                    fileLog.record("audio/prepared", "route=$routeLabel; device=${ready.routedDevice?.type}/${ready.routedDevice?.id}; started=${policy.mayPlay}")
-                    if (maximumDurationMs != null) {
-                        timeout = Runnable {
-                            if (requestGeneration == generation) { stop(); report("专用试听到时，已停止") }
-                        }.also { handler.postDelayed(it, maximumDurationMs) }
-                    }
-                    report(if (policy.mayPlay) "播放中：${file.name}；$routeLabel；设备=${ready.routedDevice?.type}/${ready.routedDevice?.id}" else "已准备，等待音频焦点或继续播放")
-                }
+@Suppress("LongParameterList", "CyclomaticComplexMethod") // Owns one atomic MediaPlayer startup lifecycle.
+internal fun LocalAudioPlayer.onPrepared(
+    ready: MediaPlayer,
+    file: File,
+    routeLabel: String,
+    maximumDurationMs: Long?,
+    requestGeneration: Int,
+    startDelayMs: Long,
+) {
+    if (player !== ready) return
+    timeout?.let { handler.removeCallbacks(it) }
+    timeout = null
+    prepared = true
+    ready.isLooping = looping && !boundedPlayback
+    applyVolume()
+    startDelayPending = startDelayMs > 0
+    fileLog.record(
+        "audio/prepared",
+        "route=$routeLabel; device=${ready.routedDevice?.type}/${ready.routedDevice?.id}; " +
+            "warmupMs=$startDelayMs; mayPlay=${policy.mayPlay}",
+    )
 
+    fun schedulePlaybackTimeout() {
+        if (maximumDurationMs == null) return
+        timeout = Runnable {
+            if (requestGeneration == generation) {
+                stop()
+                report("专用试听到时，已停止")
+            }
+        }.also { handler.postDelayed(it, maximumDurationMs) }
+    }
+
+    if (startDelayPending) {
+        report("车外音频路由预热 ${startDelayMs}ms：${file.name}")
+        timeout = Runnable {
+            if (requestGeneration != generation || player !== ready) return@Runnable
+            timeout = null
+            startDelayPending = false
+            if (policy.mayPlay) {
+                ready.start()
+                fileLog.record("audio/warmup-complete", "route=$routeLabel; started=true")
+                report("播放中：${file.name}；$routeLabel；设备=${ready.routedDevice?.type}/${ready.routedDevice?.id}")
+            } else {
+                fileLog.record("audio/warmup-complete", "route=$routeLabel; started=false; waitingFocus=true")
+                report("路由预热完成，等待音频焦点")
+            }
+            schedulePlaybackTimeout()
+        }.also { handler.postDelayed(it, startDelayMs) }
+    } else {
+        if (policy.mayPlay) ready.start()
+        schedulePlaybackTimeout()
+        report(
+            if (policy.mayPlay) {
+                "播放中：${file.name}；$routeLabel；设备=${ready.routedDevice?.type}/${ready.routedDevice?.id}"
+            } else {
+                "已准备，等待音频焦点或继续播放"
+            },
+        )
+    }
 }
 
 internal fun LocalAudioPlayer.onFocusChanged(change: Int, requestGeneration: Int) {
@@ -37,14 +80,19 @@ internal fun LocalAudioPlayer.onFocusChanged(change: Int, requestGeneration: Int
                     AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> { policy.duck(); applyVolume() }
                     AudioManager.AUDIOFOCUS_GAIN -> {
                         policy.gain(); applyVolume()
-                        if (prepared && policy.mayPlay) player?.start()
+                        if (prepared && policy.mayPlay && !startDelayPending) player?.start()
                     }
                 }
     }
 
 /** MediaPlayer creation is kept separate from focus and exterior-session ownership. */
+@Suppress("LongParameterList") // Keeps route startup inputs explicit at the MediaPlayer boundary.
 internal fun LocalAudioPlayer.prepareMediaPlayer(file: File, device: android.media.AudioDeviceInfo?,
-    playbackAttributes: android.media.AudioAttributes, routeLabel: String, maximumDurationMs: Long?) {
+    playbackAttributes: android.media.AudioAttributes,
+    routeLabel: String,
+    maximumDurationMs: Long?,
+    startDelayMs: Long,
+) {
         val requestGeneration = generation
         val candidate = MediaPlayer()
         player = candidate
@@ -57,7 +105,9 @@ internal fun LocalAudioPlayer.prepareMediaPlayer(file: File, device: android.med
             candidate.setDataSource(file.absolutePath)
             if (device != null && !candidate.setPreferredDevice(device)) error("输出设备被拒绝")
             applyVolume()
-            candidate.setOnPreparedListener { ready -> onPrepared(ready, file, routeLabel, maximumDurationMs, requestGeneration) }
+            candidate.setOnPreparedListener { ready ->
+                onPrepared(ready, file, routeLabel, maximumDurationMs, requestGeneration, startDelayMs)
+            }
             candidate.setOnCompletionListener { completed ->
                 if (player === completed) { stop(); report("播放结束") }
             }

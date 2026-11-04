@@ -52,8 +52,9 @@ internal fun LocalCameraActivity.createCameraViews() {
                 }
             }
         }
-        ui.title = "行车记录仪与驻车哨兵"
-        ui.subtitle = "自动启停 · 循环分段 · 事件保护 · 本地回看"
+        val sentry = featureMode == LocalCameraActivity.MODE_SENTRY
+        ui.title = if (sentry) "驻车哨兵" else "行车记录仪"
+        ui.subtitle = if (sentry) "锁车监控 · 开门与震动事件保护 · 本地回看" else "行驶自动启停 · 循环分段 · 事件保护 · 本地回看"
         ui.status = status
         ui.onBack = { finish() }
         addAutomaticRecorderControls()
@@ -117,11 +118,21 @@ internal fun LocalCameraActivity.addCaptureControls() {
         cameraButton("开始 / 停止 MP4 录像（5 FPS / 每分钟分段）") {
             if (videoRecording) stopVideo() else startVideo()
         }
-        cameraButton("驻车事件记录：开门触发 / 关闭") {
-            if (!open || driving) { status.text = "先打开驻车预览，行驶模式不启用开门事件"; return@cameraButton }
-            eventMode = !eventMode; previousDoors = null
-            if (eventMode && !videoRecording) startVideo()
-            status.text = if (eventMode) "驻车事件记录开启：有效开门变化保存前后录像，不保持熄火供电" else "开门事件触发关闭"
+        if (featureMode == LocalCameraActivity.MODE_SENTRY) {
+            cameraButton("驻车事件记录：开门触发 / 关闭") {
+                if (!open || driving) {
+                    status.text = "先打开驻车预览，行驶模式不启用开门事件"
+                    return@cameraButton
+                }
+                eventMode = !eventMode
+                previousDoors = null
+                if (eventMode && !videoRecording) startVideo()
+                status.text = if (eventMode) {
+                    "驻车事件记录开启：有效开门变化保存前后录像，不保持熄火供电"
+                } else {
+                    "开门事件触发关闭"
+                }
+            }
         }
         cameraButton("标记录像事件（保护上一段与当前段）") { bookmarkEvent("用户标记") }
         cameraButton("截图与录像相册") { startActivity(android.content.Intent(this, LocalMediaActivity::class.java)) }

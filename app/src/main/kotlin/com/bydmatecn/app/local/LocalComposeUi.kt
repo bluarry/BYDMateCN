@@ -29,6 +29,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -70,6 +72,7 @@ internal class LocalSlider(initial: Int, val max: Int = 100, val title: String =
     var progress by mutableIntStateOf(initial)
 }
 internal data class LocalSection(val title: String, val start: Int)
+internal enum class LocalVisualStyle { DEFAULT, EXTERIOR_AUDIO }
 class LocalUiState {
     var title = "本地工具"
     var subtitle = "车机本地能力"
@@ -77,6 +80,8 @@ class LocalUiState {
     var onBack: (() -> Unit)? = null
     internal val sections = mutableStateListOf<LocalSection>()
     internal val actionIndices = mutableSetOf<Int>()
+    internal var topTabs by mutableStateOf(false)
+    internal var visualStyle by mutableStateOf(LocalVisualStyle.DEFAULT)
     internal fun section(title: String) { sections.add(LocalSection(title, controls.size)) }
     val controls = mutableStateListOf<@Composable () -> Unit>()
     internal var dialog: LocalDialogBuilder? by mutableStateOf(null)

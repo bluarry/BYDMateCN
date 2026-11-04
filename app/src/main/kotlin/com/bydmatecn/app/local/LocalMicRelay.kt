@@ -13,12 +13,22 @@ import android.media.AudioTrack
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.os.Handler
 import android.os.Looper
 import com.bydmatecn.app.data.vehicle.HelperClient
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
+
+data class MicRelaySettings(
+    val volume: Int,
+    val echoProtection: Boolean = true,
+    val microphoneGain: Int = 65,
+    val noiseReduction: Int = 80,
+)
+
+private data class SignalLevels(val peak: Int, val average: Long)
 
 /** Parked push-to-talk routed through the selected BYD exterior-audio controller profile. */
 class LocalMicRelay(
@@ -40,7 +50,7 @@ class LocalMicRelay(
     val active: Boolean get() = running.get()
 
     @Suppress("TooGenericExceptionCaught")
-    fun start(attributes: AudioAttributes, volume: Int) {
+    fun start(attributes: AudioAttributes, settings: MicRelaySettings) {
         check(!closed)
         check(!relayPending.get()) { "上一段喊话正在停止，请稍后重试" }
         stop()
@@ -59,7 +69,7 @@ class LocalMicRelay(
         running.set(true)
         watchdog = Runnable { if (generation == session) { stop(); report("喊话15秒到时停止") } }
             .also { handler.postDelayed(it, 15_000) }
-        worker.execute { runRelay(volume, session) }
+        worker.execute { runRelay(settings, session) }
     }
 
     fun stop() {
@@ -74,12 +84,13 @@ class LocalMicRelay(
         closed = true; stop(); worker.shutdown()
     }
 
-    @Suppress("TooGenericExceptionCaught")
-    private fun runRelay(volumePercent: Int, session: Int) {
+    @Suppress("TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
+    private fun runRelay(settings: MicRelaySettings, session: Int) {
         var input: AudioRecord? = null
         var output: AudioTrack? = null
         var aec: AcousticEchoCanceler? = null
         var agc: AutomaticGainControl? = null
+        var noiseSuppressor: NoiseSuppressor? = null
         try {
             // The relay runs asynchronously, so permission can be revoked after start().
             // Check again on the worker immediately before constructing AudioRecord.
@@ -111,15 +122,22 @@ class LocalMicRelay(
                 AudioTrack.MODE_STREAM,
             )
             check(input.state == AudioRecord.STATE_INITIALIZED && output.state == AudioTrack.STATE_INITIALIZED)
-            val baseVolume = volumePercent.coerceIn(0, 50) / 100f
+            val baseVolume = settings.volume.coerceIn(0, 50) / 100f
             check(output.setVolume(baseVolume) == AudioTrack.SUCCESS)
-            aec = enableAec(input.audioSessionId)
-            agc = enableAgc(input.audioSessionId)
-            fileLog.record("mic/effects", "aec=${aec?.enabled == true}; agc=${agc?.enabled == true}; stream=${exteriorSession.streamType}")
+            aec = if (settings.echoProtection) enableAec(input.audioSessionId) else null
+            agc = if (settings.echoProtection) enableAgc(input.audioSessionId) else null
+            noiseSuppressor = if (settings.noiseReduction > 0) enableNoiseSuppressor(input.audioSessionId) else null
+            fileLog.record(
+                "mic/effects",
+                "aec=${aec?.enabled == true}; agc=${agc?.enabled == true}; " +
+                    "noise=${noiseSuppressor?.enabled == true}; gain=${settings.microphoneGain}; " +
+                    "reduction=${settings.noiseReduction}; " +
+                    "stream=${exteriorSession.streamType}",
+            )
             if (generation != session || !running.get()) return
             input.startRecording(); output.play()
             check(input.recordingState == AudioRecord.RECORDSTATE_RECORDING)
-            relayPcm(input, output, baseVolume, session)
+            relayPcm(input, output, baseVolume, settings, session)
         } catch (error: InterruptedException) {
             Thread.currentThread().interrupt()
             handler.post { if (generation == session) { stop(); report("喊话线程已中断") } }
@@ -129,7 +147,7 @@ class LocalMicRelay(
         } finally {
             runCatching { input?.stop() }; runCatching { input?.release() }
             runCatching { output?.pause() }; runCatching { output?.flush() }; runCatching { output?.release() }
-            runCatching { aec?.release() }; runCatching { agc?.release() }
+            runCatching { aec?.release() }; runCatching { agc?.release() }; runCatching { noiseSuppressor?.release() }
             // Keep the route alive briefly so the final PCM is not truncated.
             if (relayPending.get()) runCatching { Thread.sleep(1_000) }
             exteriorSession.release()
@@ -138,29 +156,55 @@ class LocalMicRelay(
         }
     }
 
-    private fun relayPcm(input: AudioRecord, output: AudioTrack, baseVolume: Float, session: Int) {
+    private fun relayPcm(
+        input: AudioRecord,
+        output: AudioTrack,
+        baseVolume: Float,
+        settings: MicRelaySettings,
+        session: Int,
+    ) {
         val buffer = ShortArray(320)
         var feedbackHits = 0
+        val gain = 0.5f + settings.microphoneGain.coerceIn(0, 100) / 100f * 1.5f
+        val noiseGate = settings.noiseReduction.coerceIn(0, 100) * 18
         var dynamicVolume = baseVolume
         handler.post { if (generation == session) report("喊话中：${exteriorSession.profile.title}，最多15秒") }
         while (running.get() && generation == session) {
             val count = input.read(buffer, 0, buffer.size, AudioRecord.READ_NON_BLOCKING)
             check(count >= 0) { "麦克风读取失败：$count" }
             if (count == 0) { Thread.sleep(5); continue }
-            var peak = 0
-            var total = 0L
-            for (index in 0 until count) {
-                val level = abs(buffer[index].toInt())
-                if (level > peak) peak = level
-                total += level
+            val levels = processSamples(buffer, count, gain, noiseGate)
+            feedbackHits = if (levels.peak > 30_000 && levels.average > 12_000) {
+                feedbackHits + 1
+            } else {
+                (feedbackHits - 1).coerceAtLeast(0)
             }
-            val average = total / count
-            feedbackHits = if (peak > 30_000 && average > 12_000) feedbackHits + 1 else (feedbackHits - 1).coerceAtLeast(0)
-            val next = if (feedbackHits >= 3) (dynamicVolume - 0.04f).coerceAtLeast(0.30f.coerceAtMost(baseVolume))
-                else (dynamicVolume + 0.0015f).coerceAtMost(baseVolume)
+            val next = if (settings.echoProtection && feedbackHits >= 3) {
+                (dynamicVolume - 0.04f).coerceAtLeast(0.30f.coerceAtMost(baseVolume))
+            } else {
+                (dynamicVolume + 0.0015f).coerceAtMost(baseVolume)
+            }
             if (next != dynamicVolume) { dynamicVolume = next; output.setVolume(dynamicVolume) }
             writePcm(output, buffer, count, session)
         }
+    }
+
+
+    private fun processSamples(buffer: ShortArray, count: Int, gain: Float, noiseGate: Int): SignalLevels {
+        var peak = 0
+        var total = 0L
+        for (index in 0 until count) {
+            val sample = buffer[index].toInt()
+            val level = abs(sample)
+            if (level > peak) peak = level
+            total += level
+            buffer[index] = if (level < noiseGate) {
+                0
+            } else {
+                (sample * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            }
+        }
+        return SignalLevels(peak, total / count)
     }
 
     private fun writePcm(output: AudioTrack, buffer: ShortArray, count: Int, session: Int) {
@@ -186,11 +230,16 @@ class LocalMicRelay(
         return source to preferred
     }
 
-    private fun enableAec(sessionId: Int): AcousticEchoCanceler? = runCatching {
-        if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(sessionId)?.apply { enabled = true } else null
-    }.getOrNull()
-
-    private fun enableAgc(sessionId: Int): AutomaticGainControl? = runCatching {
-        if (AutomaticGainControl.isAvailable()) AutomaticGainControl.create(sessionId)?.apply { enabled = true } else null
-    }.getOrNull()
 }
+
+private fun enableAec(sessionId: Int): AcousticEchoCanceler? = runCatching {
+    if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(sessionId)?.apply { enabled = true } else null
+}.getOrNull()
+
+private fun enableNoiseSuppressor(sessionId: Int): NoiseSuppressor? = runCatching {
+    if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(sessionId)?.apply { enabled = true } else null
+}.getOrNull()
+
+private fun enableAgc(sessionId: Int): AutomaticGainControl? = runCatching {
+    if (AutomaticGainControl.isAvailable()) AutomaticGainControl.create(sessionId)?.apply { enabled = true } else null
+}.getOrNull()

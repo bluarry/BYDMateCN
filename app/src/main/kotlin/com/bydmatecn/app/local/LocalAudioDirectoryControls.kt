@@ -41,7 +41,10 @@ internal fun LocalToolsActivity.audioDirectoryControls() {
 internal fun LocalToolsActivity.addAudioDirectory(path: String) {
     lifecycleScope.launch {
         val result = withContext(Dispatchers.IO) { runCatching { audioLibrary.add(path) } }
-        status.text = result.fold({ "已添加目录：$path" }, { "添加失败：${it.message}" })
+        result.onSuccess {
+            status.text = "已添加目录：$path"
+            refreshAudioGallery()
+        }.onFailure { status.text = "添加失败：${it.message}" }
     }
 }
 

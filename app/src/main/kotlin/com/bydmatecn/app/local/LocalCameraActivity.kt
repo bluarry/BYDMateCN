@@ -27,6 +27,7 @@ import javax.inject.Inject
 class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListener, LocalComposeHost {
     override val ui = LocalUiState()
     internal var panelVisible by androidx.compose.runtime.mutableStateOf(true)
+    internal var featureMode = MODE_DASHCAM
     @Inject lateinit var vehicle: VehicleApi
     @Inject lateinit var factoryCamera: CameraStateMonitor
     @Inject lateinit var avmSession: SharedAvmSession
@@ -84,7 +85,8 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        LocalFileLog.get(this).record("LocalCamera", "page opened")
+        featureMode = intent.getStringExtra(EXTRA_MODE).takeIf { it == MODE_SENTRY } ?: MODE_DASHCAM
+        LocalFileLog.get(this).record("LocalCamera", "page opened mode=$featureMode")
         store = LocalCaptureStore(java.io.File(filesDir, "local-captures"))
         videos = LocalVideoStore(java.io.File(filesDir, "local-videos"))
         videoRecorder = LocalVideoRecorder(videos)
@@ -144,5 +146,11 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
         videoWorker.execute { videoRecorder.abort() }
         videoWorker.shutdown()
         super.onDestroy()
+    }
+
+    companion object {
+        const val EXTRA_MODE = "recorder_mode"
+        const val MODE_DASHCAM = "dashcam"
+        const val MODE_SENTRY = "sentry"
     }
 }

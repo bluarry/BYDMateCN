@@ -271,10 +271,11 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        var selected by rememberSaveable { mutableStateOf(SettingsSection.VOICE) }
+        val visibleSections = setOf(SettingsSection.APP)
+        var selected by rememberSaveable { mutableStateOf(SettingsSection.APP) }
         val hiddenSelected = selected == SettingsSection.SMART_HOME
         val safeSelected = if (hiddenSelected && !state.devModeUnlocked) {
-            SettingsSection.VOICE
+            visibleSections.firstOrNull() ?: SettingsSection.APP
         } else {
             selected
         }
@@ -306,7 +307,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        SettingsSection.entries.forEach { section ->
+                        SettingsSection.entries.filter { it in visibleSections }.forEach { section ->
                             val hidden = section == SettingsSection.SMART_HOME
                             if (!hidden || state.devModeUnlocked) {
                                 CompactSettingsTab(
@@ -332,6 +333,7 @@ fun SettingsScreen(
                     SettingsRail(
                         selected = safeSelected,
                         smartHomeUnlocked = state.devModeUnlocked,
+                        visibleSections = visibleSections,
                         appVersion = state.appVersion,
                         onSelect = { selected = it },
                         onVersionTap = { viewModel.onVersionTap() },
@@ -412,6 +414,7 @@ private fun CompactSettingsTab(
 private fun SettingsRail(
     selected: SettingsSection,
     smartHomeUnlocked: Boolean,
+    visibleSections: Set<SettingsSection>,
     appVersion: String,
     onSelect: (SettingsSection) -> Unit,
     onVersionTap: () -> Unit,
@@ -434,7 +437,7 @@ private fun SettingsRail(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                 )
 
-                SettingsSection.entries.forEach { section ->
+                SettingsSection.entries.filter { it in visibleSections }.forEach { section ->
                     val isHidden = section == SettingsSection.SMART_HOME
                     if (isHidden && !smartHomeUnlocked) return@forEach
                     RailItem(

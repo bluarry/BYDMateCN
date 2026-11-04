@@ -207,4 +207,27 @@ class LockSoundEdgeTest {
         assertFalse(realUnlock?.suppressed == true)
     }
 
+    @Test fun unlockWhileVehiclePowerIsOnIsSuppressed() {
+        val detector = LockSoundEventDetector(initialLock = 2)
+        detector.sample(LockSoundSample(1, null, 0, 2, motion = VehicleMotionState.PARKED), 0)
+        val result = detector.sample(
+            LockSoundSample(1, null, 0, 2, motion = VehicleMotionState.PARKED),
+            250,
+        )
+        assertEquals(LockSoundEvent.UNLOCK, result?.event)
+        assertTrue(result?.suppressed == true)
+        assertTrue(result?.reason?.contains("powerState=0") == true)
+    }
+
+    @Test fun unlockWhileVehiclePowerIsOffIsAllowed() {
+        val detector = LockSoundEventDetector(initialLock = 2)
+        detector.sample(LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED), 0)
+        val result = detector.sample(
+            LockSoundSample(1, null, 0, 0, motion = VehicleMotionState.PARKED),
+            250,
+        )
+        assertEquals(LockSoundEvent.UNLOCK, result?.event)
+        assertFalse(result?.suppressed == true)
+    }
+
 }

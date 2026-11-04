@@ -10,61 +10,6 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** Activity-scoped controls; the activity owns state and lifecycle cleanup. */
-internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.SharedPreferences) {
-        ui.section("车外喊话")
-        micRelay = LocalMicRelay(this, helper) { status.text = it }
-        label("实时车外喊话 · 按住说话，松手停止 · 最长15秒")
-        exteriorControllerControls(audioPrefs)
-        ui.toggle("已实际确认所选控制器配置可从车外扬声器出声，理解啸叫风险", audioPrefs.getBoolean("exterior_verified", false)) { checked ->
-            audioPrefs.edit().putBoolean("exterior_verified", checked).apply()
-            if (!checked) { talkRequestGeneration++; micRelay?.stop() }
-        }
-        var held = false
-        ui.holdButton("按住喊话（需要先确认车外路由，音量≤50%）", pressed = {
-            held = true
-            val talkRequest = ++talkRequestGeneration
-            LocalFileLog.get(this).record("mic", "touch down")
-            if (!audioPrefs.getBoolean("exterior_verified", false)) {
-                status.text = "请先选择控制器配置，完成车外试听并勾选实际出声确认"
-            } else if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
-            } else lifecycleScope.launch {
-                val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
-                if (talkRequest != talkRequestGeneration || !held || !firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)) return@launch
-                runCatching {
-                    recorder?.finish(false); speech?.stop(); stopAudio()
-                    micRelay?.start(firmwareAudio.focusAttributes(FirmwareAudioRoute.EXTERIOR_VOICE), audioPrefs.getInt("volume", 25))
-                }.onFailure { micRelay?.stop(); status.text = "喊话启动失败：${it.message}" }
-            }
-        }, released = {
-            held = false; talkRequestGeneration++; micRelay?.stop()
-            LocalFileLog.get(this).record("mic", "touch released/cancelled")
-        })
-
-        speechControls(audioPrefs)
-    }
-
-
-private fun LocalToolsActivity.exteriorControllerControls(audioPrefs: android.content.SharedPreferences) {
-    val selected = ExteriorControllerProfile.selected(this)
-    val profileLabel = label("当前控制器：${selected.title}")
-    button("选择车外音频控制器") {
-        val profiles = ExteriorControllerProfile.entries.toTypedArray()
-        LocalDialogBuilder(this).setTitle("选择控制器")
-            .setMessage("宋 L DM-i 先测试23控制器；若车外无声，再切换非23控制器。切换后请重新完成试听确认。")
-            .setItems(profiles.map { it.title }.toTypedArray()) { _, index ->
-                val profile = profiles[index]
-                stopAudio(); micRelay?.stop()
-                ExteriorControllerProfile.select(this, profile)
-                audioPrefs.edit().putBoolean("exterior_verified", false).apply()
-                getSharedPreferences("local-lock-sound", Context.MODE_PRIVATE).edit().putBoolean("verified", false).apply()
-                profileLabel.text = "当前控制器：${profile.title}"
-                status.text = "已切换为${profile.title}，正在刷新页面，请重新进行驻车试听"
-                recreate()
-            }.show()
-    }
-}
 internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.SharedPreferences) {
         ui.section("录音")
         label("录制语音（仅本地保存，不是实时外放）")
@@ -80,7 +25,7 @@ internal fun LocalToolsActivity.speechControls(audioPrefs: android.content.Share
         }
         button("停止录音并保存") { recorder?.finish(true) }
         button("放弃录音") { recorder?.finish(false); status.text = "录音已取消" }
-        ui.section("语音合成")
+        ui.section("文字转语音")
         label("离线中文语音（使用已安装离线音色）")
         speech = LocalSpeechPlayer(this) { status.text = it }
         val text = LocalInput("输入语音文本，最多 500 字", audioPrefs.getString("speech_text", "") ?: "", 500)
@@ -120,7 +65,7 @@ internal fun LocalToolsActivity.firmwareControls(audioPrefs: android.content.Sha
             }
         }
 
-        ui.section("锁车与解锁")
+        ui.section("音效设置")
         label("自动锁 / 解锁音效 · 持续观察门锁状态 · 不修改原厂资源")
         val lockPrefs = getSharedPreferences("local-lock-sound", Context.MODE_PRIVATE)
         fun configuredSound(key: String): String {

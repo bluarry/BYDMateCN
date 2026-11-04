@@ -336,6 +336,16 @@ fun AppNavigation(
                 com.bydmatecn.app.ui.settings.BlindSpotSettingsScreen(onBack = { navController.popBackStack() })
             }
             composable("automation") { com.bydmatecn.app.ui.automation.AutomationScreen() }
+            composable("tool_settings/{section}") { entry ->
+                com.bydmatecn.app.ui.settings.VehicleToolSettingsScreen(
+                    section = entry.arguments?.getString("section").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                    onNavigateToAgentChat = { navController.navigate("agent_chat") },
+                    onNavigateToVoiceJournal = { navController.navigate("voice_journal") },
+                    onNavigateToVoiceUserPhrases = { navController.navigate("voice_user_phrases") },
+                    onNavigateToTariffPeriods = { navController.navigate("tariff_periods") },
+                )
+            }
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onNavigateToAgentChat = { navController.navigate("agent_chat") },

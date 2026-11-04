@@ -29,6 +29,7 @@ class LocalAudioPlayer(
     internal var generation = 0
     internal val handler = Handler(Looper.getMainLooper())
     internal var timeout: Runnable? = null
+    internal var startDelayPending = false
     internal var boundedPlayback = false
     internal var exteriorStreamType: Int? = null
     internal val attributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
@@ -42,6 +43,7 @@ class LocalAudioPlayer(
         routeLabel: String = "普通媒体",
         maximumDurationMs: Long? = null,
         fallbackToOrdinaryMedia: Boolean = false,
+        startDelayMs: Long = 0L,
     ) {
         stop()
         boundedPlayback = maximumDurationMs != null
@@ -83,7 +85,14 @@ class LocalAudioPlayer(
             "file=${file.name}; route=$effectiveRouteLabel; attrs=$effectiveAttributes; " +
                 "preferred=${device?.id}; stream=$exteriorStreamType; exteriorReady=$exteriorReady",
         )
-        prepareMediaPlayer(file, device, effectiveAttributes, effectiveRouteLabel, effectiveMaximum)
+        prepareMediaPlayer(
+            file,
+            device,
+            effectiveAttributes,
+            effectiveRouteLabel,
+            effectiveMaximum,
+            startDelayMs.takeIf { exteriorReady } ?: 0L,
+        )
     }
 
     fun togglePause() {
@@ -92,7 +101,7 @@ class LocalAudioPlayer(
         if (policy.wantsPlayback) { policy.pause(); current.pause(); report("已暂停") }
         else {
             policy.resume()
-            if (policy.mayPlay) { current.start(); report("继续播放") }
+            if (policy.mayPlay && !startDelayPending) { current.start(); report("继续播放") }
             else report("等待系统归还音频焦点")
         }
     }
@@ -117,7 +126,7 @@ class LocalAudioPlayer(
         generation++
         timeout?.let { handler.removeCallbacks(it) }; timeout = null
         val old = player
-        player = null; prepared = false; policy.stop()
+        player = null; prepared = false; startDelayPending = false; policy.stop()
         exteriorStreamType = null
         val oldFocus = focus
         focus = null
