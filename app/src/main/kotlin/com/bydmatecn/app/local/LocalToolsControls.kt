@@ -62,7 +62,12 @@ internal fun LocalToolsActivity.fileControls() {
         ui.section("媒体工具")
         button("创建本地媒体自动化（按钮或方控触发）") { mediaRuleControls() }
         button("本地媒体备份 / 恢复") { startActivity(Intent(this, LocalBackupActivity::class.java)) }
-        button("截图与录像相册 · 回看 / 导出 / 删除") { startActivity(Intent(this, LocalMediaActivity::class.java)) }
+        button("打开行车录像 · 预览 / 导出 / 删除") {
+            startActivity(Intent(this, LocalMediaActivity::class.java).putExtra(LocalMediaActivity.EXTRA_MODE, LocalCameraActivity.MODE_DASHCAM))
+        }
+        button("打开哨兵录像 · 预览 / 导出 / 删除") {
+            startActivity(Intent(this, LocalMediaActivity::class.java).putExtra(LocalMediaActivity.EXTRA_MODE, LocalCameraActivity.MODE_SENTRY))
+        }
         label("设置弹窗仅列出所选目录中的音频；此处 ZIP 仅导出旧导入副本、录音、合成语音及截图，不包含外部音频目录。")
         button("查看应用内生成 / 保留资源") {
             val audio = resources.files()
@@ -76,10 +81,12 @@ internal fun LocalToolsActivity.fileControls() {
 internal fun LocalToolsActivity.audioControls() {
     ui.topTabs = true
     ui.visualStyle = LocalVisualStyle.EXTERIOR_AUDIO
+    val audioPrefs = audioPreferences()
+    microphoneControls(audioPrefs)
     ui.section("本地音效")
     audioFileGallery()
-    val audioPrefs = audioPreferences()
     playbackPreferences(audioPrefs)
+    speechControls(audioPrefs)
 }
 
 private fun LocalToolsActivity.audioPreferences() = getSharedPreferences("local-audio", Context.MODE_PRIVATE)
@@ -99,6 +106,5 @@ private fun LocalToolsActivity.playbackPreferences(audioPrefs: android.content.S
         button("导入本地LRC歌词（UTF-8，不联网）") { importLyrics.launch(arrayOf("text/*", "application/octet-stream")) }
         lyricLabel = label("", 22f)
         button("显示播放进度") { status.text = localPlayer.progress().ifEmpty { "未在播放" } }
-        microphoneControls(audioPrefs)
 
 }

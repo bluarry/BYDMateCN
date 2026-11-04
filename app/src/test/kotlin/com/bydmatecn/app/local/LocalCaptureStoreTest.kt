@@ -41,12 +41,10 @@ class LocalCaptureStoreTest {
         assertNotEquals(store.saveJpeg(ByteArray(2), 1), store.saveJpeg(ByteArray(2), 1))
     }
     @Test fun parkedGateFailsClosed() {
-        assertTrue(localCameraAllowed(1, 0, true, false))
-        assertFalse(localCameraAllowed(null, 0, true, false))
-        assertFalse(localCameraAllowed(1, null, true, false))
-        assertFalse(localCameraAllowed(2, 0, true, false))
-        assertFalse(localCameraAllowed(1, 1, true, false))
-        assertFalse(localCameraAllowed(1, 0, false, false))
-        assertFalse(localCameraAllowed(1, 0, true, true))
+        assertTrue(localRecordingAllowed(1, 0, false))
+        assertFalse(localRecordingAllowed(null, 0, false))
+        assertFalse(localRecordingAllowed(1, null, false))
+        assertFalse(localRecordingAllowed(2, 0, false))
+        assertFalse(localRecordingAllowed(1, 1, false))
     }
 }

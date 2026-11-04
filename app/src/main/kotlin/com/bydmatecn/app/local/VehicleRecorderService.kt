@@ -72,6 +72,7 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     @Volatile private var directFrameSourceFailures = 0
     private var directFrameSourceRetryAt = 0L
     @Volatile private var recorder: LocalVideoRecorder? = null
+    @Volatile private var recorderFinishing = false
     @Volatile private var mode = VehicleRecorderMode.OFF
     private var monitorJob: Job? = null
     private var frameJob: Job? = null
@@ -472,10 +473,20 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     }
 
     private fun startCapture(targetMode: VehicleRecorderMode) {
+        if (recorderFinishing) {
+            noteSource("等待上一段录像完成收尾后切换到 $targetMode")
+            return
+        }
         if (recorder?.active == true) {
             ensureFrameSource()
-            if (mode != targetMode) switchCaptureMode(targetMode)
-            return
+            if (mode != targetMode) {
+                // Dashcam and sentry own separate roots and quotas. The next monitor tick starts the
+                // new encoder only after the single-threaded old encoder has completed its MP4 tail.
+                stopCapture("录像模式切换：$mode -> $targetMode")
+                return
+            } else {
+                return
+            }
         }
         stopCapture("清理旧录像状态")
         if (!ensureFrameSource()) {
@@ -487,8 +498,8 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
             refreshFrameSource(now)
             return
         }
-        val quota = VehicleRecorderPreferences.quotaMb(this).toLong() * 1024 * 1024
-        recorder = LocalVideoRecorder(LocalVideoStore(File(filesDir, "local-videos"), quota))
+        val quota = VehicleRecorderPreferences.quotaMb(this, targetMode).toLong() * 1024 * 1024
+        recorder = LocalVideoRecorder(LocalVideoStore(LocalVideoStorage.directory(this, targetMode), quota))
         val started = runCatching { recorder?.start() }.onFailure {
             note("编码器启动失败：${it.javaClass.simpleName}: ${it.message}")
         }.isSuccess
@@ -506,23 +517,7 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         frameJob?.cancel()
         frameJob = scope.launch { frameLoop() }
         createNotification(if (targetMode == VehicleRecorderMode.DASHCAM) "行车记录仪正在录像" else "驻车哨兵正在录像")
-        note("录像开始：mode=$targetMode; segment=${VehicleRecorderPreferences.segmentMinutes(this)}min; quota=${VehicleRecorderPreferences.quotaMb(this)}MB")
-    }
-
-    private fun switchCaptureMode(targetMode: VehicleRecorderMode) {
-        val previous = mode
-        mode = targetMode
-        if (targetMode == VehicleRecorderMode.PARKING_SENTRY) {
-            sentryStarted = SystemClock.elapsedRealtime()
-            previousDoors = null
-        } else {
-            sentryLimitReached = false
-            previousDoors = null
-        }
-        configureImpactSensor(targetMode == VehicleRecorderMode.PARKING_SENTRY)
-        acquireWakeLock()
-        createNotification(if (targetMode == VehicleRecorderMode.DASHCAM) "行车记录仪正在录像" else "驻车哨兵正在录像")
-        note("录像模式无缝切换：$previous -> $targetMode; AVM 与编码器保持运行")
+        note("录像开始：mode=$targetMode; segment=${VehicleRecorderPreferences.segmentMinutes(this)}min; quota=${VehicleRecorderPreferences.quotaMb(this, targetMode)}MB; directory=${LocalVideoStorage.directory(this, targetMode).path}")
     }
 
     private suspend fun frameLoop() {
@@ -747,8 +742,8 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
                     note("忽略过期哨兵事件：$reason")
                     return@execute
                 }
-                val quota = VehicleRecorderPreferences.quotaMb(this).toLong() * 1024 * 1024
-                val store = LocalVideoStore(File(filesDir, "local-videos"), quota)
+                val quota = VehicleRecorderPreferences.quotaMb(this, VehicleRecorderMode.PARKING_SENTRY).toLong() * 1024 * 1024
+                val store = LocalVideoStore(LocalVideoStorage.directory(this, VehicleRecorderMode.PARKING_SENTRY), quota)
                 store.files().lastOrNull()?.let { store.protect(it, reason) }
                 val eventFile = current.finish("$reason（事件发生）")
                 if (recorder === current && captureSession == session && mode == VehicleRecorderMode.PARKING_SENTRY) {
@@ -818,11 +813,16 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         avmSession.detach(RECORDER_OWNER, reason)
         val finishing = recorder
         recorder = null
+        recorderFinishing = finishing != null
         encoder.execute {
-            val postReason = eventProtection.consumePostRoll()
-            val result = runCatching { finishing?.finish(postReason?.let { "$it（事件后）" }) }
-            note(result.fold({ "录像停止：mode=$previous; reason=$reason; saved=${it?.name}" },
-                { "录像收尾失败：${it.javaClass.simpleName}: ${it.message}; reason=$reason" }))
+            try {
+                val postReason = eventProtection.consumePostRoll()
+                val result = runCatching { finishing?.finish(postReason?.let { "$it（事件后）" }) }
+                note(result.fold({ "录像停止：mode=$previous; reason=$reason; saved=${it?.name}" },
+                    { "录像收尾失败：${it.javaClass.simpleName}: ${it.message}; reason=$reason" }))
+            } finally {
+                recorderFinishing = false
+            }
         }
         wakeLock?.let { if (it.isHeld) it.release() }
         createNotification("等待车辆状态")

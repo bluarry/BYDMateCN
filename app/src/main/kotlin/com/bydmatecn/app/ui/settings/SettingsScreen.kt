@@ -5020,9 +5020,7 @@ private fun cloudOverWifiStatusText(state: CloudOverWifiState): String? = when (
 /** 独立工具入口：复用盲区显示的控制器与同一组持久化配置。 */
 @Composable
 fun BlindSpotSettingsScreen(onBack: () -> Unit) {
-    VehicleToolPage("电子后视镜", "转向联动、显示位置与镜头布局", onBack) {
-        BlindSpotCard()
-    }
+    BlindSpotToolScreen(onBack)
 }
 
 /** 独立工具配置页：业务实现仍复用设置页现有控制器，避免产生两套配置。 */

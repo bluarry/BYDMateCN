@@ -16,7 +16,6 @@ internal fun LocalToolsActivity.microphoneControls(audioPrefs: android.content.S
         status = status,
         actions = exteriorVoiceActions(audioPrefs, pressState),
     )
-    speechControls(audioPrefs)
 }
 
 private class ExteriorTalkPressState(var held: Boolean = false)

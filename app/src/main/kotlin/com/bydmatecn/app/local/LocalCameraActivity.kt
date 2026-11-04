@@ -58,9 +58,13 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
     internal var opening = false
     internal var pendingPreviewRestart = false
     internal var generation = 0
-    internal var index = 2
+    internal var index by androidx.compose.runtime.mutableIntStateOf(2)
+    internal var recorderDirection by androidx.compose.runtime.mutableStateOf(RecorderDirection.FRONT)
     internal val permission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         status.text = if (granted) "相机权限已授予，请再点击打开" else "相机权限被拒绝"
+    }
+    internal val videoStoragePermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        status.text = if (result.values.all { it }) "存储权限已授予，请重新选择录像目录" else "未授予存储读写权限，继续使用当前录像目录"
     }
     internal val export = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) lifecycleScope.launch {
@@ -88,11 +92,16 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
         featureMode = intent.getStringExtra(EXTRA_MODE).takeIf { it == MODE_SENTRY } ?: MODE_DASHCAM
         LocalFileLog.get(this).record("LocalCamera", "page opened mode=$featureMode")
         store = LocalCaptureStore(java.io.File(filesDir, "local-captures"))
-        videos = LocalVideoStore(java.io.File(filesDir, "local-videos"))
+        val recorderMode = if (featureMode == MODE_SENTRY) VehicleRecorderMode.PARKING_SENTRY else VehicleRecorderMode.DASHCAM
+        videos = LocalVideoStore(
+            LocalVideoStorage.directory(this, recorderMode),
+            VehicleRecorderPreferences.quotaMb(this, recorderMode).toLong() * 1024 * 1024,
+        )
         videoRecorder = LocalVideoRecorder(videos)
         val preferences = getSharedPreferences("local-mirror", Context.MODE_PRIVATE)
         dual = preferences.getBoolean("dual", false)
-        index = preferences.getInt("index", 2).takeIf { it in 1..4 } ?: 2
+        recorderDirection = VehicleRecorderPreferences.capturePlan(this).direction
+        index = VehicleRecorderPreferences.capturePlan(this, recorderDirection).surfaceIndex
         viewConfig = MirrorViewConfig(
             preferences.getBoolean("flip", false),
             preferences.getInt("zoom", 100).coerceIn(100, 200),

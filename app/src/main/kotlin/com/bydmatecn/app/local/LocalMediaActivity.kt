@@ -1,165 +1,183 @@
 package com.bydmatecn.app.local
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Private, offline gallery. SAF exports one selected file; no public storage permission. */
+/** Offline in-app video browser. Dashcam and sentry recordings are intentionally isolated. */
 @dagger.hilt.android.AndroidEntryPoint
 class LocalMediaActivity : ComponentActivity(), LocalComposeHost {
     override val ui = LocalUiState()
     @javax.inject.Inject lateinit var vehicle: com.bydmatecn.app.data.vehicle.VehicleApi
+
     private var resumed = false
     private var parked = false
-    private lateinit var captures: LocalCaptureStore
+    private lateinit var mode: VehicleRecorderMode
     private lateinit var videos: LocalVideoStore
-    private val message = LocalText() { LocalFileLog.get(this).record("media", it) }
-    private var selected: File? = null
+    private val message = LocalText { LocalFileLog.get(this).record("media", it) }
+    private val files = mutableStateListOf<File>()
+    private var selected: File? by androidx.compose.runtime.mutableStateOf(null)
     private var player: VideoView? by androidx.compose.runtime.mutableStateOf(null)
-    private var image: Bitmap? by androidx.compose.runtime.mutableStateOf(null)
     private var previewGeneration = 0
-    private val export = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+
+    private val export = registerForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { uri ->
         val file = selected
-        if (uri != null && file != null) lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching {
-                withOwned(file) {
-                    contentResolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }
+        if (uri != null && file != null) lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val result = runCatching {
+                videos.withFiles { owned ->
+                    require(file in owned)
+                    contentResolver.openOutputStream(uri)?.use { output -> file.inputStream().use { it.copyTo(output) } }
                         ?: error("无法打开导出目标")
                 }
-            } }
-            message.text = result.fold({ "已导出：${file.name}" }, { "导出失败：${it.message}" })
+            }
+            runOnUiThread {
+                message.text = result.fold({ "已导出：${file.name}" }, { "导出失败：${it.message}" })
+            }
         }
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        LocalFileLog.get(this).record("LocalMedia", "page opened")
-        captures = LocalCaptureStore(File(filesDir, "local-captures"))
-        videos = LocalVideoStore(File(filesDir, "local-videos"))
-        installLocalContent(ui)
+        mode = if (intent.getStringExtra(EXTRA_MODE) == LocalCameraActivity.MODE_SENTRY) {
+            VehicleRecorderMode.PARKING_SENTRY
+        } else {
+            VehicleRecorderMode.DASHCAM
+        }
+        val quota = VehicleRecorderPreferences.quotaMb(this, mode).toLong() * 1024 * 1024
+        videos = LocalVideoStore(LocalVideoStorage.directory(this, mode), quota)
         videos.quarantineStale(System.currentTimeMillis())
+        LocalFileLog.get(this).record("LocalMedia", "page opened mode=$mode; directory=${LocalVideoStorage.directory(this, mode).path}")
+
+        ui.title = if (mode == VehicleRecorderMode.PARKING_SENTRY) "哨兵录像" else "行车录像"
+        ui.subtitle = "本地视频 · 应用内预览"
+        ui.status = message
+        ui.onBack = { finish() }
+        ui.topTabs = true
+        ui.visualStyle = LocalVisualStyle.EXTERIOR_AUDIO
+        ui.section("已录视频")
+        ui.controls.add {
+            VideoLibraryWorkspace(
+                files = files,
+                selected = selected,
+                protected = { videos.isProtected(it) },
+                preview = { VideoPreview() },
+                onPlay = { preview(it) },
+                onExport = { selected = it; export.launch(it.name) },
+                onDelete = { delete(it) },
+                onProtect = { toggleProtection(it) },
+                onRefresh = { refresh() },
+            )
+        }
+        installLocalContent(ui)
         refresh()
         lifecycleScope.launch {
             while (true) {
                 val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { runCatching { vehicle.readSnapshot() }.getOrNull() }
                 parked = firmwareAudioAllowed(snapshot?.gear, snapshot?.speed, resumed)
-                if (!parked && player != null) { clearPreview(); message.text = "非驻车或车辆状态未知，视频回看已停止" }
-                kotlinx.coroutines.delay(500)
-            }
-        }
-    }
-    @androidx.compose.runtime.Composable
-    private fun GalleryPreview() {
-        player?.let { view -> androidx.compose.runtime.key(view) { AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().height(300.dp)) } }
-        image?.let { bitmap -> Image(bitmap.asImageBitmap(), contentDescription = "本地截图", modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) }
-    }
-    private fun refresh() {
-        fun galleryHeader() {
-            ui.controls.clear()
-            ui.actionIndices.clear()
-            ui.title = "本地相册"
-            ui.status = message
-            ui.onBack = { finish() }
-            ui.controls.add { GalleryPreview() }
-        }
-
-        clearPreview()
-        galleryHeader()
-        val damaged = videos.incomplete()
-        if (damaged.isNotEmpty()) mediaButton("隔离的未完成录像：${damaged.size}个（不作为正常MP4）") {
-            LocalDialogBuilder(this).setItems(damaged.map { it.name }.toTypedArray()) { _, which ->
-                LocalDialogBuilder(this).setMessage("此段录像未正常收尾。删除隔离文件？")
-                    .setNegativeButton("保留", null).setPositiveButton("删除") { _, _ -> videos.deleteIncomplete(damaged[which]); refresh() }.show()
-            }.show()
-        }
-        val files = (captures.captures() + videos.files()).sortedByDescending { it.lastModified() }
-        message.text = "本地相册 · ${files.size} 个文件 · 录像无音频\n仅驻车回看，离开页面停止播放"
-        // Bound initial UI allocation; older files remain available through page selection.
-        val pages = files.chunked(50)
-        fun page(index: Int) {
-            clearPreview(); galleryHeader()
-            if (damaged.isNotEmpty()) mediaButton("清理未完成录像（${damaged.size}段，保留前请自行取证）") {
-                LocalDialogBuilder(this).setMessage("删除已隔离的不完整录像？不删除正常MP4。")
-                    .setNegativeButton("保留", null).setPositiveButton("删除") { _, _ -> damaged.forEach { videos.deleteIncomplete(it) }; refresh() }.show()
-            }
-            if (index > 0) mediaButton("上一页") { page(index - 1) }
-            pages.getOrNull(index).orEmpty().forEach { file ->
-                mediaButton("${if (file.extension == "mp4" && videos.isProtected(file)) "[事件保护] " else ""}${file.name} · ${file.length() / 1024} KiB") {
-                    selected = file
-                    LocalDialogBuilder(this).setTitle(file.name).setItems(arrayOf("回看", "导出", "删除", "保护 / 解除事件保护")) { _, which ->
-                        performMediaAction(file, which)
-                    }.show()
+                if (!parked && player != null) {
+                    clearPreview()
+                    message.text = "非驻车或车辆状态未知，视频预览已停止"
                 }
+                delay(500)
             }
-            if (index + 1 < pages.size) mediaButton("下一页") { page(index + 1) }
         }
-        page(0)
     }
+
+    @androidx.compose.runtime.Composable
+    private fun VideoPreview() {
+        player?.let { view ->
+            androidx.compose.runtime.key(view) {
+                AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().height(340.dp))
+            }
+        }
+    }
+
+    private fun refresh() {
+        clearPreview()
+        selected = null
+        files.clear()
+        files.addAll(videos.files().sortedByDescending { it.lastModified() })
+        val damaged = videos.incomplete().size
+        val kind = if (mode == VehicleRecorderMode.PARKING_SENTRY) "哨兵" else "行车"
+        message.text = "${kind}录像 ${files.size} 段 · 未完成 $damaged 段 · 仅驻车时可预览"
+    }
+
     private fun preview(file: File) {
         clearPreview()
+        if (!parked || !resumed) {
+            message.text = "需有效 P 挡、零车速才能预览录像"
+            return
+        }
+        if (file !in videos.files()) {
+            message.text = "录像已被循环存储清理"
+            refresh()
+            return
+        }
+        selected = file
         val request = previewGeneration
-        if (file.extension == "mp4") {
-            if (!parked || !resumed) { message.text = "需有效 P 挡、零车速才能回看录像"; return }
-            if (!videos.files().contains(file)) { message.text = "录像已被清理"; return }
-            player = VideoView(this).also { view ->
-                val controls = MediaController(this); controls.setAnchorView(view)
-                view.setMediaController(controls)
-                view.setOnErrorListener { _, what, extra -> message.text = "视频解码失败：$what / $extra"; true }
-                view.setVideoPath(file.absolutePath)
-                view.setOnPreparedListener { if (previewGeneration == request && parked && resumed) view.start() else view.stopPlayback() }
+        player = VideoView(this).also { view ->
+            val controls = MediaController(this)
+            controls.setAnchorView(view)
+            view.setMediaController(controls)
+            view.setOnErrorListener { _, what, extra ->
+                message.text = "视频解码失败：$what / $extra"
+                true
             }
-        } else lifecycleScope.launch {
-            val decoded = withContext(Dispatchers.IO) { runCatching { withOwned(file) {
-                decodeCapture(file)
-            } } }
-            decoded.onSuccess { bitmap ->
-                if (request != previewGeneration || isFinishing) bitmap.recycle()
-                else { image = bitmap }
-            }.onFailure { message.text = "截图读取失败：${it.message}" }
+            view.setVideoPath(file.absolutePath)
+            view.setOnPreparedListener {
+                if (previewGeneration == request && parked && resumed) view.start() else view.stopPlayback()
+            }
+        }
+        message.text = "正在预览：${file.name}"
+    }
+
+    private fun delete(file: File) {
+        clearPreview()
+        selected = null
+        val deleted = videos.delete(file)
+        refresh()
+        if (!deleted) message.text = "录像已被循环清理或删除失败"
+    }
+
+    private fun toggleProtection(file: File) {
+        val changed = if (videos.isProtected(file)) videos.unprotect(file) else videos.protect(file, "用户保护")
+        if (changed) {
+            message.text = if (videos.isProtected(file)) "已保护：${file.name}" else "已解除保护：${file.name}"
+        } else {
+            message.text = "录像状态已变化，请刷新"
         }
     }
-    private fun <T> withOwned(file: File, action: () -> T): T =
-        if (file.extension == "mp4") videos.withFiles { require(file in it); action() }
-        else captures.withCaptures { require(file in it); action() }
+
     private fun clearPreview() {
         previewGeneration++
-        player?.stopPlayback(); player = null
-        // Compose may still draw the previous frame until recomposition. Let GC release this bitmap.
-        image = null
+        player?.stopPlayback()
+        player = null
     }
+
     override fun onResume() { super.onResume(); resumed = true }
-    override fun onPause() { LocalFileLog.get(this).record("media", "page paused; releasing preview"); resumed = false; parked = false; clearPreview(); super.onPause() }
+    override fun onPause() {
+        LocalFileLog.get(this).record("media", "page paused; releasing preview")
+        resumed = false
+        parked = false
+        clearPreview()
+        super.onPause()
+    }
     override fun onDestroy() { clearPreview(); super.onDestroy() }
 
-    private fun performMediaAction(file: File, which: Int) {
-        when (which) {
-                            3 -> { if (file.extension == "mp4") { if (videos.isProtected(file)) videos.unprotect(file) else videos.protect(file, "用户保护"); refresh() } }
-                            0 -> preview(file)
-                            1 -> export.launch(file.name)
-                            2 -> LocalDialogBuilder(this).setMessage("删除私有副本？导出副本不受影响。")
-                                .setNegativeButton("取消", null).setPositiveButton("删除") { _, _ ->
-                                    clearPreview()
-                                    val deleted = if (file.extension == "mp4") videos.delete(file) else captures.delete(file)
-                                    refresh(); if (!deleted) message.text = "文件已被循环存储清理或删除失败"
-                                }.show()
-
-        }
-    }
+    companion object { const val EXTRA_MODE = "recording_mode" }
 }

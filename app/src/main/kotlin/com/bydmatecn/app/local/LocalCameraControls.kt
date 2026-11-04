@@ -57,14 +57,24 @@ internal fun LocalCameraActivity.createCameraViews() {
         ui.subtitle = if (sentry) "锁车监控 · 开门与震动事件保护 · 本地回看" else "行驶自动启停 · 循环分段 · 事件保护 · 本地回看"
         ui.status = status
         ui.onBack = { finish() }
+        ui.topTabs = true
+        ui.visualStyle = LocalVisualStyle.EXTERIOR_AUDIO
         addAutomaticRecorderControls()
-        ui.section("手动预览与标定")
-
+        ui.section("存储与回看")
+        addVideoStorageControls()
+        cameraButton("打开${if (sentry) "哨兵" else "行车"}录像") { openRecordedVideos() }
         addMirrorControls()
     }
 
 internal fun LocalCameraActivity.addMirrorControls() {
-        ui.section("预览与画面")
+        ui.section("视角预览")
+        ui.controls.add {
+            RecorderAngleSelector(
+                selected = recorderDirection,
+                plans = RecorderDirection.entries.associateWith { VehicleRecorderPreferences.capturePlan(this, it) },
+                onSelect = { selectRecorderDirection(it) },
+            )
+        }
         cameraButton("打开预览") { startPreview() }
         cameraButton("选择固件 AVM 通道 1～4（需标定方位）") {
             LocalDialogBuilder(this).setTitle("通道号不等于左/右方位")
@@ -109,7 +119,7 @@ internal fun LocalCameraActivity.addMirrorControls() {
     }
 
 internal fun LocalCameraActivity.addCaptureControls() {
-        ui.section("录像与相册")
+        ui.section("手动录像")
         cameraButton("截图（原始帧，双路并排）") { capture() }
         cameraButton("开始 / 停止帧录像（1 FPS）") {
             if (open && !videoRecording) { recording = !recording; status.text = if (recording) "帧录像中（无音频）" else "帧录像已停止" }
@@ -135,7 +145,7 @@ internal fun LocalCameraActivity.addCaptureControls() {
             }
         }
         cameraButton("标记录像事件（保护上一段与当前段）") { bookmarkEvent("用户标记") }
-        cameraButton("截图与录像相册") { startActivity(android.content.Intent(this, LocalMediaActivity::class.java)) }
+        cameraButton("打开已录视频") { openRecordedVideos() }
         cameraButton("导出全部帧 ZIP") { export.launch("BYDMateCN-local-frames.zip") }
         cameraButton("关闭") { closePreview("用户关闭") }
         installLocalContent(ui) { CameraLayout() }

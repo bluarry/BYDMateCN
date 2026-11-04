@@ -3,12 +3,15 @@ package com.bydmatecn.app.local
 import android.content.Context
 
 /** Persistent options for the local dashcam and parking-sentry recorder. */
+@Suppress("TooManyFunctions")
 object VehicleRecorderPreferences {
     const val PREFS = "vehicle-recorder"
     const val KEY_DASHCAM = "dashcam_enabled"
     const val KEY_SENTRY = "parking_sentry_enabled"
     const val KEY_SEGMENT_MINUTES = "segment_minutes"
     const val KEY_QUOTA_MB = "quota_mb"
+    const val KEY_DASHCAM_QUOTA_MB = "dashcam_quota_mb"
+    const val KEY_SENTRY_QUOTA_MB = "sentry_quota_mb"
     const val KEY_SENTRY_HOURS = "sentry_hours"
     const val KEY_DOOR_EVENT = "door_event"
     const val KEY_IMPACT_EVENT = "impact_event"
@@ -25,13 +28,20 @@ object VehicleRecorderPreferences {
     }
     fun segmentMinutes(context: Context): Int = prefs(context).getInt(KEY_SEGMENT_MINUTES, 3)
         .takeIf { it in setOf(1, 3, 5) } ?: 3
-    fun quotaMb(context: Context): Int = prefs(context).getInt(KEY_QUOTA_MB, 2048)
-        .coerceIn(512, 8192)
+    fun quotaMb(context: Context, mode: VehicleRecorderMode = VehicleRecorderMode.DASHCAM): Int {
+        val preferences = prefs(context)
+        val key = if (mode == VehicleRecorderMode.PARKING_SENTRY) KEY_SENTRY_QUOTA_MB else KEY_DASHCAM_QUOTA_MB
+        return preferences.getInt(key, preferences.getInt(KEY_QUOTA_MB, 2048)).coerceIn(512, 8192)
+    }
     fun sentryHours(context: Context): Int = prefs(context).getInt(KEY_SENTRY_HOURS, 3)
         .takeIf { it in setOf(1, 3, 6, 12) } ?: 3
 
-    fun capturePlan(context: Context): RecorderCapturePlan = prefs(context).run {
-        val direction = RecorderDirection.fromStored(getString(KEY_CAPTURE_DIRECTION, null))
+    fun capturePlan(context: Context): RecorderCapturePlan {
+        val preferences = prefs(context)
+        return capturePlan(context, RecorderDirection.fromStored(preferences.getString(KEY_CAPTURE_DIRECTION, null)))
+    }
+
+    fun capturePlan(context: Context, direction: RecorderDirection): RecorderCapturePlan = prefs(context).run {
         RecorderCapturePlan(
             direction = direction,
             // Existing installs retain the old global values until each direction is calibrated.

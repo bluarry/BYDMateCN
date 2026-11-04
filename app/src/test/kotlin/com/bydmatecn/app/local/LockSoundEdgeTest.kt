@@ -8,11 +8,10 @@ import org.junit.Test
 
 class LockSoundEdgeTest {
     @Test fun drivingGateDoesNotPermitReverse() {
-        assertTrue(localRecordingAllowed(4, 30, true, false, true))
-        assertFalse(localRecordingAllowed(4, 30, true, false, false))
-        assertFalse(localRecordingAllowed(2, 0, true, false, true))
-        assertFalse(localRecordingAllowed(4, null, true, false, true))
-        assertFalse(localRecordingAllowed(4, 30, true, true, true))
+        assertTrue(localRecordingAllowed(4, 30, true))
+        assertFalse(localRecordingAllowed(4, 30, false))
+        assertFalse(localRecordingAllowed(2, 0, true))
+        assertFalse(localRecordingAllowed(4, null, true))
     }
 
     @Test fun baselineNeverPlays() {

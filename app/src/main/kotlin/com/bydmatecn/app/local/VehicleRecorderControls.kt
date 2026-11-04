@@ -36,7 +36,7 @@ internal fun LocalCameraActivity.addAutomaticRecorderControls() {
         stopService(Intent(this, VehicleRecorderService::class.java))
         status.text = "本次录像服务已停止；下次应用/车机启动时按开关恢复"
     }
-    cameraButton("截图与录像相册") { startActivity(Intent(this, LocalMediaActivity::class.java)) }
+    cameraButton("打开${if (sentry) "哨兵" else "行车"}录像") { openRecordedVideos() }
     val last = prefs.getString(VehicleRecorderPreferences.KEY_LAST_STATUS, null)
     ui.label(last?.let { "最近状态：$it" } ?: "后台录像尚无运行记录。所有启停、抢占、分段和事件均写入应用日志。")
 }
@@ -76,7 +76,12 @@ private fun LocalCameraActivity.addSharedRecorderControls(prefs: android.content
         val values = intArrayOf(512, 1024, 2048, 4096, 8192)
         LocalDialogBuilder(this).setTitle("应用内录像存储上限")
             .setItems(values.map { if (it < 1024) "$it MiB" else "${it / 1024} GiB" }.toTypedArray()) { _, which ->
-                prefs.edit().putInt(VehicleRecorderPreferences.KEY_QUOTA_MB, values[which]).apply()
+                val key = if (featureMode == LocalCameraActivity.MODE_SENTRY) {
+                VehicleRecorderPreferences.KEY_SENTRY_QUOTA_MB
+            } else {
+                VehicleRecorderPreferences.KEY_DASHCAM_QUOTA_MB
+            }
+            prefs.edit().putInt(key, values[which]).apply()
                 status.text = "录像存储上限将在下一段生效：${values[which]} MiB"
             }.show()
     }

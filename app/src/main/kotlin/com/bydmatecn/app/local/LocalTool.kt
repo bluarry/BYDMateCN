@@ -17,6 +17,6 @@ val localTools = listOf(
     LocalTool("integrations", "地图与集成", "地图源 · 外部应用联动", "tool_settings/INTEGRATIONS", 0),
     LocalTool("service", "车辆服务", "后台服务 · 车辆数据采集", "tool_settings/SERVICE", 1),
     LocalTool("smart_home", "智能家居", "车辆与家庭场景联动", "tool_settings/SMART_HOME", 2),
-    LocalTool("files", "本地媒体", "目录选择 · 扫描媒体 · 相册备份", "native:files", 0),
+    LocalTool("files", "本地媒体", "目录选择 · 扫描媒体 · 录像备份", "native:files", 0),
     LocalTool("diagnostics", "固件与权限", "只读检测 · 适配报告导出", "native:diagnostics", 1),
 )

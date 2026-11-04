@@ -37,7 +37,7 @@ class LocalMediaBackupTest {
     }
     @Test fun protectedVideoRoundTrip() = withRoot { root ->
         val source = File(root, "source")
-        val store = LocalVideoStore(File(source, "local-videos"))
+        val store = LocalVideoStore(File(source, "local-dashcam-videos"))
         val pending = store.pending().apply { writeBytes(byteArrayOf(1,2,3)) }
         val file = store.publish(pending)
         assertTrue(store.protect(file, "door-open"))
@@ -45,14 +45,47 @@ class LocalMediaBackupTest {
         assertEquals(2, LocalMediaBackup(source, File(root,"c1")).export(out))
         val dest = File(root,"dest")
         assertEquals(2, LocalMediaBackup(dest, File(root,"c2")).restore(out.toByteArray().inputStream()))
-        val restored = LocalVideoStore(File(dest,"local-videos"))
+        val restored = LocalVideoStore(File(dest,"local-dashcam-videos"))
         assertTrue(restored.isProtected(restored.files().single()))
     }
     @Test fun orphanMarkerRejectedWithoutPublication() = withRoot { root ->
         try { LocalMediaBackup(root, File(root,"cache")).restore(zip("videos/video-a.mp4.event").inputStream()); fail() }
         catch (_: IllegalArgumentException) {}
-        assertTrue(File(root,"local-videos").listFiles().orEmpty().isEmpty())
+        assertTrue(File(root,"local-dashcam-videos").listFiles().orEmpty().isEmpty())
     }
+    @Test fun dashcamAndSentryRoundTripRemainSeparated() = withRoot { root ->
+        val source = File(root, "source")
+        fun create(folder: String, payload: Byte): File {
+            val store = LocalVideoStore(File(source, folder))
+            return store.publish(store.pending().apply { writeBytes(byteArrayOf(payload)) })
+        }
+        create("local-dashcam-videos", 1)
+        create("local-sentry-videos", 2)
+        val out = ByteArrayOutputStream()
+        assertEquals(2, LocalMediaBackup(source, File(root, "cache1")).export(out))
+
+        val destination = File(root, "destination")
+        assertEquals(2, LocalMediaBackup(destination, File(root, "cache2")).restore(out.toByteArray().inputStream()))
+        assertArrayEquals(
+            byteArrayOf(1),
+            LocalVideoStore(File(destination, "local-dashcam-videos")).files().single().readBytes(),
+        )
+        assertArrayEquals(
+            byteArrayOf(2),
+            LocalVideoStore(File(destination, "local-sentry-videos")).files().single().readBytes(),
+        )
+    }
+
+    @Test fun legacyVideoArchiveRestoresIntoDashcamOnly() = withRoot { root ->
+        val destination = File(root, "destination")
+        assertEquals(
+            1,
+            LocalMediaBackup(destination, File(root, "cache")).restore(zip("videos/video-legacy.mp4").inputStream()),
+        )
+        assertEquals(1, LocalVideoStore(File(destination, "local-dashcam-videos")).files().size)
+        assertTrue(LocalVideoStore(File(destination, "local-sentry-videos")).files().isEmpty())
+    }
+
     @Test fun invalidLateEntryLeavesNoPartialMedia() = withRoot { root ->
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->

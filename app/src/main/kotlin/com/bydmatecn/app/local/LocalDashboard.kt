@@ -90,21 +90,12 @@ private fun ExteriorAudioDashboard(
     onSelect: (Int) -> Unit,
     modifier: Modifier,
 ) {
-    BoxWithConstraints(modifier.background(Color(0xFF111820))) {
+    BoxWithConstraints(modifier.background(Color(0xFF303132))) {
         val wide = maxWidth >= 920.dp
-        Column(Modifier.fillMaxSize().padding(horizontal = if (wide) 34.dp else 18.dp, vertical = 18.dp)) {
-            if (wide) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    ToolHeader(ui, Modifier.width(360.dp), compact = true)
-                    TopSectionTabs(sections, active, true, onSelect, Modifier.weight(1f))
-                }
-            } else {
-                ToolHeader(ui, compact = true)
-                Spacer(Modifier.size(10.dp))
-                TopSectionTabs(sections, active, true, onSelect)
-            }
-            Spacer(Modifier.size(18.dp))
-            ui.status?.let { CompactStatus(it) }
+        Column(Modifier.fillMaxSize().padding(horizontal = if (wide) 34.dp else 18.dp, vertical = 14.dp)) {
+            ToolHeader(ui, compact = true)
+            Spacer(Modifier.size(12.dp))
+            TopSectionTabs(sections, active, true, onSelect)
             Spacer(Modifier.size(12.dp))
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 key(active) { SectionControls(ui, sections, active, flat = true) }
@@ -117,14 +108,17 @@ private fun ExteriorAudioDashboard(
 private fun ToolHeader(ui: LocalUiState, modifier: Modifier = Modifier, compact: Boolean = false) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         ui.onBack?.let { back ->
-            IconButton(onClick = back, modifier = Modifier.size(if (compact) 36.dp else 40.dp)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回", tint = if (compact) AudioAccent else Color.White)
+            IconButton(onClick = back, modifier = Modifier.size(if (compact) 38.dp else 40.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "返回",
+                    tint = if (compact) Color(0xFFD9DDE2) else Color.White,
+                )
             }
-            if (compact) Text("返回工具", color = AudioAccent, fontSize = 13.sp, modifier = Modifier.clickable(onClick = back))
-            Spacer(Modifier.width(if (compact) 14.dp else 4.dp))
+            Spacer(Modifier.width(if (compact) 10.dp else 4.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(ui.title, fontSize = if (compact) 25.sp else 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF4F7FA))
+            Text(ui.title, fontSize = if (compact) 21.sp else 18.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFF4F7FA))
             if (!compact) Text(ui.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         }
     }
@@ -140,7 +134,7 @@ private fun TopSectionTabs(
 ) {
     Row(
         modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(if (flat) 8.dp else 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (flat) 0.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         sections.forEachIndexed { index, section ->
@@ -148,16 +142,16 @@ private fun TopSectionTabs(
             Box(
                 Modifier
                     .background(
-                        if (selected) AudioAccent else if (flat) Color.Transparent else Color(0xFF14263A),
-                        RoundedCornerShape(if (flat) 7.dp else 14.dp),
+                        if (selected) AudioAccent else if (flat) Color(0xFF444648) else Color(0xFF14263A),
+                        RoundedCornerShape(if (flat) 3.dp else 14.dp),
                     )
                     .clickable { onSelect(index) }
-                    .padding(horizontal = if (flat) 22.dp else 16.dp, vertical = if (flat) 11.dp else 9.dp),
+                    .padding(horizontal = if (flat) 30.dp else 16.dp, vertical = if (flat) 12.dp else 9.dp),
             ) {
                 Text(
                     section.title,
-                    fontSize = if (flat) 14.sp else 15.sp,
-                    color = if (selected) Color(0xFF08131F) else Color(0xFF9AA8B8),
+                    fontSize = if (flat) 15.sp else 15.sp,
+                    color = if (selected) Color.White else Color(0xFFD0D3D6),
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                 )
@@ -223,7 +217,7 @@ private fun SectionControls(ui: LocalUiState, sections: List<LocalSection>, acti
     val end = sections.getOrNull(active + 1)?.start ?: ui.controls.size
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(if (flat) 16.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(if (flat) 10.dp else 12.dp),
     ) {
         if (!flat) Text(sections[active].title, fontSize = 18.sp, color = Color.White, fontWeight = FontWeight.Bold)
         for (index in start until end) {
@@ -234,4 +228,4 @@ private fun SectionControls(ui: LocalUiState, sections: List<LocalSection>, acti
     }
 }
 
-internal val AudioAccent = Color(0xFF4A9CFF)
+internal val AudioAccent = Color(0xFF4E9DF8)

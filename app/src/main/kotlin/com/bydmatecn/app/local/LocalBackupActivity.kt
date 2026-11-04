@@ -12,7 +12,16 @@ class LocalBackupActivity : ComponentActivity(), LocalComposeHost {
     override val ui = LocalUiState()
     private val status = LocalText("本地媒体备份 / 恢复 · 不含账号及敏感数据库") { LocalFileLog.get(this).record("media-backup", it) }
     private var busy = false
-    private val backup by lazy { LocalMediaBackup(filesDir, cacheDir) }
+    private val backup by lazy {
+        LocalMediaBackup(
+            filesDir,
+            cacheDir,
+            mapOf(
+                VehicleRecorderMode.DASHCAM to LocalVideoStorage.directory(this, VehicleRecorderMode.DASHCAM),
+                VehicleRecorderMode.PARKING_SENTRY to LocalVideoStorage.directory(this, VehicleRecorderMode.PARKING_SENTRY),
+            ),
+        )
+    }
     private val export = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) runOperation { contentResolver.openOutputStream(uri)?.use { backup.export(it) } ?: error("无法写入") }
     }
@@ -28,7 +37,7 @@ class LocalBackupActivity : ComponentActivity(), LocalComposeHost {
         ui.title = "媒体备份与恢复"
         ui.status = status
         ui.onBack = { finish() }
-        button("导出音频、截图和MP4备份") { export.launch("BYDMateCN-local-media.zip") }
+        button("导出音频、截图、行车录像和哨兵录像") { export.launch("BYDMateCN-local-media.zip") }
         button("从本地ZIP恢复") { restore.launch(arrayOf("application/zip", "application/octet-stream")) }
         installLocalContent(ui)
     }
