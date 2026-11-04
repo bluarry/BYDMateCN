@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,6 +80,7 @@ import com.bydmatecn.app.ui.dashboard.DashboardScreen
 import com.bydmatecn.app.ui.settings.DonateDialog
 import com.bydmatecn.app.ui.settings.DonateEntry
 import com.bydmatecn.app.ui.settings.DonationReminder
+import com.bydmatecn.app.ui.settings.SettingsScreen
 import com.bydmatecn.app.ui.settings.UpdateDialog
 import com.bydmatecn.app.ui.settings.UpdateState
 import com.bydmatecn.app.ui.theme.*
@@ -101,6 +103,7 @@ enum class Screen(val route: String, val labelRes: Int, val icon: ImageVector) {
     Trips("trips", R.string.nav_tab_trips, Icons.Outlined.DirectionsCar),
     Charges("charges", R.string.nav_tab_charges, Icons.Outlined.BatteryChargingFull),
     Local("local_capabilities", R.string.nav_tab_local, Icons.Outlined.DirectionsCar),
+    Settings("settings", R.string.nav_tab_settings, Icons.Outlined.Settings),
 }
 
 @Composable
@@ -225,18 +228,13 @@ fun AppNavigation(
     var sideNavigationCollapsed by rememberSaveable {
         mutableStateOf(navigationPrefs.getBoolean(KEY_SIDE_NAV_COLLAPSED, false))
     }
-    val localChildRoutes = setOf(
-        "blind_spot",
-        "tool_settings/{section}",
-        "automation",
-        "tariff_periods",
-        "agent_chat",
-        "voice_journal",
-        "voice_user_phrases",
-    )
+    val localChildRoutes = setOf("blind_spot", "automation")
+    val settingsChildRoutes = setOf("tariff_periods", "agent_chat", "voice_journal", "voice_user_phrases")
     fun isSelected(screen: Screen): Boolean {
         val exact = currentDestination?.hierarchy?.any { it.route == screen.route } == true
-        return exact || (screen == Screen.Local && currentDestination?.route in localChildRoutes)
+        return exact ||
+            (screen == Screen.Local && currentDestination?.route in localChildRoutes) ||
+            (screen == Screen.Settings && currentDestination?.route in settingsChildRoutes)
     }
     fun navigateTo(screen: Screen) {
         Trace.event(TraceArea.USER, "tab", "to" to screen.route)
@@ -337,17 +335,15 @@ fun AppNavigation(
             composable("blind_spot") {
                 com.bydmatecn.app.ui.settings.BlindSpotSettingsScreen(onBack = { navController.popBackStack() })
             }
-            composable("tool_settings/{section}") { entry ->
-                com.bydmatecn.app.ui.settings.VehicleToolSettingsScreen(
-                    section = entry.arguments?.getString("section") ?: "",
-                    onBack = { navController.popBackStack() },
+            composable("automation") { com.bydmatecn.app.ui.automation.AutomationScreen() }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
                     onNavigateToAgentChat = { navController.navigate("agent_chat") },
                     onNavigateToVoiceJournal = { navController.navigate("voice_journal") },
                     onNavigateToVoiceUserPhrases = { navController.navigate("voice_user_phrases") },
                     onNavigateToTariffPeriods = { navController.navigate("tariff_periods") },
                 )
             }
-            composable("automation") { com.bydmatecn.app.ui.automation.AutomationScreen() }
             composable("trip_temperature") {
                 com.bydmatecn.app.ui.trips.TripTemperatureScreen(onBack = { navController.popBackStack() })
             }

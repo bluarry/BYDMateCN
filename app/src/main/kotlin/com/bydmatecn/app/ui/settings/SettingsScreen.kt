@@ -206,9 +206,27 @@ private const val SHOW_VOICE_USER_PHRASES = false
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
+    onNavigateToAgentChat: () -> Unit = {},
+    onNavigateToVoiceJournal: () -> Unit = {},
+    onNavigateToVoiceUserPhrases: () -> Unit = {},
+    onNavigateToTariffPeriods: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // The fid recorder runs in the daemon, so its switch is re-read every time the screen opens.
+    LaunchedEffect(Unit) { viewModel.refreshFidRecorder() }
+
+    // Manual range calculation table dialog
+    if (state.showManualRangeTableDialog) {
+        ManualRangeTableDialog(
+            currentTable = state.manualRangeTable,
+            onDismiss = { viewModel.hideManualRangeTableDialog() },
+            onSave = { viewModel.saveManualRangeTable(it) },
+            onReset = { viewModel.resetManualRangeTable() },
+        )
+    }
+
+    // Update dialog
     if (state.showUpdateDialog) {
         UpdateDialog(
             currentVersion = state.appVersion,
@@ -219,8 +237,23 @@ fun SettingsScreen(
                     else -> viewModel.checkForUpdate()
                 }
             },
-            onDismiss = { viewModel.hideUpdateDialog() },
+            onDismiss = { viewModel.hideUpdateDialog() }
         )
+    }
+
+    val previewContext = LocalContext.current
+    val previewLifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(previewLifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                WidgetController.setPreviewMode(previewContext, false)
+            }
+        }
+        previewLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            previewLifecycleOwner.lifecycle.removeObserver(observer)
+            WidgetController.setPreviewMode(previewContext, false)
+        }
     }
 
     Column(
@@ -235,12 +268,82 @@ fun SettingsScreen(
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
         )
+
         Spacer(modifier = Modifier.height(12.dp))
-        SettingsContentCard(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            compact = false,
-        ) {
-            AppSection(state, viewModel)
+
+        var selected by rememberSaveable { mutableStateOf(SettingsSection.VOICE) }
+        val hiddenSelected = selected == SettingsSection.SMART_HOME
+        val safeSelected = if (hiddenSelected && !state.devModeUnlocked) {
+            SettingsSection.VOICE
+        } else {
+            selected
+        }
+
+        val sectionContent: @Composable ColumnScope.() -> Unit = {
+            when (safeSelected) {
+                SettingsSection.BATTERY -> BatterySection(state, viewModel, onNavigateToTariffPeriods)
+                SettingsSection.INTEGRATIONS -> IntegrationsSection(state, viewModel)
+                SettingsSection.VOICE -> VoiceSettingsContent(
+                    state, viewModel, onNavigateToVoiceJournal, onNavigateToAgentChat, onNavigateToVoiceUserPhrases,
+                )
+                SettingsSection.WIDGET -> WidgetSection()
+                SettingsSection.DISPLAY -> DisplaySection()
+                SettingsSection.SPLIT -> SplitSection(viewModel)
+                SettingsSection.SERVICE -> ServiceSection(state, viewModel)
+                SettingsSection.APP -> AppSection(state, viewModel)
+                SettingsSection.SMART_HOME -> SmartHomeSection(state, viewModel)
+            }
+        }
+
+        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            val compact = maxWidth < 760.dp
+            if (compact) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SettingsSection.entries.forEach { section ->
+                            val hidden = section == SettingsSection.SMART_HOME
+                            if (!hidden || state.devModeUnlocked) {
+                                CompactSettingsTab(
+                                    section = section,
+                                    selected = section == safeSelected,
+                                    hidden = hidden,
+                                    onClick = { selected = section },
+                                )
+                            }
+                        }
+                    }
+                    SettingsContentCard(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        compact = true,
+                        content = sectionContent,
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    SettingsRail(
+                        selected = safeSelected,
+                        smartHomeUnlocked = state.devModeUnlocked,
+                        appVersion = state.appVersion,
+                        onSelect = { selected = it },
+                        onVersionTap = { viewModel.onVersionTap() },
+                        modifier = Modifier.width(260.dp).fillMaxSize(),
+                    )
+                    SettingsContentCard(
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                        compact = false,
+                        content = sectionContent,
+                    )
+                }
+            }
         }
     }
 }
@@ -267,6 +370,144 @@ private fun SettingsContentCard(
 }
 
 @Composable
+private fun CompactSettingsTab(
+    section: SettingsSection,
+    selected: Boolean,
+    hidden: Boolean,
+    onClick: () -> Unit,
+) {
+    val accent = if (hidden) AccentOrange else AccentGreen
+    Row(
+        modifier = Modifier
+            .background(
+                if (selected) accent.copy(alpha = 0.16f) else CardSurface,
+                RoundedCornerShape(10.dp),
+            )
+            .border(
+                width = 1.dp,
+                color = if (selected) accent.copy(alpha = 0.55f) else CardBorder,
+                shape = RoundedCornerShape(10.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = section.icon,
+            contentDescription = null,
+            tint = if (selected) accent else TextSecondary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = stringResource(section.labelRes),
+            color = if (selected) accent else TextSecondary,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
+@Composable
+private fun SettingsRail(
+    selected: SettingsSection,
+    smartHomeUnlocked: Boolean,
+    appVersion: String,
+    onSelect: (SettingsSection) -> Unit,
+    onVersionTap: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardSurface),
+        modifier = modifier,
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(vertical = 12.dp, horizontal = 8.dp)) {
+            // Only the section list scrolls, for enlarged fonts or a short screen; it takes the
+            // remaining height, so the divider and the version stay pinned to the bottom.
+            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                Text(
+                    stringResource(R.string.settings_rail_sections_label),
+                    color = TextMuted,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+
+                SettingsSection.entries.forEach { section ->
+                    val isHidden = section == SettingsSection.SMART_HOME
+                    if (isHidden && !smartHomeUnlocked) return@forEach
+                    RailItem(
+                        section = section,
+                        isActive = section == selected,
+                        isHidden = isHidden,
+                        onClick = { onSelect(section) },
+                    )
+                }
+            }
+
+            HorizontalDivider(color = CardBorder)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .clickable { onVersionTap() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "v$appVersion",
+                    color = TextMuted,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RailItem(
+    section: SettingsSection,
+    isActive: Boolean,
+    isHidden: Boolean,
+    onClick: () -> Unit,
+) {
+    val activeColor = if (isHidden) AccentOrange else AccentGreen
+    val bg = if (isActive) activeColor.copy(alpha = 0.12f) else Color.Transparent
+    val fg = when {
+        isActive -> activeColor
+        isHidden -> AccentOrange
+        else -> TextSecondary
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 2.dp)
+            .background(bg, shape = RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = section.icon,
+            contentDescription = null,
+            tint = fg,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = stringResource(section.labelRes),
+            color = fg,
+            fontSize = 14.sp,
+            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
+}
+
+/**
+ * One-line description of the period in force today, shown under the «Тарифы и периоды»
+ * button so the section stays compact but still tells the driver what is being charged.
+ */
+@Composable
 private fun currentTariffPeriodSummary(state: SettingsUiState, hybrid: Boolean): String {
     val current = state.tariffPeriods.firstOrNull { it.startTs <= System.currentTimeMillis() }
         ?: state.tariffPeriods.lastOrNull()
@@ -283,7 +524,6 @@ private fun currentTariffPeriodSummary(state: SettingsUiState, hybrid: Boolean):
     return if (date == null) rates
     else stringResource(R.string.settings_tariff_periods_summary_since, date, rates)
 }
-
 
 @Composable
 private fun BatterySection(
@@ -4795,48 +5035,6 @@ fun VehicleToolSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val destination = runCatching { SettingsSection.valueOf(section) }.getOrDefault(SettingsSection.APP)
-
-    if (destination == SettingsSection.SERVICE) {
-        LaunchedEffect(Unit) { viewModel.refreshFidRecorder() }
-    }
-    if (destination == SettingsSection.BATTERY && state.showManualRangeTableDialog) {
-        ManualRangeTableDialog(
-            currentTable = state.manualRangeTable,
-            onDismiss = { viewModel.hideManualRangeTableDialog() },
-            onSave = { viewModel.saveManualRangeTable(it) },
-            onReset = { viewModel.resetManualRangeTable() },
-        )
-    }
-    if (destination == SettingsSection.APP && state.showUpdateDialog) {
-        UpdateDialog(
-            currentVersion = state.appVersion,
-            state = state.updateDialogState,
-            onCheck = {
-                when (state.updateDialogState) {
-                    is UpdateState.Available -> viewModel.downloadUpdate()
-                    else -> viewModel.checkForUpdate()
-                }
-            },
-            onDismiss = { viewModel.hideUpdateDialog() },
-        )
-    }
-    if (destination == SettingsSection.WIDGET) {
-        val previewContext = LocalContext.current
-        val previewLifecycleOwner = LocalLifecycleOwner.current
-        DisposableEffect(previewLifecycleOwner) {
-            val observer = LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_PAUSE) {
-                    WidgetController.setPreviewMode(previewContext, false)
-                }
-            }
-            previewLifecycleOwner.lifecycle.addObserver(observer)
-            onDispose {
-                previewLifecycleOwner.lifecycle.removeObserver(observer)
-                WidgetController.setPreviewMode(previewContext, false)
-            }
-        }
-    }
-
     val title = stringResource(destination.labelRes)
     VehicleToolPage(title, "功能配置", onBack) {
         when (destination) {

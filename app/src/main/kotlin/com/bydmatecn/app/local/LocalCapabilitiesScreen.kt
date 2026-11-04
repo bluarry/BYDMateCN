@@ -28,11 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.DisplaySettings
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -74,10 +71,7 @@ private fun toolIcon(id: String): ImageVector = when (id) {
     "files" -> Icons.Outlined.Folder
     "diagnostics" -> Icons.Outlined.Info
     "automation", "voice" -> Icons.Outlined.AutoAwesome
-    "cast", "split" -> Icons.Outlined.DisplaySettings
-    "desktop" -> Icons.Outlined.Dashboard
-    "battery", "integrations", "service", "app_settings" -> Icons.Outlined.Settings
-    else -> Icons.Outlined.Settings
+    else -> Icons.Outlined.Info
 }
 
 @Composable

@@ -11,7 +11,9 @@ import android.view.Surface
 import androidx.lifecycle.lifecycleScope
 import com.bydmatecn.app.camera.AvmConsumerPriority
 import com.bydmatecn.app.camera.AvmSurfaceBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
 /** Activity-scoped controls; the activity owns state and lifecycle cleanup. */
