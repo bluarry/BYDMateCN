@@ -22,6 +22,34 @@ internal fun LocalCameraActivity.addAutomaticRecorderControls() {
         status.text = if (enabled) "驻车哨兵已启用；锁车后按配置时长录像" else "驻车哨兵已关闭"
     }
     cameraButton("授予后台录像所需权限") { requestAutomaticRecorderPermissions() }
+    cameraButton("录像方向") {
+        val values = RecorderDirection.entries
+        val current = VehicleRecorderPreferences.capturePlan(this)
+        LocalDialogBuilder(this).setTitle("选择录像方向（每个方向独立保存通道与镜像）")
+            .setItems(values.map { direction ->
+                if (direction == current.direction) "${direction.displayName}（当前）" else direction.displayName
+            }.toTypedArray()) { _, which ->
+                prefs.edit().putString(VehicleRecorderPreferences.KEY_CAPTURE_DIRECTION, values[which].name).apply()
+                restartRecorderForCapturePlan("录像方向已设为${values[which].displayName}")
+            }.show()
+    }
+    cameraButton("录像 AVM 通道") {
+        val current = VehicleRecorderPreferences.capturePlan(this)
+        val values = (1..4).toList()
+        LocalDialogBuilder(this).setTitle("选择与录像方向对应的固件通道")
+            .setItems(values.map { if (it == current.surfaceIndex) "通道 $it（当前）" else "通道 $it" }.toTypedArray()) { _, which ->
+                VehicleRecorderPreferences.setCaptureSurface(this, current.direction, values[which])
+                restartRecorderForCapturePlan("${current.direction.displayName}录像通道已设为 ${values[which]}")
+            }.show()
+    }
+    val capturePlan = VehicleRecorderPreferences.capturePlan(this)
+    ui.toggle("录像画面水平镜像", capturePlan.horizontalFlip) { enabled ->
+        VehicleRecorderPreferences.setCaptureFlip(this, capturePlan.direction, enabled)
+        restartRecorderForCapturePlan(
+            if (enabled) "${capturePlan.direction.displayName}录像画面已启用水平镜像"
+            else "${capturePlan.direction.displayName}录像画面已关闭水平镜像",
+        )
+    }
     cameraButton("录像分段时长") {
         val values = intArrayOf(1, 3, 5)
         LocalDialogBuilder(this).setTitle("每段录像时长")
@@ -69,6 +97,15 @@ internal fun LocalCameraActivity.addAutomaticRecorderControls() {
     ui.label(last?.let { "最近状态：$it" } ?: "后台录像尚无运行记录。所有启停、抢占、分段和事件均写入应用日志。")
 }
 
+private fun LocalCameraActivity.restartRecorderForCapturePlan(message: String) {
+    VehicleRecorderService.reloadCapturePlan(this)
+    status.text = if (VehicleRecorderPreferences.enabled(this)) {
+        "$message；录像服务正在安全重载画面方案"
+    } else {
+        "$message；将在下次启用录像时生效"
+    }
+}
+
 private fun LocalCameraActivity.updateRecorderService() {
     if (VehicleRecorderPreferences.enabled(this)) VehicleRecorderService.start(this)
     else VehicleRecorderService.stop(this)
@@ -81,8 +118,6 @@ private fun LocalCameraActivity.requestAutomaticRecorderPermissions() {
         !Settings.canDrawOverlays(this) -> runCatching {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
         }.onFailure { status.text = "无法打开悬浮窗授权页面：${it.message}" }
-        !usageAllowed() -> runCatching { startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
-            .onFailure { status.text = "无法打开使用情况访问设置：${it.message}" }
         else -> {
             updateRecorderService()
             status.text = "后台录像权限已具备；服务已按当前开关刷新"

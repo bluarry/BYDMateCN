@@ -46,6 +46,12 @@ object AvmFrameShare {
         else sources.keys.sorted().firstOrNull { availableView(it) != null }
     }
 
+    /** Like [activeIndex], but startup grace never counts as a delivered camera frame. */
+    fun freshIndex(preferred: Int): Int? = synchronized(lock) {
+        if (freshView(preferred) != null) preferred
+        else sources.keys.sorted().firstOrNull { freshView(it) != null }
+    }
+
     fun bitmap(index: Int, width: Int, height: Int): Bitmap? {
         val source = synchronized(lock) { sources[index] } ?: return null
         val view = source.view.get() ?: run {
@@ -64,6 +70,15 @@ object AvmFrameShare {
         val recent = source.lastFrameAt > 0L && now - source.lastFrameAt <= FRAME_FRESH_MS
         val starting = source.lastFrameAt == 0L && now - source.publishedAt <= START_GRACE_MS
         return view?.takeIf { it.isAvailable && (recent || starting) }
+    }
+
+    private fun freshView(index: Int): TextureView? {
+        val view = sources[index]?.view?.get()
+        if (view == null) sources.remove(index)
+        val source = sources[index] ?: return null
+        val recent = source.lastFrameAt > 0L &&
+            SystemClock.elapsedRealtime() - source.lastFrameAt <= FRAME_FRESH_MS
+        return view?.takeIf { it.isAvailable && recent }
     }
 
     private const val FRAME_FRESH_MS = 1_500L

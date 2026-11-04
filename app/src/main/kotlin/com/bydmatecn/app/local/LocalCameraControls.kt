@@ -59,10 +59,6 @@ internal fun LocalCameraActivity.createCameraViews() {
         addAutomaticRecorderControls()
         ui.section("手动预览与标定")
 
-        cameraButton("打开使用情况访问设置") {
-            runCatching { startActivity(android.content.Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
-                .onFailure { status.text = "固件没有使用情况访问设置：${it.message}" }
-        }
         addMirrorControls()
     }
 
@@ -164,7 +160,10 @@ private fun LocalCameraActivity.CameraPreviews(modifier: Modifier) {
 internal fun LocalCameraActivity.observeCamera() {
         lifecycleScope.launch {
             factoryCamera.active.collect { active ->
-                if (active && open) closePreview("原厂相机启动，释放 AVM")
+                LocalFileLog.get(this@observeCamera).record(
+                    "camera/share",
+                    "原厂相机状态变化：active=$active；保持当前 AVM 订阅，由帧超时检测决定是否释放",
+                )
             }
         }
         lifecycleScope.launch {
@@ -188,8 +187,8 @@ internal fun LocalCameraActivity.cameraButton(label: String, action: () -> Unit)
 
 private suspend fun LocalCameraActivity.pollCameraState() {
                     val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { runCatching { vehicle.readSnapshot() }.getOrNull() }
-                    if (!localRecordingAllowed(snapshot?.gear, snapshot?.speed, usageAllowed(), !factoryCameraClear(), driving)) {
-                        closePreview("车辆状态未知/非驻车，或原厂相机占用")
+                    if (!localRecordingAllowed(snapshot?.gear, snapshot?.speed, driving)) {
+                        closePreview("车辆状态未知或不满足当前预览安全条件")
                     } else {
                         if (lastFrameMs > 0 && android.os.SystemClock.elapsedRealtime()-lastFrameMs > 5000) {
                             closePreview("相机5秒未更新，停止录像并释放资源")

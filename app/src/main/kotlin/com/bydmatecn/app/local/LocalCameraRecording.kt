@@ -83,7 +83,7 @@ internal fun LocalCameraActivity.closePreview(reason: String) {
         stopVideo()
         recording = false; eventMode = false; previousDoors = null
         texture.alpha = 1f; secondTexture.alpha = 1f
-        probe.close(reason)
+        avmSession.detach(MANUAL_CAMERA_OWNER, reason)
         open = false
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         status.text = reason

@@ -68,7 +68,7 @@ class BlindSpotControllerNative360Test {
         controller = BlindSpotController(
             context, BlindSpotPreferences(context), helper,
             ClusterJournal(context.getSharedPreferences("cluster_journal_test", Context.MODE_PRIVATE)),
-            monitor, fidPush,
+            monitor, fidPush, SharedAvmSession(),
         )
     }
 

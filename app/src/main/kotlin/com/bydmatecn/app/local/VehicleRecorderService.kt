@@ -1,11 +1,9 @@
 package com.bydmatecn.app.local
 
-import android.app.AppOpsManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -24,9 +22,11 @@ import android.view.TextureView
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.bydmatecn.app.camera.AvmCameraProbe
+import com.bydmatecn.app.camera.AvmConsumerPriority
 import com.bydmatecn.app.camera.AvmFrameShare
-import com.bydmatecn.app.data.camera.CameraStateMonitor
+import com.bydmatecn.app.camera.AvmSurfaceBinding
+import com.bydmatecn.app.camera.AvmSourceConfig
+import com.bydmatecn.app.camera.SharedAvmSession
 import com.bydmatecn.app.data.vehicle.BatchReadItem
 import com.bydmatecn.app.data.vehicle.HelperBootstrap
 import com.bydmatecn.app.data.vehicle.HelperClient
@@ -48,27 +48,29 @@ import javax.inject.Inject
 import kotlin.math.sqrt
 
 /**
- * Dashcam and parking-sentry encoder backed by one AVM producer at a time.
- * Interactive BYDMateCN previews own the vendor handle while visible and publish their rendered
- * TextureView through [AvmFrameShare], so encoding continues without opening a competing handle.
+ * Dashcam and parking-sentry encoder backed by the process-wide shared AVM producer.
+ * Interactive previews and the recorder attach independent surfaces to that producer. On firmware
+ * that rejects a combined set, [AvmFrameShare] remains the compatibility fallback.
  */
 @AndroidEntryPoint
 @Suppress("TooManyFunctions") // Android callbacks plus one recorder state machine stay in one lifecycle owner.
 class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, SensorEventListener {
     @Inject lateinit var helper: HelperClient
     @Inject lateinit var helperBootstrap: HelperBootstrap
-    @Inject lateinit var factoryCamera: CameraStateMonitor
+    @Inject lateinit var avmSession: SharedAvmSession
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val encoder = Executors.newSingleThreadExecutor()
     private val frameBusy = AtomicBoolean(false)
     private val prefs by lazy { VehicleRecorderPreferences.prefs(this) }
-    private val probe by lazy {
-        AvmCameraProbe(eventSink = { note("avm: $it") }, yieldToForeground = true)
-    }
     private lateinit var windowManager: WindowManager
     private var texture: TextureView? = null
     private var surface: Surface? = null
+    private var directFrameSource: AvmImageReaderFrameSource? = null
+    private var capturePlan = RecorderCapturePlan()
+    private var directSourceConfig: AvmSourceConfig? = null
+    @Volatile private var directFrameSourceFailures = 0
+    private var directFrameSourceRetryAt = 0L
     @Volatile private var recorder: LocalVideoRecorder? = null
     @Volatile private var mode = VehicleRecorderMode.OFF
     private var monitorJob: Job? = null
@@ -84,12 +86,15 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     private var sensorReady = false
     private var sensorSamples = 0
     @Volatile private var captureSession = 0
-    private var lastSurfaceFrameAt = 0L
+    @Volatile private var lastSurfaceFrameAt = 0L
+    @Volatile private var lastTextureFrameAt = 0L
+    private var lastStaleRecoveryAt = 0L
+    private var firstFrameWaitingSince = 0L
+    private var deliveredFrameCount = 0L
     private var sentryLimitReached = false
-    private var lastForegroundPackage: String? = null
-    private var usageCursorMs = 0L
     private var activeFrameSource = ""
     private var lastSourceAttemptAt = 0L
+    private val eventProtection = RecorderEventProtection()
 
     override fun onCreate() {
         super.onCreate()
@@ -98,14 +103,21 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "bydmatecn:vehicle_recorder")
             .apply { setReferenceCounted(false) }
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        capturePlan = VehicleRecorderPreferences.capturePlan(this)
         createNotification("等待车辆状态")
-        createCaptureTexture()
+        note(
+            "录像画面方案：direction=${capturePlan.direction}; surface=${capturePlan.surfaceIndex}; " +
+                "strip=${capturePlan.direction.stripIndex}; flip=${capturePlan.horizontalFlip}",
+        )
+        createDirectFrameSource()
+        if (directFrameSource == null) createCaptureTexture()
     }
 
     override fun onBind(intent: Intent?) = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
+            RELOAD_CAPTURE_PLAN -> reloadCapturePlan()
             STOP -> {
                 prefs.edit().putBoolean(VehicleRecorderPreferences.KEY_DASHCAM, false)
                     .putBoolean(VehicleRecorderPreferences.KEY_SENTRY, false).apply()
@@ -118,9 +130,154 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
             stopSelf()
             return START_NOT_STICKY
         }
-        if (texture == null && Settings.canDrawOverlays(this)) createCaptureTexture()
+        if (directFrameSource == null && texture == null && Settings.canDrawOverlays(this)) createCaptureTexture()
         if (monitorJob?.isActive != true) monitorJob = scope.launch { monitorLoop() }
         return START_STICKY
+    }
+
+    private fun createDirectFrameSource() {
+        if (directFrameSource != null || SystemClock.elapsedRealtime() < directFrameSourceRetryAt) return
+        val sourceConfig = runCatching {
+            avmSession.discover()
+            avmSession.preferredSourceConfig()
+        }.onFailure {
+            note("AVM 默认画面规格探测失败：${it.javaClass.simpleName}: ${it.message}")
+        }.getOrDefault(DEFAULT_RECORDER_SOURCE_CONFIG)
+        val source = AvmImageReaderFrameSource(
+            sourceWidth = sourceConfig.width,
+            sourceHeight = sourceConfig.height,
+            outputWidth = LocalVideoRecorder.WIDTH,
+            outputHeight = LocalVideoRecorder.HEIGHT,
+            targetFps = LocalVideoRecorder.FPS,
+            stripIndex = capturePlan.direction.stripIndex,
+            horizontalFlip = capturePlan.horizontalFlip,
+            note = ::note,
+            onFrame = {
+                lastSurfaceFrameAt = it
+                firstFrameWaitingSince = 0L
+                directFrameSourceFailures = 0
+            },
+        )
+        if (source.start()) {
+            directSourceConfig = sourceConfig
+            directFrameSource = source
+            directFrameSourceRetryAt = 0L
+            note("录像优先使用 ImageReader 直接取帧：$sourceConfig")
+        } else {
+            directFrameSourceFailures++
+            scheduleDirectFrameRetry("ImageReader 创建失败")
+        }
+    }
+
+    private fun scheduleDirectFrameRetry(reason: String) {
+        val retiring = directFrameSource
+        val retiringSurface = retiring?.surface
+        if (retiringSurface != null) {
+            val retiringBinding = AvmSurfaceBinding(configuredCameraIndex(), retiringSurface)
+            val wasActive = avmSession.isBindingActive(RECORDER_OWNER, retiringBinding)
+            val fallback = surface
+            val fallbackReady = fallback != null && runCatching {
+                avmSession.attach(
+                    RECORDER_OWNER,
+                    listOf(AvmSurfaceBinding(configuredCameraIndex(), fallback)),
+                    AvmConsumerPriority.BACKGROUND,
+                )
+            }.getOrDefault(false)
+            if (!fallbackReady) {
+                // Also clear a deferred request for this ImageReader: another owner attaching later
+                // must never revive a Surface after its ImageReader has been closed.
+                avmSession.detach(RECORDER_OWNER, "ImageReader 退避前清理失效 Surface")
+            } else if (wasActive) {
+                note("ImageReader 退避前已无缝切换到隐藏 TextureView Surface")
+            }
+        }
+        retiring?.stopAndAwait(IMAGE_READER_RELEASE_WAIT_MS)
+        firstFrameWaitingSince = 0L
+        directFrameSource = null
+        directSourceConfig = null
+        val delay = if (directFrameSourceFailures >= DIRECT_SOURCE_MAX_FAILURES) {
+            DIRECT_SOURCE_BACKOFF_MS
+        } else {
+            DIRECT_SOURCE_RETRY_MS
+        }
+        directFrameSourceRetryAt = SystemClock.elapsedRealtime() + delay
+        note(
+            "ImageReader 暂时不可用：$reason；failure=$directFrameSourceFailures/" +
+                "$DIRECT_SOURCE_MAX_FAILURES；${delay}ms 后重试",
+        )
+        if (directFrameSourceFailures >= DIRECT_SOURCE_MAX_FAILURES) createCaptureTexture()
+    }
+
+    private fun recreateDirectFrameSource(reason: String): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (now < directFrameSourceRetryAt) {
+            noteSource("ImageReader 重试退避中（剩余 ${directFrameSourceRetryAt - now}ms）")
+            return false
+        }
+        val previous = directFrameSource ?: return false
+        val previousConfig = directSourceConfig
+        directFrameSource = null
+        directSourceConfig = null
+        directFrameSourceRetryAt = 0L
+        note("无缝重建 ImageReader：$reason；保留旧 Surface 直到新 Surface 完成绑定")
+        val failuresBeforeCreate = directFrameSourceFailures
+        createDirectFrameSource()
+        val replacement = directFrameSource
+        val replacementBinding = replacement?.surface?.let {
+            AvmSurfaceBinding(configuredCameraIndex(), it)
+        }
+        if (replacement != null && replacementBinding != null && ensureFrameSource() &&
+            avmSession.isBindingActive(RECORDER_OWNER, replacementBinding)
+        ) {
+            previous.stopAndAwait(IMAGE_READER_RELEASE_WAIT_MS)
+            firstFrameWaitingSince = SystemClock.elapsedRealtime()
+            note("ImageReader 已无缝替换，等待首帧确认；${avmSession.diagnosticSnapshot()}")
+            return true
+        }
+
+        replacement?.stopAndAwait(IMAGE_READER_RELEASE_WAIT_MS)
+        firstFrameWaitingSince = 0L
+        directFrameSource = previous
+        directSourceConfig = previousConfig
+        previous.surface?.let { oldSurface ->
+            runCatching {
+                avmSession.attach(
+                    RECORDER_OWNER,
+                    listOf(AvmSurfaceBinding(configuredCameraIndex(), oldSurface)),
+                    AvmConsumerPriority.BACKGROUND,
+                    previousConfig,
+                )
+            }
+        }
+        if (directFrameSourceFailures == failuresBeforeCreate) directFrameSourceFailures++
+        val delay = if (directFrameSourceFailures >= DIRECT_SOURCE_MAX_FAILURES) {
+            DIRECT_SOURCE_BACKOFF_MS
+        } else {
+            DIRECT_SOURCE_RETRY_MS
+        }
+        directFrameSourceRetryAt = SystemClock.elapsedRealtime() + delay
+        note(
+            "ImageReader 替换失败，继续使用旧画面：$reason；failure=$directFrameSourceFailures/" +
+                "$DIRECT_SOURCE_MAX_FAILURES；${delay}ms 后重试；${avmSession.diagnosticSnapshot()}",
+        )
+        if (directFrameSourceFailures >= DIRECT_SOURCE_MAX_FAILURES) createCaptureTexture()
+        return false
+    }
+
+    private fun reloadCapturePlan() {
+        val previous = capturePlan
+        stopCapture("重新加载录像画面方案")
+        avmSession.detach(RECORDER_OWNER, "重新加载录像画面方案")
+        directFrameSource?.stopAndAwait(IMAGE_READER_RELEASE_WAIT_MS)
+        firstFrameWaitingSince = 0L
+        directFrameSource = null
+        directSourceConfig = null
+        directFrameSourceFailures = 0
+        directFrameSourceRetryAt = 0L
+        capturePlan = VehicleRecorderPreferences.capturePlan(this)
+        createDirectFrameSource()
+        if (directFrameSource == null) createCaptureTexture()
+        note("录像画面方案已重载：$previous -> $capturePlan")
     }
 
     private fun createCaptureTexture() {
@@ -156,11 +313,25 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     }
     override fun onSurfaceTextureSizeChanged(value: SurfaceTexture, width: Int, height: Int) = Unit
     override fun onSurfaceTextureUpdated(value: SurfaceTexture) {
-        lastSurfaceFrameAt = SystemClock.elapsedRealtime()
+        val now = SystemClock.elapsedRealtime()
+        lastTextureFrameAt = now
+        lastSurfaceFrameAt = now
+        firstFrameWaitingSince = 0L
     }
     override fun onSurfaceTextureDestroyed(value: SurfaceTexture): Boolean {
-        surface?.release(); surface = null
+        val destroyed = surface
         stopCapture("后台 Surface 销毁")
+        if (destroyed != null && avmSession.isBindingActive(
+                RECORDER_OWNER,
+                AvmSurfaceBinding(configuredCameraIndex(), destroyed),
+            )
+        ) {
+            avmSession.detach(RECORDER_OWNER, "后台 Surface 销毁")
+        }
+        destroyed?.release()
+        surface = null
+        lastTextureFrameAt = 0L
+        firstFrameWaitingSince = 0L
         return true
     }
 
@@ -179,7 +350,6 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     private fun RecorderVehicleState.toRecorderInput() = VehicleRecorderInput(
         dashcamEnabled = prefs.getBoolean(VehicleRecorderPreferences.KEY_DASHCAM, false),
         sentryEnabled = prefs.getBoolean(VehicleRecorderPreferences.KEY_SENTRY, false),
-        factoryCameraActive = factoryCameraInUse(),
         powerState = power,
         gear = gear,
         speedKph = speed,
@@ -213,7 +383,16 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     }
 
     private fun stopIfRecording(reason: String) {
-        if (mode != VehicleRecorderMode.OFF) stopCapture(reason)
+        if (mode != VehicleRecorderMode.OFF || recorder != null) {
+            stopCapture(reason)
+            return
+        }
+        if (avmSession.hasRegistration(RECORDER_OWNER)) {
+            activeFrameSource = ""
+            firstFrameWaitingSince = 0L
+            avmSession.detach(RECORDER_OWNER, reason)
+            note("取消等待录像首帧：$reason")
+        }
     }
 
     private fun updateParkingSentry(sample: RecorderVehicleState) {
@@ -225,55 +404,64 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         stopCapture("驻车哨兵达到最长 $hours 小时")
     }
 
-    private fun factoryCameraInUse(): Boolean {
-        if (factoryCamera.active.value) return true
-        if (!usageAllowed()) return true
-        return runCatching {
-            val now = System.currentTimeMillis()
-            val begin = if (usageCursorMs == 0L) now - FOREGROUND_INITIAL_LOOKBACK_MS else usageCursorMs - 1_000L
-            val usage = getSystemService(USAGE_STATS_SERVICE) as UsageStatsManager
-            CameraStateMonitor.latestResumed(usage, begin, now + 1)?.let { (pkg, timestamp) ->
-                lastForegroundPackage = pkg
-                usageCursorMs = maxOf(usageCursorMs, timestamp)
-            }
-            if (usageCursorMs == 0L) usageCursorMs = now
-            lastForegroundPackage == FACTORY_CAMERA_PACKAGE
-        }.onFailure { note("前台相机检测失败：${it.javaClass.simpleName}: ${it.message}") }.getOrDefault(true)
-    }
-
-    private fun usageAllowed(): Boolean {
-        val appOps = getSystemService(APP_OPS_SERVICE) as AppOpsManager
-        return appOps.checkOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            android.os.Process.myUid(),
-            packageName,
-        ) == AppOpsManager.MODE_ALLOWED
-    }
-
     private fun permissionsReady(): Boolean {
         if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return false
-        if (!Settings.canDrawOverlays(this) || surface == null) return false
-        return usageAllowed()
+        if (directFrameSource?.surface == null && (!Settings.canDrawOverlays(this) || surface == null)) return false
+        return true
     }
 
-    private fun configuredCameraIndex(): Int = getSharedPreferences("local-mirror", MODE_PRIVATE)
-        .getInt("index", 2).takeIf { it in 1..4 } ?: 2
+    private fun configuredCameraIndex(): Int = capturePlan.surfaceIndex
 
-    /** True when either an interactive preview supplies frames or our hidden AVM surface is open. */
+    /** Registers the recorder Surface on the same AVM handle used by the electronic mirror. */
     private fun ensureFrameSource(): Boolean {
-        val shared = AvmFrameShare.activeIndex(configuredCameraIndex())
-        if (shared != null) {
-            if (probe.isOpen) probe.close("切换到共享预览画面")
-            noteSource("共享电子后视镜画面（通道 $shared）")
+        val target = directFrameSource?.surface ?: surface ?: return false
+        val binding = AvmSurfaceBinding(configuredCameraIndex(), target)
+        if (avmSession.isBindingActive(RECORDER_OWNER, binding)) {
+            markFirstFrameWaitIfNeeded(target)
             return true
         }
-        if (probe.isOpen) return true
-        val target = surface ?: return false
         val opened = runCatching {
-            probe.discover(setOf("pano_h", "pano_l")) && probe.open(configuredCameraIndex(), target)
-        }.onFailure { note("AVM 打开异常：${it.javaClass.simpleName}: ${it.message}") }.getOrDefault(false)
-        if (opened) noteSource("后台隐藏画面")
-        return opened
+            avmSession.attach(
+                RECORDER_OWNER,
+                listOf(binding),
+                AvmConsumerPriority.BACKGROUND,
+                directSourceConfig.takeIf { directFrameSource?.surface === target },
+            )
+        }.onFailure { note("AVM 共享订阅异常：${it.javaClass.simpleName}: ${it.message}") }.getOrDefault(false)
+        if (opened) markFirstFrameWaitIfNeeded(target)
+        val shared = AvmFrameShare.activeIndex(configuredCameraIndex())
+        when {
+            opened && directFrameSource?.surface === target -> noteSource(
+                "ImageReader 已绑定，等待首帧（${capturePlan.direction.displayName}/通道${capturePlan.surfaceIndex}）",
+            )
+            opened -> noteSource("后台共享 AVM Surface（${capturePlan.direction.displayName}/通道${capturePlan.surfaceIndex}）")
+            shared != null -> noteSource("电子后视镜帧降级（通道 $shared）")
+        }
+        return opened || shared != null
+    }
+
+    private fun markFirstFrameWaitIfNeeded(target: Surface) {
+        val alreadyHasFrame = if (directFrameSource?.surface === target) {
+            directFrameSource?.lastFrameAt?.let { it > 0L } == true
+        } else {
+            lastTextureFrameAt > 0L
+        }
+        if (!alreadyHasFrame && firstFrameWaitingSince <= 0L) {
+            firstFrameWaitingSince = SystemClock.elapsedRealtime()
+        }
+    }
+
+    private fun firstFrameWaitTimedOut(now: Long): Boolean =
+        firstFrameWaitingSince > 0L && now - firstFrameWaitingSince >= SURFACE_START_GRACE_MS
+
+    private fun hasFreshFrameSource(now: Long): Boolean {
+        val directAt = directFrameSource?.lastFrameAt ?: 0L
+        if (directAt > 0L && now - directAt <= SURFACE_STALE_MS) return true
+        if (AvmFrameShare.freshIndex(configuredCameraIndex()) != null) return true
+        val hiddenSurface = surface ?: return false
+        val hiddenBinding = AvmSurfaceBinding(configuredCameraIndex(), hiddenSurface)
+        return avmSession.isBindingActive(RECORDER_OWNER, hiddenBinding) &&
+            lastTextureFrameAt > 0L && now - lastTextureFrameAt <= SURFACE_STALE_MS
     }
 
     private fun noteSource(source: String) {
@@ -283,13 +471,19 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     }
 
     private fun startCapture(targetMode: VehicleRecorderMode) {
-        if (recorder?.active == true && mode == targetMode) {
+        if (recorder?.active == true) {
             ensureFrameSource()
+            if (mode != targetMode) switchCaptureMode(targetMode)
             return
         }
-        stopCapture("切换录像模式")
+        stopCapture("清理旧录像状态")
         if (!ensureFrameSource()) {
             note("AVM 画面源尚未就绪，将稍后重试")
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        if (!hasFreshFrameSource(now)) {
+            refreshFrameSource(now)
             return
         }
         val quota = VehicleRecorderPreferences.quotaMb(this).toLong() * 1024 * 1024
@@ -297,11 +491,14 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         val started = runCatching { recorder?.start() }.onFailure {
             note("编码器启动失败：${it.javaClass.simpleName}: ${it.message}")
         }.isSuccess
-        if (!started) { probe.close("编码器启动失败"); recorder?.abort(); recorder = null; return }
+        if (!started) { avmSession.detach(RECORDER_OWNER, "编码器启动失败"); recorder?.abort(); recorder = null; return }
         captureSession++
         mode = targetMode
         segmentStarted = SystemClock.elapsedRealtime()
-        lastSurfaceFrameAt = segmentStarted
+        // Do not fabricate frame freshness here. AVM binding success only means that the vendor
+        // accepted the Surface; the first ImageReader/TextureView callback proves real pixels.
+        lastStaleRecoveryAt = 0L
+        deliveredFrameCount = 0L
         if (targetMode == VehicleRecorderMode.PARKING_SENTRY) sentryStarted = segmentStarted
         acquireWakeLock()
         configureImpactSensor(targetMode == VehicleRecorderMode.PARKING_SENTRY)
@@ -311,28 +508,134 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         note("录像开始：mode=$targetMode; segment=${VehicleRecorderPreferences.segmentMinutes(this)}min; quota=${VehicleRecorderPreferences.quotaMb(this)}MB")
     }
 
+    private fun switchCaptureMode(targetMode: VehicleRecorderMode) {
+        val previous = mode
+        mode = targetMode
+        if (targetMode == VehicleRecorderMode.PARKING_SENTRY) {
+            sentryStarted = SystemClock.elapsedRealtime()
+            previousDoors = null
+        } else {
+            sentryLimitReached = false
+            previousDoors = null
+        }
+        configureImpactSensor(targetMode == VehicleRecorderMode.PARKING_SENTRY)
+        acquireWakeLock()
+        createNotification(if (targetMode == VehicleRecorderMode.DASHCAM) "行车记录仪正在录像" else "驻车哨兵正在录像")
+        note("录像模式无缝切换：$previous -> $targetMode; AVM 与编码器保持运行")
+    }
+
     private suspend fun frameLoop() {
         while (scope.isActive && mode != VehicleRecorderMode.OFF && recorder?.active == true) {
             val now = SystemClock.elapsedRealtime()
             refreshFrameSource(now)
             submitFrame()
             if (now - segmentStarted >= SURFACE_START_GRACE_MS && now - lastSurfaceFrameAt >= SURFACE_STALE_MS) {
-                note("录像画面暂时中断，保持编码器并等待 AVM/电子后视镜恢复")
-                lastSurfaceFrameAt = now
+                recoverStaleFrameSource(now)
             }
             delay(FRAME_INTERVAL_MS)
         }
     }
 
     private fun refreshFrameSource(now: Long) {
-        val shared = AvmFrameShare.activeIndex(configuredCameraIndex())
-        if (shared != null) {
-            if (probe.isOpen) probe.close("电子后视镜共享画面接管")
-            noteSource("共享电子后视镜画面（通道 $shared）")
+        if (directFrameSource == null && now >= directFrameSourceRetryAt) {
+            createDirectFrameSource()
+            directFrameSource?.surface?.let { newSurface ->
+                val binding = AvmSurfaceBinding(configuredCameraIndex(), newSurface)
+                if (!ensureFrameSource() || !avmSession.isBindingActive(RECORDER_OWNER, binding)) {
+                    directFrameSourceFailures++
+                    scheduleDirectFrameRetry("ImageReader Surface 热切换失败；${avmSession.diagnosticSnapshot()}")
+                } else {
+                    note("ImageReader Surface 已热切换；${avmSession.diagnosticSnapshot()}")
+                }
+            }
+        }
+        val direct = directFrameSource
+        val directBinding = direct?.surface?.let {
+            AvmSurfaceBinding(configuredCameraIndex(), it)
+        }
+        if (direct != null && directBinding != null &&
+            avmSession.isBindingActive(RECORDER_OWNER, directBinding)
+        ) {
+            val frameAt = direct.lastFrameAt
+            when {
+                frameAt <= 0L && firstFrameWaitTimedOut(now) -> {
+                    val waited = now - firstFrameWaitingSince
+                    noteSource("ImageReader 等待首帧超时（${waited}ms），准备重建")
+                    recoverStaleFrameSource(now, "等待首帧 ${waited}ms")
+                }
+                frameAt <= 0L -> noteSource("ImageReader 已绑定，等待首帧")
+                now - frameAt <= SURFACE_STALE_MS -> noteSource("ImageReader 共享 AVM Surface")
+                else -> noteSource("ImageReader Surface 已绑定但画面过期（${now - frameAt}ms）")
+            }
             return
         }
-        if (probe.isOpen || now - lastSourceAttemptAt < SOURCE_RETRY_MS) return
+        val textureBinding = surface?.let { AvmSurfaceBinding(configuredCameraIndex(), it) }
+        if (textureBinding != null && avmSession.isBindingActive(RECORDER_OWNER, textureBinding)) {
+            when {
+                lastTextureFrameAt <= 0L && firstFrameWaitTimedOut(now) -> {
+                    noteSource("隐藏 TextureView 等待首帧超时，重建后台 AVM 订阅")
+                    recoverStaleFrameSource(now, "隐藏 TextureView 等待首帧超时")
+                }
+                lastTextureFrameAt <= 0L -> noteSource("隐藏 TextureView 已绑定，等待首帧")
+                now - lastTextureFrameAt <= SURFACE_STALE_MS -> noteSource("隐藏 TextureView 共享 AVM Surface")
+                else -> noteSource("隐藏 TextureView 已绑定但画面过期（${now - lastTextureFrameAt}ms）")
+            }
+            return
+        }
+        if (avmSession.isActive(RECORDER_OWNER)) {
+            noteSource("录像 AVM 请求已登记，但目标 Surface 尚未生效")
+            return
+        }
+        val shared = AvmFrameShare.activeIndex(configuredCameraIndex())
+        if (shared != null) {
+            noteSource("电子后视镜帧降级（通道 $shared）")
+            return
+        }
+        if (now - lastSourceAttemptAt < SOURCE_RETRY_MS) return
         lastSourceAttemptAt = now
+        if (!ensureFrameSource()) noteSource("等待 AVM 画面恢复")
+    }
+
+    /**
+     * Keep a delivered-frame timestamp and restart a stale capture subscription. A successful
+     * getBitmap is not proof of a new frame because
+     * TextureView returns its last buffer indefinitely, so freshness comes only from the real
+     * SurfaceTexture callback or AvmFrameShare's frame callback.
+     */
+    private fun recoverStaleFrameSource(now: Long, reason: String? = null) {
+        if (now - lastStaleRecoveryAt < STALE_RECOVERY_COOLDOWN_MS) return
+        lastStaleRecoveryAt = now
+        val shared = AvmFrameShare.freshIndex(configuredCameraIndex())
+        if (directFrameSource != null) {
+            val age = directFrameSource?.lastFrameAt?.takeIf { it > 0L }?.let { now - it }
+            val detail = reason ?: "ImageReader ${age ?: "尚未"}ms 未收到新帧"
+            if (shared != null) {
+                note(
+                    "录像 ImageReader 过期，但电子后视镜通道 $shared 仍有新鲜帧；" +
+                        "仅热替换录像 Surface，不重启共享 AVM producer",
+                )
+            }
+            if (!recreateDirectFrameSource(detail)) {
+                if (shared != null) {
+                    noteSource("ImageReader 热替换失败，继续使用电子后视镜帧（通道 $shared）")
+                } else if (!ensureFrameSource()) {
+                    noteSource("等待 ImageReader 重试或隐藏 TextureView Surface")
+                }
+            }
+            return
+        }
+        if (shared != null) {
+            // There is no recorder-owned ImageReader to repair. Keep consuming the mirror frames;
+            // detaching/reopening the producer here would unnecessarily blank the interactive view.
+            noteSource("电子后视镜帧降级（通道 $shared）")
+            return
+        }
+        note(
+            "录像画面超时：lastFrameAge=${now - lastSurfaceFrameAt}ms; " +
+                "delivered=$deliveredFrameCount; 重建后台 AVM 订阅",
+        )
+        avmSession.detach(RECORDER_OWNER, "录像帧超时")
+        firstFrameWaitingSince = 0L
         if (!ensureFrameSource()) noteSource("等待 AVM 画面恢复")
     }
 
@@ -353,21 +656,37 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     }
 
     private suspend fun captureBitmap() = withContext(Dispatchers.Main.immediate) {
+        directFrameSource?.copyBitmap()?.let { bitmap ->
+            lastSurfaceFrameAt = SystemClock.elapsedRealtime()
+            return@withContext bitmap
+        }
         val preferred = configuredCameraIndex()
         val sharedIndex = AvmFrameShare.activeIndex(preferred)
-        val bitmap = sharedIndex?.let {
+        val sharedBitmap = sharedIndex?.let {
             AvmFrameShare.bitmap(it, LocalVideoRecorder.WIDTH, LocalVideoRecorder.HEIGHT)
-        } ?: runCatching {
-            texture?.takeIf { probe.isOpen }?.getBitmap(LocalVideoRecorder.WIDTH, LocalVideoRecorder.HEIGHT)
+        }
+        if (sharedBitmap != null) {
+            lastSurfaceFrameAt = SystemClock.elapsedRealtime()
+            return@withContext sharedBitmap
+        }
+        val now = SystemClock.elapsedRealtime()
+        val hiddenSurface = surface ?: return@withContext null
+        val hiddenBinding = AvmSurfaceBinding(configuredCameraIndex(), hiddenSurface)
+        if (!avmSession.isBindingActive(RECORDER_OWNER, hiddenBinding) ||
+            lastTextureFrameAt <= 0L || now - lastTextureFrameAt > SURFACE_STALE_MS
+        ) {
+            return@withContext null
+        }
+        runCatching {
+            texture?.getBitmap(LocalVideoRecorder.WIDTH, LocalVideoRecorder.HEIGHT)
         }.getOrNull()
-        if (bitmap != null) lastSurfaceFrameAt = SystemClock.elapsedRealtime()
-        bitmap
     }
 
     private fun encodeFrame(current: LocalVideoRecorder, session: Int, bitmap: android.graphics.Bitmap) {
         try {
             if (!captureIsCurrent(current, session)) return
             current.frame(bitmap)
+            deliveredFrameCount++
             rotateSegmentIfNeeded(current, session)
         } catch (error: IllegalStateException) {
             handleEncodingFailure(error)
@@ -384,8 +703,9 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     private fun rotateSegmentIfNeeded(current: LocalVideoRecorder, session: Int) {
         val segmentMs = VehicleRecorderPreferences.segmentMinutes(this) * 60_000L
         if (SystemClock.elapsedRealtime() - segmentStarted < segmentMs) return
-        val file = current.finish()
-        note("分段已保存：${file?.name ?: "empty"}")
+        val postReason = eventProtection.consumePostRoll()
+        val file = current.finish(postReason?.let { "$it（事件后）" })
+        note("分段已保存：${file?.name ?: "empty"}; postEvent=${postReason ?: "none"}")
         if (!captureIsCurrent(current, session)) return
         current.start()
         segmentStarted = SystemClock.elapsedRealtime()
@@ -428,12 +748,13 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
                 val quota = VehicleRecorderPreferences.quotaMb(this).toLong() * 1024 * 1024
                 val store = LocalVideoStore(File(filesDir, "local-videos"), quota)
                 store.files().lastOrNull()?.let { store.protect(it, reason) }
-                val eventFile = current.finish(reason)
+                val eventFile = current.finish("$reason（事件发生）")
                 if (recorder === current && captureSession == session && mode == VehicleRecorderMode.PARKING_SENTRY) {
                     current.start()
                     segmentStarted = SystemClock.elapsedRealtime()
+                    eventProtection.armPostRoll(reason)
                 }
-                note("哨兵事件已保护：$reason; saved=${eventFile?.name}")
+                note("哨兵事件已保护：$reason; current=${eventFile?.name}; postRoll=armed")
             }.onFailure { note("哨兵事件保护失败：${it.javaClass.simpleName}: ${it.message}") }
         }
     }
@@ -491,11 +812,13 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         sensorManager?.unregisterListener(this); sensorReady = false
         previousDoors = null
         activeFrameSource = ""
-        probe.close(reason)
+        firstFrameWaitingSince = 0L
+        avmSession.detach(RECORDER_OWNER, reason)
         val finishing = recorder
         recorder = null
         encoder.execute {
-            val result = runCatching { finishing?.finish() }
+            val postReason = eventProtection.consumePostRoll()
+            val result = runCatching { finishing?.finish(postReason?.let { "$it（事件后）" }) }
             note(result.fold({ "录像停止：mode=$previous; reason=$reason; saved=${it?.name}" },
                 { "录像收尾失败：${it.javaClass.simpleName}: ${it.message}; reason=$reason" }))
         }
@@ -535,9 +858,12 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         stopCapture("服务停止")
         scope.cancel()
         sensorManager?.unregisterListener(this)
-        surface?.release(); surface = null
         texture?.let { runCatching { windowManager.removeView(it) } }; texture = null
-        probe.close("服务销毁")
+        avmSession.detach(RECORDER_OWNER, "服务销毁")
+        directFrameSource?.stopAndAwait(IMAGE_READER_DESTROY_WAIT_MS)
+        directFrameSource = null
+        directSourceConfig = null
+        surface?.release(); surface = null
         recorder?.abort(); recorder = null
         encoder.shutdown()
         wakeLock?.let { if (it.isHeld) it.release() }
@@ -552,20 +878,27 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
     companion object {
         const val START = "com.bydmatecn.app.RECORDER_START"
         const val STOP = "com.bydmatecn.app.RECORDER_STOP"
+        const val RELOAD_CAPTURE_PLAN = "com.bydmatecn.app.RECORDER_RELOAD_CAPTURE_PLAN"
         private const val CHANNEL = "vehicle_recorder"
+        private const val RECORDER_OWNER = "vehicle-recorder"
         private const val NOTIFICATION_ID = 5814
         private const val CAPTURE_WIDTH = 640
         private const val CAPTURE_HEIGHT = 360
+        private val DEFAULT_RECORDER_SOURCE_CONFIG = AvmSourceConfig(1280, 720, 15)
         private const val STATE_POLL_MS = 1_000L
-        private const val FOREGROUND_INITIAL_LOOKBACK_MS = 10 * 60_000L
-        private const val FACTORY_CAMERA_PACKAGE = "com.byd.avc"
         private const val FRAME_INTERVAL_MS = 200L
         private const val READ_TIMEOUT_MS = 2_000L
         private const val EVENT_GUARD_MS = 10_000L
         private const val SENSOR_WARMUP_SAMPLES = 10
         private const val SURFACE_START_GRACE_MS = 8_000L
         private const val SURFACE_STALE_MS = 5_000L
+        private const val STALE_RECOVERY_COOLDOWN_MS = 5_000L
         private const val SOURCE_RETRY_MS = 1_000L
+        private const val DIRECT_SOURCE_RETRY_MS = 2_000L
+        private const val DIRECT_SOURCE_BACKOFF_MS = 30_000L
+        private const val DIRECT_SOURCE_MAX_FAILURES = 3
+        private const val IMAGE_READER_RELEASE_WAIT_MS = 150L
+        private const val IMAGE_READER_DESTROY_WAIT_MS = 500L
         private const val WAKE_LOCK_MAX_MS = 12 * 60 * 60_000L
         private val READ_ITEMS = listOf(
             BatchReadItem(5, 1023, 315_621_408),
@@ -582,6 +915,14 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
             ContextCompat.startForegroundService(context, Intent(context, VehicleRecorderService::class.java).setAction(START))
         }
         fun restoreIfEnabled(context: Context) { if (VehicleRecorderPreferences.enabled(context)) start(context) }
+        fun reloadCapturePlan(context: Context) {
+            if (VehicleRecorderPreferences.enabled(context)) {
+                ContextCompat.startForegroundService(
+                    context,
+                    Intent(context, VehicleRecorderService::class.java).setAction(RELOAD_CAPTURE_PLAN),
+                )
+            }
+        }
         fun stop(context: Context) { context.stopService(Intent(context, VehicleRecorderService::class.java)) }
     }
 }

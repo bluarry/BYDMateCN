@@ -65,8 +65,10 @@ class AvmCameraProbe(
     private var camera: Any? = null
     val isOpen: Boolean get() = synchronized(this) { camera != null }
     /** Preview index → surface currently bound to the open camera; close() unbinds every entry. */
-    private val bound = linkedMapOf<Int, Surface>()
+    private val bound = mutableListOf<AvmSurfaceBinding>()
     var cameraId: Int = -1; private set
+    var discoveredSourceConfig: AvmSourceConfig = DEFAULT_SOURCE_CONFIG; private set
+    var activeSourceConfig: AvmSourceConfig? = null; private set
 
     /** Loader of the vendor jar the camera classes came from; null when they are on the class path. */
     private var cameraLoader: ClassLoader? = null
@@ -156,29 +158,142 @@ class AvmCameraProbe(
             val w = info.getMethod("getDefaultPreviewWidth", Int::class.java).invoke(null, id)
             val h = info.getMethod("getDefaultPreviewHeight", Int::class.java).invoke(null, id)
             note("defaultPreview=${w}x$h")
+            discoveredSourceConfig = AvmSourceConfig((w as Number).toInt(), (h as Number).toInt(), DEFAULT_SOURCE_CONFIG.fps)
         }
         return true
     }
 
-    fun open(previewIndex: Int, surface: Surface): Boolean = openBound(mapOf(previewIndex to surface))
+    fun open(previewIndex: Int, surface: Surface): Boolean =
+        openBound(listOf(AvmSurfaceBinding(previewIndex, surface)), discoveredSourceConfig)
 
     /**
      * Opens the camera with SEVERAL previews bound at once (the donor drives its multi-window
      * views that way), so one warm camera can feed both blind-spot windows and a side swap is
      * just an alpha flip. Same error contract as [open]: any failure closes the camera.
      */
-    fun openWarm(surfaces: Map<Int, Surface>): Boolean = openBound(surfaces)
+    fun openWarm(surfaces: Map<Int, Surface>): Boolean =
+        openBound(surfaces.map { AvmSurfaceBinding(it.key, it.value) }, discoveredSourceConfig)
 
+    /** Same channel may intentionally feed more than one Surface on supporting firmwares. */
+    fun openWarmBindings(
+        bindings: List<AvmSurfaceBinding>,
+        sourceConfig: AvmSourceConfig = discoveredSourceConfig,
+    ): Boolean = openBound(bindings, sourceConfig)
+
+    /**
+     * Applies one warm binding transaction without interrupting unaffected consumers.
+     *
+     * New surfaces are attached before obsolete ones are removed. If any operation fails, every
+     * completed step is reversed. A rollback failure closes the handle because its real vendor
+     * binding set is then unknowable; keeping it marked active would hand clients a dead Surface.
+     */
     @Synchronized
-    private fun openBound(surfaces: Map<Int, Surface>): Boolean {
-        if (cameraId < 0) {
-            append("open: no camera id (run discover)")
-            traceOpen(cameraId, surfaces.keys, "no camera id")
+    fun updateBindings(
+        added: List<AvmSurfaceBinding>,
+        removed: List<AvmSurfaceBinding>,
+    ): Boolean {
+        val cam = camera ?: return false
+        val attached = mutableListOf<AvmSurfaceBinding>()
+        for (binding in added) {
+            if (bound.any { it.index == binding.index && it.surface === binding.surface }) continue
+            if (!attachBinding(cam, binding, bound.isEmpty())) {
+                if (!rollbackAttached(cam, attached)) close("warm add rollback failed")
+                return false
+            }
+            bound += binding
+            attached += binding
+        }
+
+        val detached = mutableListOf<AvmSurfaceBinding>()
+        for (binding in removed) {
+            val existing = bound.firstOrNull {
+                it.index == binding.index && it.surface === binding.surface
+            } ?: continue
+            if (!detachBindingInternal(cam, existing)) {
+                // Restore old outputs before dropping provisional outputs. Since every provisional
+                // add succeeded, the producer previously had enough capacity for this full set.
+                val restored = rollbackDetached(cam, detached)
+                val additionsRemoved = rollbackAttached(cam, attached)
+                if (!restored || !additionsRemoved) {
+                    append(
+                        "warm binding rollback inconsistent restored=$restored " +
+                            "additionsRemoved=$additionsRemoved; closing handle",
+                    )
+                    close("warm binding rollback inconsistent")
+                }
+                return false
+            }
+            bound.remove(existing)
+            detached += existing
+        }
+        return true
+    }
+
+    private fun rollbackAttached(cam: Any, attached: List<AvmSurfaceBinding>): Boolean {
+        var clean = true
+        attached.asReversed().forEach { binding ->
+            val existing = bound.firstOrNull {
+                it.index == binding.index && it.surface === binding.surface
+            } ?: return@forEach
+            if (detachBindingInternal(cam, existing)) {
+                bound.remove(existing)
+            } else {
+                clean = false
+            }
+        }
+        return clean
+    }
+
+    private fun rollbackDetached(cam: Any, detached: List<AvmSurfaceBinding>): Boolean {
+        var restored = true
+        detached.asReversed().forEach { binding ->
+            if (bound.any { it.index == binding.index && it.surface === binding.surface }) return@forEach
+            if (attachBinding(cam, binding, bound.isEmpty())) {
+                bound += binding
+            } else {
+                restored = false
+            }
+        }
+        return restored
+    }
+
+    /** Raises or lowers the shared producer FPS without closing its already-bound surfaces. */
+    @Synchronized
+    fun updateActiveFps(fps: Int): Boolean {
+        val cam = camera ?: return false
+        val current = activeSourceConfig ?: return false
+        if (current.fps == fps) return true
+        val method = runCatching {
+            cam.javaClass.getMethod("setCameraFps", Int::class.java)
+        }.getOrNull()
+        if (method == null) {
+            append("warm setCameraFps unavailable; keep fps=${current.fps}")
             return false
         }
-        if (surfaces.isEmpty()) {
+        val call = runCatching { method.invoke(cam, fps) }
+        if (call.isFailure || call.getOrNull() == false) {
+            append(
+                "warm setCameraFps failed ${current.fps}->$fps: " +
+                    (call.exceptionOrNull()?.let(::rootMessage) ?: "rejected"),
+            )
+            return false
+        }
+        activeSourceConfig = current.copy(fps = fps)
+        append("warm setCameraFps=${call.getOrNull()} ${current.fps}->$fps")
+        return true
+    }
+
+    @Synchronized
+    private fun openBound(bindings: List<AvmSurfaceBinding>, sourceConfig: AvmSourceConfig): Boolean {
+        val indexes = bindings.map { it.index }
+        if (cameraId < 0) {
+            append("open: no camera id (run discover)")
+            traceOpen(cameraId, indexes, "no camera id")
+            return false
+        }
+        if (bindings.isEmpty()) {
             append("open: no surfaces to bind")
-            traceOpen(cameraId, surfaces.keys, "no surfaces")
+            traceOpen(cameraId, indexes, "no surfaces")
             return false
         }
         if (camera != null) close("reopen")
@@ -214,7 +329,7 @@ class AvmCameraProbe(
             // on the catch path only works while the handle is stored here.
             camera = opened
             bound.clear()
-            bound.putAll(surfaces)
+            activeSourceConfig = null
 
             val cbType = classLookup("android.hardware.AVMCamera\$IEventCallback", cameraLoader)
             val proxy = Proxy.newProxyInstance(cbType.classLoader, arrayOf(cbType)) { p, m, args ->
@@ -246,36 +361,124 @@ class AvmCameraProbe(
                 }
             }
             avm.getMethod("setEventCallback", cbType).invoke(opened, proxy)
+            if (!configureSource(opened, sourceConfig)) {
+                append("source config rejected: $sourceConfig")
+                traceOpen(cameraId, indexes, "source config rejected")
+                close("source config rejected")
+                return false
+            }
+            activeSourceConfig = sourceConfig
 
-            val addPreview = avm.getMethod("addPreviewSurface", Surface::class.java, Int::class.java)
-            val setPreview = avm.getMethod("setPreviewSurface", Surface::class.java, Int::class.java)
             var allBound = true
-            for ((index, previewSurface) in surfaces) {
-                val added = addPreview.invoke(opened, previewSurface, index)
-                val set = setPreview.invoke(opened, previewSurface, index)
-                append("addPreviewSurface=$added setPreviewSurface=$set index=$index")
-                if (added == false || set == false) allBound = false
+            for (binding in bindings) {
+                if (!attachBinding(opened, binding, bound.isEmpty())) {
+                    allBound = false
+                    break
+                }
+                bound += binding
             }
             // One startPreview for the whole binding set, as in the donor.
             val started = avm.getMethod("startPreview").invoke(opened)
-            append("startPreview=$started indexes=${surfaces.keys.joinToString()}")
+            append("startPreview=$started indexes=${indexes.joinToString()}")
             // A refused bind or start leaves a half-open camera: the handle is live but nothing
             // will ever arrive on the surfaces, so close it instead of reporting a warm camera.
             if (!allBound || started == false) {
                 append("open rejected by the vendor stack; closing")
-                traceOpen(cameraId, surfaces.keys, "rejected by the vendor stack")
+                traceOpen(cameraId, indexes, "rejected by the vendor stack")
                 close("open rejected")
                 false
             } else {
-                traceOpen(cameraId, surfaces.keys, null)
+                traceOpen(cameraId, indexes, null)
                 true
             }
         } catch (e: Throwable) {
             append("open failed: ${e.javaClass.simpleName}: ${rootMessage(e)}")
-            traceOpen(cameraId, surfaces.keys, rootMessage(e))
+            traceOpen(cameraId, indexes, rootMessage(e))
             close("open failed")
             false
         }
+    }
+
+    /** Mirrors the vendor sequence: size and FPS are selected before surfaces and startPreview. */
+    private fun configureSource(cam: Any, config: AvmSourceConfig): Boolean {
+        val type = cam.javaClass
+        val size = runCatching {
+            type.getMethod("setPreviewSize", Int::class.java, Int::class.java)
+        }.getOrNull()
+        if (size == null) {
+            append("setPreviewSize unavailable; using firmware default")
+        } else {
+            val call = runCatching { size.invoke(cam, config.width, config.height) }
+            if (call.isFailure) {
+                append("setPreviewSize failed ${config.width}x${config.height}: ${rootMessage(call.exceptionOrNull()!!)}")
+                return false
+            }
+            append("setPreviewSize=${call.getOrNull()} ${config.width}x${config.height}")
+            if (call.getOrNull() == false) return false
+        }
+        val fps = runCatching { type.getMethod("setCameraFps", Int::class.java) }.getOrNull()
+        if (fps == null) {
+            append("setCameraFps unavailable; using firmware default")
+        } else {
+            val call = runCatching { fps.invoke(cam, config.fps) }
+            if (call.isFailure) {
+                append("setCameraFps failed ${config.fps}: ${rootMessage(call.exceptionOrNull()!!)}")
+                return false
+            }
+            append("setCameraFps=${call.getOrNull()} fps=${config.fps}")
+            if (call.getOrNull() == false) return false
+        }
+        return true
+    }
+
+    private fun attachBinding(cam: Any, binding: AvmSurfaceBinding, first: Boolean): Boolean {
+        val type = cam.javaClass
+        val add = runCatching {
+            type.getMethod("addPreviewSurface", Surface::class.java, Int::class.java)
+        }.getOrNull()
+        if (add != null) {
+            val call = runCatching { add.invoke(cam, binding.surface, binding.index) }
+            if (call.isSuccess) {
+                val result = call.getOrNull()
+                append("addPreviewSurface=$result index=${binding.index}")
+                if (result != false) return true // null is a successful void vendor call.
+            } else {
+                append("addPreviewSurface failed index=${binding.index}: ${rootMessage(call.exceptionOrNull()!!)}")
+                return false
+            }
+        }
+
+        // Calling set after a successful add can replace that surface on some firmwares. It is a
+        // compatibility fallback only, and cannot safely represent a second simultaneous binding.
+        if (!first) {
+            append("setPreviewSurface fallback refused for additional index=${binding.index}")
+            return false
+        }
+        val set = runCatching {
+            type.getMethod("setPreviewSurface", Surface::class.java, Int::class.java)
+        }.getOrNull() ?: return false
+        val call = runCatching { set.invoke(cam, binding.surface, binding.index) }
+        if (call.isFailure) {
+            append("setPreviewSurface failed index=${binding.index}: ${rootMessage(call.exceptionOrNull()!!)}")
+            return false
+        }
+        val result = call.getOrNull()
+        append("setPreviewSurface=$result index=${binding.index}")
+        return result != false
+    }
+
+    private fun detachBindingInternal(cam: Any, binding: AvmSurfaceBinding): Boolean {
+        val remove = runCatching {
+            cam.javaClass.getMethod("rmPreviewSurface", Surface::class.java, Int::class.java)
+        }.getOrNull() ?: return false
+        val call = runCatching { remove.invoke(cam, binding.surface, binding.index) }
+        if (call.isFailure) {
+            append("rmPreviewSurface failed index=${binding.index}: ${rootMessage(call.exceptionOrNull()!!)}")
+            return false
+        }
+        val result = call.getOrNull()
+        append("rmPreviewSurface=$result index=${binding.index}")
+        return result != false
     }
 
     /**
@@ -315,6 +518,7 @@ class AvmCameraProbe(
         }
         camera = null
         bound.clear()
+        activeSourceConfig = null
         releaseOwnership()
         val err = firstError
         val (line, result) = when {
@@ -353,6 +557,7 @@ class AvmCameraProbe(
 
         private val CAMERA_TAGS = listOf("pano_h", "pano_l", "apa", "byd_apa")
         private const val TAG = "CameraProbe"
+        val DEFAULT_SOURCE_CONFIG = AvmSourceConfig(1280, 720, 15)
     }
 }
 

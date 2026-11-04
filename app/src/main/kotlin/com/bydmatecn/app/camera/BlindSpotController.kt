@@ -152,8 +152,8 @@ class BlindSpotController @Inject constructor(
     private val cameraStateMonitor: CameraStateMonitor,
     /** Turn signal / gear / BSD events straight from the car, ahead of the 150 ms tick. */
     private val fidPush: FidPushChannel,
+    private val avmSession: SharedAvmSession,
 ) {
-    private val probe = AvmCameraProbe()
     private val telemetry = BlindSpotTelemetryGate()
 
     /** Teardown must outlive [serviceScope]: TrackingService cancels it right after stop(),
@@ -289,7 +289,7 @@ class BlindSpotController @Inject constructor(
         val turnSignal = lastTurnSignal
         val cameraStack = when {
             !discovered -> "untested"
-            probe.cameraId >= 0 -> "available"
+            avmSession.cameraId >= 0 -> "available"
             else -> "unavailable"
         }
         return listOf(
@@ -311,9 +311,9 @@ class BlindSpotController @Inject constructor(
             "native_camera_foreground=${cameraStateMonitor.active.value}",
             "camera_stack=$cameraStack",
             "camera_probe=" +
-                probe.discoverJournal.joinToString(" | ").ifEmpty { "(not run)" },
+                avmSession.discoverJournal.joinToString(" | ").ifEmpty { "(not run)" },
             "camera_log=" +
-                probe.log.value.takeLast(DUMP_LOG_LINES).joinToString(" | ").ifEmpty { "(empty)" },
+                avmSession.log.value.takeLast(DUMP_LOG_LINES).joinToString(" | ").ifEmpty { "(empty)" },
         )
     }
 
@@ -498,14 +498,14 @@ class BlindSpotController @Inject constructor(
         // The camera lookup comes before the windows: a car with no camera stack at all (Song
         // DiLink 4.0, 2026-09-18 — BmmCameraInfo missing) must not get windows that nothing will
         // ever draw into, flashing on every blinker tick.
-        if (!discovered || (probe.cameraId < 0 && now - probe.lastDiscoverAt >= REDISCOVER_MS)) {
+        if (!discovered || (avmSession.cameraId < 0 && now - avmSession.lastDiscoverAt >= REDISCOVER_MS)) {
             discoverCamera()
         }
-        if (probe.cameraId < 0) {
+        if (avmSession.cameraId < 0) {
             // Wait out the rest of the lookup interval, not a fresh one: a blinker pulled again
             // at second 50 must not push the next lookup from 60 to 110.
             clusterJournal.append("camera: none found, next lookup in ${REDISCOVER_MS / 1000} s")
-            backoff.fail(probe.lastDiscoverAt, REDISCOVER_MS)
+            backoff.fail(avmSession.lastDiscoverAt, REDISCOVER_MS)
             return
         }
 
@@ -527,7 +527,7 @@ class BlindSpotController @Inject constructor(
                 if (now - windowsAttachedAt >= SURFACE_TIMEOUT_MS) failCamera("no surface", now)
                 return
             }
-            val opened = withContext(cameraDispatcher()) { probe.openWarm(surfaces) }
+            val opened = withContext(cameraDispatcher()) { avmSession.attach(BLIND_SPOT_OWNER, surfaces.map { AvmSurfaceBinding(it.key, it.value) }, AvmConsumerPriority.INTERACTIVE) }
             if (!opened) {
                 failCamera("open failed", now)
                 return
@@ -535,7 +535,7 @@ class BlindSpotController @Inject constructor(
             // The windows can have gone away while the vendor stack was opening (a teardown from
             // the poll thread, a destroyed surface): do not keep a camera nobody can see.
             if (clusterWindow == null && pipWindow == null) {
-                withContext(cameraDispatcher()) { probe.close("windows gone") }
+                withContext(cameraDispatcher()) { avmSession.detach(BLIND_SPOT_OWNER, "windows gone") }
                 return
             }
             cameraOpen = true
@@ -575,8 +575,8 @@ class BlindSpotController @Inject constructor(
 
     private suspend fun discoverCamera() {
         discovered = true
-        withContext(cameraDispatcher()) { probe.discover() }
-        Log.i(TAG, "camera discover: id=${probe.cameraId} " + probe.discoverJournal.joinToString(" | "))
+        withContext(cameraDispatcher()) { avmSession.discover() }
+        Log.i(TAG, "camera discover: id=${avmSession.cameraId} " + avmSession.discoverJournal.joinToString(" | "))
     }
 
     private suspend fun failCamera(reason: String, now: Long) {
@@ -923,7 +923,7 @@ class BlindSpotController @Inject constructor(
             // Camera first: nothing may write into a surface that is about to be released.
             if (cameraOpen) {
                 clusterJournal.append("camera: teardown $reason")
-                withContext(cameraDispatcher()) { probe.close(reason) }
+                withContext(cameraDispatcher()) { avmSession.detach(BLIND_SPOT_OWNER, reason) }
                 cameraOpen = false
             }
             applyShow(BlindSpotSide.NONE)
@@ -1203,6 +1203,7 @@ class BlindSpotController @Inject constructor(
     }
 
     private companion object {
+        const val BLIND_SPOT_OWNER = "blind-spot"
         const val TAG = "BlindSpot"
         /** Suppression key handed to WidgetController while a window covers the main screen. */
         const val WIDGET_SUPPRESS_REASON = "blind-spot camera"

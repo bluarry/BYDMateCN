@@ -3,35 +3,18 @@
 package com.bydmatecn.app.local
 
 import android.Manifest
-import android.app.AppOpsManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Matrix
 import android.view.WindowManager
-import android.os.Process
 import android.view.Surface
-import android.view.TextureView
 import androidx.lifecycle.lifecycleScope
-import com.bydmatecn.app.data.camera.CameraStateMonitor
-import kotlinx.coroutines.Dispatchers
+import com.bydmatecn.app.camera.AvmConsumerPriority
+import com.bydmatecn.app.camera.AvmSurfaceBinding
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
 /** Activity-scoped controls; the activity owns state and lifecycle cleanup. */
-internal suspend fun LocalCameraActivity.factoryCameraClear(): Boolean = withContext(Dispatchers.IO) {
-        if (factoryCamera.active.value || !usageAllowed()) return@withContext false
-        runCatching {
-            val now = System.currentTimeMillis()
-            val manager = getSystemService(Context.USAGE_STATS_SERVICE) as android.app.usage.UsageStatsManager
-            val foreground = CameraStateMonitor.latestResumed(manager, now - 120_000, now)?.first
-            foreground != null && foreground != "com.byd.avc"
-        }.getOrDefault(false)
-    }
-
-internal fun LocalCameraActivity.usageAllowed(): Boolean = (getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager)
-        .checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), packageName) == AppOpsManager.MODE_ALLOWED
-
 internal fun LocalCameraActivity.requestPreviewRestart() {
     pendingPreviewRestart = true
     texture.post { restartPreviewIfReady() }
@@ -115,9 +98,19 @@ internal fun LocalCameraActivity.captureFrame() {
 
 private fun LocalCameraActivity.bindPreview(target: Surface) {
                 // Vendor lifetime operations are serialized on the UI thread with texture teardown.
-                open = probe.discover(setOf("pano_h", "pano_l")) && if (dual) {
-                    probe.openWarm(mapOf(2 to target, 3 to checkNotNull(secondSurface)))
-                } else probe.open(index, target)
+                val bindings = if (dual) {
+                    listOf(
+                        AvmSurfaceBinding(2, target),
+                        AvmSurfaceBinding(3, checkNotNull(secondSurface)),
+                    )
+                } else {
+                    listOf(AvmSurfaceBinding(index, target))
+                }
+                open = avmSession.attach(
+                    MANUAL_CAMERA_OWNER,
+                    bindings,
+                    AvmConsumerPriority.INTERACTIVE,
+                )
                 if (open) {
                     lastFrameMs = android.os.SystemClock.elapsedRealtime()
                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -125,15 +118,18 @@ private fun LocalCameraActivity.bindPreview(target: Surface) {
                     secondTexture.alpha = if (driving) 0f else 1f
                     if (driving) startVideo()
                 }
-                status.text = if (open) "预览已启动：通道 ${if (dual) "2 + 3" else index.toString()}" else probe.log.value.takeLast(4).joinToString("\n")
+                status.text = if (open) {
+                    "预览已启动：通道 ${if (dual) "2 + 3" else index.toString()}"
+                } else {
+                    avmSession.log.value.takeLast(4).joinToString("\n")
+                }
 }
 
 private suspend fun LocalCameraActivity.previewAllowed(request: Int): Boolean {
                 val snapshot = kotlinx.coroutines.withTimeoutOrNull(2500) { vehicle.readSnapshot() }
-                val cameraClear = factoryCameraClear()
                 if (request != generation || !resumed) return false
-                if (!localRecordingAllowed(snapshot?.gear, snapshot?.speed, usageAllowed(), !cameraClear, driving)) {
-                    status.text = "需要使用情况访问权限、有效 P 挡和零车速；原厂相机必须关闭"; return false
+                if (!localRecordingAllowed(snapshot?.gear, snapshot?.speed, driving)) {
+                    status.text = "车辆状态不可读，或不满足当前预览安全条件"; return false
                 }
 
     return true
@@ -148,3 +144,5 @@ private fun LocalCameraActivity.previewSurfacesReady(): Boolean {
 
     return true
 }
+
+internal const val MANUAL_CAMERA_OWNER = "manual-camera"

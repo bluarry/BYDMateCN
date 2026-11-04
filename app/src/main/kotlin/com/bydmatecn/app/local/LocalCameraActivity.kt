@@ -10,7 +10,7 @@ import android.view.TextureView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
-import com.bydmatecn.app.camera.AvmCameraProbe
+import com.bydmatecn.app.camera.SharedAvmSession
 import com.bydmatecn.app.camera.AvmFrameShare
 import com.bydmatecn.app.data.camera.CameraStateMonitor
 import com.bydmatecn.app.data.vehicle.VehicleApi
@@ -29,7 +29,7 @@ class LocalCameraActivity : ComponentActivity(), TextureView.SurfaceTextureListe
     internal var panelVisible by androidx.compose.runtime.mutableStateOf(true)
     @Inject lateinit var vehicle: VehicleApi
     @Inject lateinit var factoryCamera: CameraStateMonitor
-    internal val probe = AvmCameraProbe(eventSink = { LocalFileLog.get(this).record("avm", it) })
+    @Inject lateinit var avmSession: SharedAvmSession
     internal lateinit var texture: TextureView
     internal lateinit var secondTexture: TextureView
     internal var secondSurface: Surface? = null
