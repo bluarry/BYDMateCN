@@ -1672,7 +1672,15 @@ class TrackingService : Service(), LocationListener {
                         // which shares a lock with a connect that can wait up to 60 s for auth.
                         val healthy = helperBootstrap.isHealthy()
                         if (healthy) {
-                            serviceScope.launch { runCatching { adbVerdictMonitor.recompute() } }
+                            // The helper can survive after the firmware closes adbd, so a healthy
+                            // Binder alone does not prove ADB is still available. Periodically run
+                            // the manager's cheap classic-port probe; on failure it reasserts the
+                            // firmware switch and only then falls back to standard wireless debug.
+                            serviceScope.launch {
+                                runCatching { adbRestoreManager.attemptIfNeeded("adb_watchdog") }
+                                    .onFailure { Log.w(TAG, "ADB watchdog failed: ${it.message}") }
+                                runCatching { adbVerdictMonitor.recompute() }
+                            }
                         } else {
                             val now = System.currentTimeMillis()
                             if (!shouldAttemptRespawn(now, lastHelperRespawnAtMs)) {

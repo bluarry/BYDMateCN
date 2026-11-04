@@ -385,6 +385,11 @@ object HelperBinderProtocol {
     /** Drops every push listener and the callback. (no args) -> [int status, int unregistered]. */
     val TX_PUSH_UNSUBSCRIBE: Int = IBinder.FIRST_CALL_TRANSACTION + 45  // 46
 
+    /** Reasserts DiLink's fixed wireless-ADB properties under shell uid.
+     *  Request: [int enable: 1=on, 0=off]; reply: [int status (0=verified), int 0].
+     *  This is intentionally not a generic setprop API. */
+    val TX_SET_WIRELESS_ADB: Int = IBinder.FIRST_CALL_TRANSACTION + 63 // 64
+
     /**
      * Live state of the subscription for the diagnostic dump.
      *

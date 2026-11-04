@@ -13,6 +13,10 @@ interface AdbRestorePreferences {
     fun isEnabled(): Boolean
     fun setEnabled(enabled: Boolean)
 
+    /** Independent DiLink private-property watchdog toggle. */
+    fun isVendorKeepEnabled(): Boolean = false
+    fun setVendorKeepEnabled(enabled: Boolean) = Unit
+
     /** Network id (BSSID/SSID) of the last enable-write, or null if there was none. */
     fun lastWriteNetwork(): String?
 
@@ -34,6 +38,13 @@ class AdbRestorePreferencesImpl(context: Context) : AdbRestorePreferences {
         prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
     }
 
+    override fun isVendorKeepEnabled(): Boolean =
+        prefs.getBoolean(KEY_VENDOR_KEEP_ENABLED, false)
+
+    override fun setVendorKeepEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_VENDOR_KEEP_ENABLED, enabled).apply()
+    }
+
     override fun lastWriteNetwork(): String? = prefs.getString(KEY_LAST_WRITE_NETWORK, null)
 
     override fun lastWriteAtMs(): Long = prefs.getLong(KEY_LAST_WRITE_AT, 0L)
@@ -48,6 +59,7 @@ class AdbRestorePreferencesImpl(context: Context) : AdbRestorePreferences {
     companion object {
         const val PREFS_NAME = "adb_restore"
         const val KEY_ENABLED = "adb_restore_enabled"
+        const val KEY_VENDOR_KEEP_ENABLED = "vendor_adb_keep_enabled"
         const val KEY_LAST_WRITE_NETWORK = "last_write_network"
         const val KEY_LAST_WRITE_AT = "last_write_at"
     }

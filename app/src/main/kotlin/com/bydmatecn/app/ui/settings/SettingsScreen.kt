@@ -2628,9 +2628,12 @@ private fun ServiceSection(
     // every car: where the port survives a reboot the status line simply says so.
     val adbRestore = remember { clusterEntryPoint.adbRestoreManager() }
     var adbRestoreEnabled by remember { mutableStateOf(adbRestore.isEnabled()) }
-    // Android 10: the toggle stays visible but locked off, the status line says why.
+    var vendorAdbKeepEnabled by remember { mutableStateOf(adbRestore.isVendorKeepEnabled()) }
+    // The original Android restore and the DiLink shell-helper watchdog are separate features.
     val adbRestoreSupported = remember { adbRestore.isSupported() }
+    val vendorAdbKeepSupported = remember { adbRestore.isVendorKeepSupported() }
     var adbRestoreHelpOpen by remember { mutableStateOf(false) }
+    var vendorAdbKeepHelpOpen by remember { mutableStateOf(false) }
     val adbRestoreState by adbRestore.state.collectAsStateWithLifecycle()
     val adbVerdict by viewModel.adbVerdict.collectAsStateWithLifecycle()
     val adbChecking by viewModel.adbChecking.collectAsStateWithLifecycle()
@@ -2646,6 +2649,9 @@ private fun ServiceSection(
     // follows a successful restore.
     LaunchedEffect(adbRestoreEnabled) {
         if (adbRestoreEnabled) adbRestore.requestAttempt("settings")
+    }
+    LaunchedEffect(vendorAdbKeepEnabled) {
+        if (vendorAdbKeepEnabled) adbRestore.requestAttempt("vendor_keep_settings")
     }
     // BYD cloud over Wi-Fi (#310), same card. Every step goes through ADB to ourselves.
     val cloudOverWifi = remember { clusterEntryPoint.cloudOverWifiManager() }
@@ -2675,7 +2681,26 @@ private fun ServiceSection(
                 // The help explains a working restore; on Android 10 the status line says why there is none.
                 onHelp = if (adbRestoreSupported) ({ adbRestoreHelpOpen = true }) else null,
             )
-            adbRestoreStatusText(adbRestoreState)?.let { SettingHint(text = it) }
+            if (adbRestoreEnabled) {
+                adbRestoreStatusText(adbRestoreState)?.let { SettingHint(text = it) }
+            }
+            SettingToggleRow(
+                title = stringResource(R.string.settings_vendor_adb_keep_title),
+                traceId = "vendor_adb_keep",
+                description = stringResource(R.string.settings_vendor_adb_keep_desc),
+                checked = vendorAdbKeepEnabled && vendorAdbKeepSupported,
+                onCheckedChange = { enabled ->
+                    vendorAdbKeepEnabled = enabled
+                    adbRestore.setVendorKeepEnabled(enabled)
+                },
+                enabled = vendorAdbKeepSupported,
+                onHelp = if (vendorAdbKeepSupported) ({ vendorAdbKeepHelpOpen = true }) else null,
+            )
+            if (vendorAdbKeepEnabled && !adbRestoreEnabled) {
+                adbRestoreStatusText(adbRestoreState)?.let { SettingHint(text = it) }
+            } else if (!vendorAdbKeepSupported) {
+                SettingHint(text = stringResource(R.string.settings_vendor_adb_keep_status_unsupported))
+            }
             val verdict = adbVerdict
             if (adbChecking) {
                 Text(
@@ -2760,6 +2785,27 @@ private fun ServiceSection(
             },
             confirmButton = {
                 TextButton(onClick = { adbRestoreHelpOpen = false }) {
+                    Text(stringResource(R.string.nav_autostart_dialog_button), color = AccentGreen)
+                }
+            },
+        )
+    }
+    if (vendorAdbKeepHelpOpen) {
+        AppAlertDialog(
+            onDismissRequest = { vendorAdbKeepHelpOpen = false },
+            containerColor = CardSurface,
+            title = {
+                Text(stringResource(R.string.settings_vendor_adb_keep_help_title), color = TextPrimary)
+            },
+            text = {
+                Text(
+                    stringResource(R.string.settings_vendor_adb_keep_help_body),
+                    color = TextSecondary, fontSize = 14.sp, lineHeight = 19.sp,
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vendorAdbKeepHelpOpen = false }) {
                     Text(stringResource(R.string.nav_autostart_dialog_button), color = AccentGreen)
                 }
             },

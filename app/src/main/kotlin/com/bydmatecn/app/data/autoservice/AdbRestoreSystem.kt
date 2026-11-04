@@ -35,6 +35,8 @@ import kotlin.coroutines.resume
  * Every platform call [AdbRestoreManager] makes, behind one interface so the manager's
  * decision logic is testable on the JVM (mDNS, TLS sockets and secure settings are not).
  */
+enum class VendorAdbRestoreResult { APPLIED, UNAVAILABLE, DENIED }
+
 interface AdbRestoreSystem {
     /** Is WRITE_SECURE_SETTINGS granted to us? */
     fun hasWriteSecureSettings(): Boolean
@@ -49,6 +51,16 @@ interface AdbRestoreSystem {
 
     /** Writes `adb_wifi_enabled`; false when the write itself was rejected. */
     fun writeAdbWifiEnabled(value: Int): Boolean
+
+    /** True when this firmware exposes BYD's private wireless-ADB property switch. */
+    fun hasVendorWirelessAdbControl(): Boolean = false
+
+    /**
+     * Reasserts the firmware switch that drives init's adbd TCP/5555 restart rule. This path does
+     * not require a connected Wi-Fi network, but a normal app uid may be denied by property SELinux.
+     */
+    suspend fun setVendorWirelessAdbEnabled(enabled: Boolean): VendorAdbRestoreResult =
+        VendorAdbRestoreResult.UNAVAILABLE
 
     /**
      * The TLS port adbd itself publishes in `service.adb.tls.port`, null when the property is
@@ -139,6 +151,36 @@ class AndroidAdbRestoreSystem @Inject constructor(
             .getMethod("get", String::class.java)
         (getter.invoke(null, ADB_TLS_PORT_PROP) as? String)?.trim()?.toIntOrNull()
     }.onFailure { Log.d(TAG, "read $ADB_TLS_PORT_PROP failed: ${it.message}") }.getOrNull()
+
+    override fun hasVendorWirelessAdbControl(): Boolean =
+        readSystemProperty(BYD_ADB_PERSIST_PROP).isNotEmpty() ||
+            readSystemProperty(BYD_ADB_TRIGGER_PROP).isNotEmpty()
+
+    override suspend fun setVendorWirelessAdbEnabled(enabled: Boolean): VendorAdbRestoreResult {
+        if (!hasVendorWirelessAdbControl()) return VendorAdbRestoreResult.UNAVAILABLE
+
+        // A normal application uid cannot write persist/sys properties. Bootstrap (or reuse) the
+        // app_process helper while local ADB is still reachable; that process runs as shell and its
+        // Binder remains available after the firmware closes the ADB listener.
+        val helperReady = runCatching { helperBootstrap.ensureRunning() }
+            .onFailure { Log.w(TAG, "vendor ADB helper bootstrap failed: ${it.message}") }
+            .getOrDefault(false)
+        if (!helperReady) {
+            Log.w(TAG, "vendor ADB helper unavailable; enable ADB once before using keep-alive")
+            return VendorAdbRestoreResult.DENIED
+        }
+        val applied = runCatching { helperClient.setWirelessAdbEnabled(enabled) }
+            .onFailure { Log.w(TAG, "vendor ADB helper reassert failed: ${it.message}") }
+            .getOrDefault(false)
+        Log.i(TAG, "vendor ADB shell helper enabled=$enabled result=$applied")
+        return if (applied) VendorAdbRestoreResult.APPLIED else VendorAdbRestoreResult.DENIED
+    }
+
+    private fun readSystemProperty(key: String): String = runCatching {
+        val getter = Class.forName("android.os.SystemProperties")
+            .getMethod("get", String::class.java)
+        (getter.invoke(null, key) as? String).orEmpty().trim()
+    }.getOrDefault("")
 
     override suspend fun discoverTlsPort(timeoutMs: Long): Int? =
         withTimeoutOrNull(timeoutMs) { discoverTlsPortInternal() }
@@ -288,6 +330,8 @@ class AndroidAdbRestoreSystem @Inject constructor(
         private const val ADB_WIFI_ENABLED = "adb_wifi_enabled"
         private const val TLS_CONNECT_SERVICE = "_adb-tls-connect._tcp"
         private const val ADB_TLS_PORT_PROP = "service.adb.tls.port"
+        private const val BYD_ADB_PERSIST_PROP = "persist.sys.adb.wiress.enable"
+        private const val BYD_ADB_TRIGGER_PROP = "sys.connect.adb.wiress"
         // Wi-Fi is up but its identity is hidden (no location permission / masked BSSID) —
         // the cooldown then applies to "some network" instead of a specific one.
         private const val UNKNOWN_NETWORK = "wifi"

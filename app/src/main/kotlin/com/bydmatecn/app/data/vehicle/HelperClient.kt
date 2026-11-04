@@ -411,6 +411,9 @@ interface HelperClient {
      *  TETHER_PRIVILEGED). True on daemon status 0. Needs on-car validation. */
     suspend fun setHotspot(enable: Boolean): Boolean
 
+    /** Reasserts the fixed DiLink wireless-ADB init trigger. Old daemons return false. */
+    suspend fun setWirelessAdbEnabled(enabled: Boolean): Boolean = false
+
     /** Central screen backlight on / off inside the daemon (TX_SET_SCREEN_BACKLIGHT, #275). Null
      *  when the daemon is unreachable or too old to know the transaction; [isAlive] tells the
      *  two apart. */
@@ -883,6 +886,9 @@ open class HelperClientImpl @Inject constructor() : HelperClient {
 
     override suspend fun setHotspot(enable: Boolean): Boolean =
         statusOk(HelperBinderProtocol.TX_SET_HOTSPOT) { it.writeInt(if (enable) 1 else 0) }
+
+    override suspend fun setWirelessAdbEnabled(enabled: Boolean): Boolean =
+        statusOk(HelperBinderProtocol.TX_SET_WIRELESS_ADB) { it.writeInt(if (enabled) 1 else 0) }
 
     override suspend fun setScreenBacklight(on: Boolean): ScreenBacklightReply? =
         transactParsed(HelperBinderProtocol.TX_SET_SCREEN_BACKLIGHT, { it.writeInt(if (on) 1 else 0) }) { reply ->

@@ -2150,4 +2150,13 @@
     <string name="settings_blindspot_close_delay_title">Atraso ao fechar</string>
     <string name="settings_blindspot_close_delay_desc">Manter a imagem visível por alguns instantes depois de desligar o pisca, evitando que desapareça imediatamente</string>
     <string name="settings_blindspot_close_delay_value">%.1f s</string>
+
+    <!-- DiLink firmware ADB watchdog, separate from restore-after-reboot. -->
+    <string name="settings_vendor_adb_keep_title">Keep ADB enabled</string>
+    <string name="settings_vendor_adb_keep_desc">Uses local ADB to start a shell helper that periodically restores port 5555. The existing restore-after-reboot setting is unchanged.</string>
+    <string name="settings_vendor_adb_keep_help_title">How ADB keep-alive works</string>
+    <string name="settings_vendor_adb_keep_help_body">A normal application uid cannot change DiLink ADB system properties. ADB must therefore be reachable once when this option is first enabled. BYDMateCN starts a shell-uid helper through local ADB; the helper can then reassert the fixed firmware properties after the listener is closed.
+
+This option is independent of Restore ADB after reboot. Turning either option off does not change the other one.</string>
+    <string name="settings_vendor_adb_keep_status_unsupported">Compatible DiLink ADB firmware switch was not detected</string>
 </resources>

@@ -414,6 +414,32 @@ fun main(args: Array<String>) {
                     true
                 }.getOrElse { reply?.writeInt(-1); reply?.writeInt(0); true }
 
+                HelperBinderProtocol.TX_SET_WIRELESS_ADB -> runCatching {
+                    val enable = data.readInt() != 0
+                    // Fixed property names and values: never expose a generic setprop shell bridge.
+                    // Pulse the trigger because an already-1 property may not retrigger init.
+                    val off = shExec("setprop sys.connect.adb.wiress 0")
+                    val persist = shExec(
+                        "setprop persist.sys.adb.wiress.enable \"\$1\"",
+                        if (enable) "true" else "false",
+                    )
+                    val on = if (enable) shExec("setprop sys.connect.adb.wiress 1") else CmdResult(0, "")
+                    val readback = if (enable) {
+                        shExec(
+                            "test \"$(getprop persist.sys.adb.wiress.enable)\" = true -a " +
+                                "\"$(getprop sys.connect.adb.wiress)\" = 1"
+                        )
+                    } else {
+                        shExec(
+                            "test \"$(getprop persist.sys.adb.wiress.enable)\" != true -a " +
+                                "\"$(getprop sys.connect.adb.wiress)\" != 1"
+                        )
+                    }
+                    val ok = persist.code == 0 && off.code == 0 && on.code == 0 && readback.code == 0
+                    reply?.writeInt(if (ok) 0 else -1); reply?.writeInt(0)
+                    true
+                }.getOrElse { reply?.writeInt(-1); reply?.writeInt(0); true }
+
                 HelperBinderProtocol.TX_SET_SCREEN_BACKLIGHT -> {
                     val on = runCatching { data.readInt() != 0 }.getOrDefault(true)
                     val result = setScreenBacklight(on, android.os.SystemClock.uptimeMillis()) {

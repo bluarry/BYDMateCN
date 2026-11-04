@@ -26,18 +26,13 @@ annotation class AdbRestoreScope
  * helper daemon never starts and every write feature of the app is dead until the user
  * re-enables ADB by hand.
  *
- * The path is Android's own wireless debugging: switch `adb_wifi_enabled` on (needs
- * WRITE_SECURE_SETTINGS, self-granted earlier over the still-alive classic channel), find the
- * `_adb-tls-connect._tcp` port over mDNS, connect to it with the same RSA key the daemon
- * already trusts (it is in `/data/misc/adb/adb_keys`, so no pairing code), and ask the daemon
- * for `tcpip:5555`.
+ * DiLink firmwares are handled first through their private init property switch, which restarts
+ * adbd directly on TCP/5555 and does not require an associated Wi-Fi network. If the app and its
+ * shell helper cannot write that switch, the fallback is Android's own wireless debugging:
+ * enable `adb_wifi_enabled`, discover `_adb-tls-connect._tcp`, then request `tcpip:5555`.
  *
- * Two facts the user cannot be spared: Android refuses to enable wireless debugging without a
- * Wi-Fi connection, and the first enable on each network raises a system dialog that only the
- * user can confirm. Both are surfaced as states, never worked around.
- *
- * Wireless debugging only exists from Android 11: on older head units the feature is
- * [AdbRestoreState.Unsupported] and never attempts anything, whatever the stored toggle says.
+ * The fallback requires Wi-Fi and may show Android's per-network confirmation dialog. Android 10
+ * can use the DiLink private route, but has no standard wireless-debugging fallback.
  */
 @Singleton
 class AdbRestoreManager @Inject constructor(
@@ -95,6 +90,11 @@ class AdbRestoreManager @Inject constructor(
     // The "unsupported" reason is logged once per process, not on every trigger.
     private val unsupportedLogged = AtomicBoolean(false)
 
+    // Enabling the independent firmware watchdog while port 5555 is already alive must still
+    // bootstrap the shell helper and persist the firmware switch once. Normal watchdog passes do
+    // not pulse/restart a healthy adbd listener.
+    private val vendorArmRequested = AtomicBoolean(false)
+
     // One enable attempt per process for the dialog auto-allow (see ensureAccessibilityForDialog).
     @Volatile
     private var a11yEnableAttempted = false
@@ -102,8 +102,39 @@ class AdbRestoreManager @Inject constructor(
     /** True while the toggle is on. */
     fun isEnabled(): Boolean = prefs.isEnabled()
 
-    /** False on Android 10 and older, which have no wireless debugging to restore through. */
+    /** Support status of the original Android wireless-debugging restore feature. */
     fun isSupported(): Boolean = isSupportedOn(system.sdkInt())
+
+    fun isVendorKeepEnabled(): Boolean = prefs.isVendorKeepEnabled()
+
+    fun isVendorKeepSupported(): Boolean = system.hasVendorWirelessAdbControl()
+
+    /** Persists the separate DiLink firmware ADB watchdog without changing the old restore toggle. */
+    fun setVendorKeepEnabled(enabled: Boolean) {
+        prefs.setVendorKeepEnabled(enabled)
+        generation.incrementAndGet()
+        if (enabled) {
+            vendorArmRequested.set(true)
+            requestAttempt("vendor_keep_toggle")
+        } else if (system.hasVendorWirelessAdbControl()) {
+            scope.launch {
+                mutex.lock()
+                try {
+                    if (!prefs.isVendorKeepEnabled()) {
+                        val result = system.setVendorWirelessAdbEnabled(false)
+                        Log.i(TAG, "firmware ADB keep switch disabled: $result")
+                    }
+                } finally {
+                    mutex.unlock()
+                    if (prefs.isEnabled()) requestAttempt("vendor_keep_disabled")
+                }
+            }
+        } else if (prefs.isEnabled()) {
+            requestAttempt("vendor_keep_disabled")
+        }
+    }
+
+    private fun anyRestoreEnabled(): Boolean = prefs.isEnabled() || prefs.isVendorKeepEnabled()
 
     /**
      * Persists the toggle. Turning it off also switches wireless debugging back off, so the
@@ -117,7 +148,11 @@ class AdbRestoreManager @Inject constructor(
             // enable-write in between and leave wireless debugging on.
             generation.incrementAndGet()
             if (system.hasWriteSecureSettings()) system.writeAdbWifiEnabled(0)
-            transition(AdbRestoreState.Disabled, "toggle off")
+            if (!prefs.isVendorKeepEnabled()) {
+                transition(AdbRestoreState.Disabled, "toggle off")
+            } else {
+                requestAttempt("standard_restore_disabled")
+            }
         } else {
             // A fresh "on" is the user asking us to try again on whatever network they are on now.
             exhaustedNetwork = null
@@ -135,9 +170,10 @@ class AdbRestoreManager @Inject constructor(
     suspend fun attemptIfNeeded(trigger: String = TRIGGER_UNKNOWN) {
         // A toggle switched on by an earlier version stays stored, but must not cost a 45 s mDNS
         // wait on every trigger for a service that cannot exist here.
-        if (!isSupported()) {
+        if (!anyRestoreEnabled()) return
+        if (!isSupported() && !isVendorKeepSupported()) {
             if (unsupportedLogged.compareAndSet(false, true)) {
-                Log.i(TAG, "unsupported on API ${system.sdkInt()} (needs Wireless debugging, API $MIN_SDK+)")
+                Log.i(TAG, "ADB recovery unsupported on API ${system.sdkInt()}")
             }
             return
         }
@@ -300,12 +336,18 @@ class AdbRestoreManager @Inject constructor(
     }
 
     private suspend fun attemptLocked(gen: Int, isRetry: Boolean, force: Boolean) {
-        if (!prefs.isEnabled()) {
-            transition(AdbRestoreState.Disabled, "toggle off")
+        if (!anyRestoreEnabled()) {
+            transition(AdbRestoreState.Disabled, "all toggles off")
             return
         }
         if (system.classicConnect()) {
             if (abandoned(gen)) return
+            if (prefs.isVendorKeepEnabled() && vendorArmRequested.compareAndSet(true, false)) {
+                val armed = system.setVendorWirelessAdbEnabled(true)
+                Log.i(TAG, "firmware ADB keep initial arm result=$armed")
+                if (armed != VendorAdbRestoreResult.APPLIED) vendorArmRequested.set(true)
+                if (abandoned(gen)) return
+            }
             // The classic port answering is the one moment a shell command can reach us: take the
             // permission now so the next reboot can be restored without it (idempotent, see TrackingService).
             if (!system.hasWriteSecureSettings()) {
@@ -319,6 +361,34 @@ class AdbRestoreManager @Inject constructor(
             return
         }
         if (abandoned(gen)) return
+
+        // The private firmware route belongs exclusively to the separate keep-ADB toggle.
+        if (prefs.isVendorKeepEnabled()) {
+            when (system.setVendorWirelessAdbEnabled(true)) {
+                VendorAdbRestoreResult.APPLIED -> {
+                    if (abandoned(gen)) {
+                        system.setVendorWirelessAdbEnabled(false)
+                        return
+                    }
+                    transition(AdbRestoreState.Connecting, "firmware ADB switch reasserted")
+                    if (pollClassicPort(gen, VENDOR_POLL_TIMEOUT_MS)) return
+                    Log.w(TAG, "firmware ADB switch applied but port 5555 stayed silent")
+                }
+                VendorAdbRestoreResult.DENIED -> Log.w(TAG, "firmware ADB switch write denied")
+                VendorAdbRestoreResult.UNAVAILABLE -> Unit
+            }
+            if (abandoned(gen)) return
+        }
+
+        // Preserve the original switch exactly: only it enables the Wi-Fi/TLS fallback.
+        if (!prefs.isEnabled()) {
+            transition(AdbRestoreState.Failed("firmware ADB keep failed"), "standard restore toggle off")
+            return
+        }
+        if (!isSupportedOn(system.sdkInt())) {
+            transition(AdbRestoreState.Unsupported, "standard restore unavailable")
+            return
+        }
         if (!system.hasWriteSecureSettings()) {
             transition(AdbRestoreState.NeedsActivation, "no WRITE_SECURE_SETTINGS")
             return
@@ -365,6 +435,21 @@ class AdbRestoreManager @Inject constructor(
             TcpipOutcome.FAILED ->
                 transition(AdbRestoreState.Failed("classic port silent after tcpip"), "tls port $port")
         }
+    }
+
+    /** Waits for the private init property trigger to restart adbd on classic TCP/5555. */
+    private suspend fun pollClassicPort(gen: Int, timeoutMs: Long): Boolean {
+        val attempts = (timeoutMs / TCPIP_POLL_INTERVAL_MS).toInt()
+        for (attempt in 1..attempts) {
+            system.sleep(TCPIP_POLL_INTERVAL_MS)
+            if (abandoned(gen)) return false
+            if (system.classicConnect()) {
+                if (abandoned(gen)) return false
+                markRestored(gen, "port 5555 back through firmware switch after $attempt check(s)")
+                return true
+            }
+        }
+        return false
     }
 
     private enum class TcpipOutcome { RESTORED, ABANDONED, FAILED }
@@ -453,7 +538,7 @@ class AdbRestoreManager @Inject constructor(
      * Disabled, and a later attempt owns whatever comes next.
      */
     private fun abandoned(gen: Int): Boolean {
-        if (generation.get() == gen && prefs.isEnabled()) return false
+        if (generation.get() == gen && anyRestoreEnabled()) return false
         Log.i(TAG, "attempt abandoned reason=toggle changed mid-attempt")
         return true
     }
@@ -549,6 +634,7 @@ class AdbRestoreManager @Inject constructor(
         /** Shortest gap between two enable-writes on one network inside a retry wave. */
         const val WRITE_RETRY_INTERVAL_MS = 15_000L
         const val TCPIP_POLL_TIMEOUT_MS = 15_000L
+        const val VENDOR_POLL_TIMEOUT_MS = 10_000L
         const val TCPIP_POLL_INTERVAL_MS = 1_000L
 
         /** Retry cadence after a NeedsDialog verdict; the last value repeats. */

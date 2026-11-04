@@ -25,13 +25,18 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdbRestoreManagerTest {
 
-    private class FakePrefs(private var enabled: Boolean = true) : AdbRestorePreferences {
+    private class FakePrefs(
+        private var enabled: Boolean = true,
+        private var vendorKeepEnabled: Boolean = false,
+    ) : AdbRestorePreferences {
         var network: String? = null
         var writeAt: Long = 0L
         var writes = 0
 
         override fun isEnabled(): Boolean = enabled
         override fun setEnabled(enabled: Boolean) { this.enabled = enabled }
+        override fun isVendorKeepEnabled(): Boolean = vendorKeepEnabled
+        override fun setVendorKeepEnabled(enabled: Boolean) { vendorKeepEnabled = enabled }
         override fun lastWriteNetwork(): String? = network
         override fun lastWriteAtMs(): Long = writeAt
         override fun recordWrite(network: String?, atMs: Long) {
@@ -47,6 +52,9 @@ class AdbRestoreManagerTest {
         var selfGrantResult = true
         var wifi: String? = "aa:bb:cc:dd:ee:ff"
         var adbWifiEnabled = 0
+        var vendorControl = false
+        var vendorResult = VendorAdbRestoreResult.UNAVAILABLE
+        var vendorCalls = 0
         /** What the setting reads back as after our write — 0 models the unconfirmed dialog. */
         var settingSticks = true
         var settingsWrites = mutableListOf<Int>()
@@ -102,6 +110,11 @@ class AdbRestoreManagerTest {
             return wifi
         }
         override fun readAdbWifiEnabled(): Int = adbWifiEnabled
+        override fun hasVendorWirelessAdbControl(): Boolean = vendorControl
+        override suspend fun setVendorWirelessAdbEnabled(enabled: Boolean): VendorAdbRestoreResult {
+            vendorCalls++
+            return vendorResult
+        }
 
         override fun writeAdbWifiEnabled(value: Int): Boolean {
             if (value == 1) onEnableWrite?.let { it(); onEnableWrite = null }
@@ -281,6 +294,117 @@ class AdbRestoreManagerTest {
 
         assertEquals(AdbRestoreState.NotNeeded, m.state.value)
         assertEquals(0, system.selfGrantCalls)
+    }
+
+    @Test
+    fun `old restore toggle does not call vendor switch`() = runTest {
+        val system = FakeSystem().apply {
+            vendorControl = true
+            classicResults = mutableListOf(false, false, true)
+        }
+        val manager = manager(FakePrefs(enabled = true, vendorKeepEnabled = false), system, this)
+
+        manager.attemptIfNeeded("test")
+
+        assertEquals(0, system.vendorCalls)
+        assertEquals(listOf(1), system.settingsWrites)
+    }
+
+    @Test
+    fun `enabling vendor keep arms helper even while classic port is alive`() = runTest {
+        val prefs = FakePrefs(enabled = false, vendorKeepEnabled = false)
+        val system = FakeSystem().apply {
+            vendorControl = true
+            vendorResult = VendorAdbRestoreResult.APPLIED
+            classicResults = mutableListOf(true)
+        }
+        val manager = manager(prefs, system, backgroundScope)
+
+        manager.setVendorKeepEnabled(true)
+        runCurrent()
+
+        assertTrue(manager.isVendorKeepEnabled())
+        assertEquals(1, system.vendorCalls)
+        assertEquals(0, system.settingsWrites.size)
+    }
+
+    @Test
+    fun `disabling old restore leaves vendor keep enabled`() = runTest {
+        val prefs = FakePrefs(enabled = true, vendorKeepEnabled = true)
+        val manager = manager(prefs, FakeSystem(), backgroundScope)
+
+        manager.setEnabled(false)
+
+        assertTrue(manager.isVendorKeepEnabled())
+    }
+
+    @Test
+    fun `disabling vendor keep leaves old restore enabled`() = runTest {
+        val prefs = FakePrefs(enabled = true, vendorKeepEnabled = true)
+        val system = FakeSystem().apply { vendorControl = false }
+        val manager = manager(prefs, system, backgroundScope)
+
+        manager.setVendorKeepEnabled(false)
+        runCurrent()
+
+        assertTrue(manager.isEnabled())
+        assertTrue(!manager.isVendorKeepEnabled())
+        assertEquals(0, system.vendorCalls)
+    }
+
+    @Test
+    fun `vendor firmware switch restores classic port without wifi`() = runTest {
+        val system = FakeSystem().apply {
+            sdk = 29
+            wifi = null
+            vendorControl = true
+            vendorResult = VendorAdbRestoreResult.APPLIED
+            classicResults = mutableListOf(false, false, true)
+        }
+        val manager = manager(FakePrefs(enabled = false, vendorKeepEnabled = true), system, this)
+
+        manager.attemptIfNeeded("test")
+
+        assertTrue(manager.state.value is AdbRestoreState.Restored)
+        assertEquals(1, system.vendorCalls)
+        assertEquals(0, system.settingsWrites.size)
+        assertEquals(0, system.discoverCalls)
+    }
+
+    @Test
+    fun `denied vendor switch falls back to standard wireless debugging`() = runTest {
+        val system = FakeSystem().apply {
+            vendorControl = true
+            vendorResult = VendorAdbRestoreResult.DENIED
+            classicResults = mutableListOf(false, false, true)
+        }
+        val manager = manager(FakePrefs(enabled = true, vendorKeepEnabled = true), system, this)
+
+        manager.attemptIfNeeded("test")
+
+        assertTrue(manager.state.value is AdbRestoreState.Restored)
+        assertEquals(1, system.vendorCalls)
+        assertEquals(listOf(1), system.settingsWrites)
+        assertEquals(1, system.discoverCalls)
+    }
+
+    @Test
+    fun `Android 10 vendor failure is reported without wifi fallback`() = runTest {
+        val system = FakeSystem().apply {
+            sdk = 29
+            wifi = null
+            vendorControl = true
+            vendorResult = VendorAdbRestoreResult.DENIED
+            classicResults = mutableListOf(false)
+        }
+        val manager = manager(FakePrefs(enabled = false, vendorKeepEnabled = true), system, this)
+
+        manager.attemptIfNeeded("test")
+
+        assertTrue(manager.state.value is AdbRestoreState.Failed)
+        assertEquals(1, system.vendorCalls)
+        assertEquals(0, system.settingsWrites.size)
+        assertEquals(0, system.discoverCalls)
     }
 
     @Test
