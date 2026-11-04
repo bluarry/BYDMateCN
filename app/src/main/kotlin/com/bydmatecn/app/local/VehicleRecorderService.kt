@@ -53,7 +53,7 @@ import kotlin.math.sqrt
  * that rejects a combined set, [AvmFrameShare] remains the compatibility fallback.
  */
 @AndroidEntryPoint
-@Suppress("TooManyFunctions") // Android callbacks plus one recorder state machine stay in one lifecycle owner.
+@Suppress("TooManyFunctions", "LargeClass") // Android callbacks plus one recorder state machine stay in one lifecycle owner.
 class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, SensorEventListener {
     @Inject lateinit var helper: HelperClient
     @Inject lateinit var helperBootstrap: HelperBootstrap
@@ -208,6 +208,7 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         if (directFrameSourceFailures >= DIRECT_SOURCE_MAX_FAILURES) createCaptureTexture()
     }
 
+    @Suppress("ComplexCondition") // All predicates must hold before replacing the active vendor camera source.
     private fun recreateDirectFrameSource(reason: String): Boolean {
         val now = SystemClock.elapsedRealtime()
         if (now < directFrameSourceRetryAt) {
@@ -536,6 +537,7 @@ class VehicleRecorderService : Service(), TextureView.SurfaceTextureListener, Se
         }
     }
 
+    @Suppress("CyclomaticComplexMethod") // Central recorder recovery state machine keeps transitions atomic.
     private fun refreshFrameSource(now: Long) {
         if (directFrameSource == null && now >= directFrameSourceRetryAt) {
             createDirectFrameSource()

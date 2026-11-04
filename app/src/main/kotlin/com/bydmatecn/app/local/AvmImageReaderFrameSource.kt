@@ -16,6 +16,7 @@ import android.view.Surface
  * TextureView.getBitmap() polling. Frames are converted directly to the encoder size instead of
  * first allocating a full-size bitmap. Every acquired Image is closed on the callback thread.
  */
+@Suppress("LongParameterList") // Immutable geometry and callbacks describe one vendor ImageReader pipeline.
 internal class AvmImageReaderFrameSource(
     private val sourceWidth: Int,
     private val sourceHeight: Int,
@@ -138,6 +139,7 @@ internal class AvmImageReaderFrameSource(
         return stopped
     }
 
+    @Suppress("TooGenericExceptionCaught") // Vendor Image/ImageReader implementations throw several RuntimeException subtypes.
     private fun handleAvailable(source: ImageReader, callbackGeneration: Long) {
         val image = runCatching { source.acquireLatestImage() }.getOrNull() ?: return
         try {
@@ -234,6 +236,7 @@ internal class AvmImageReaderFrameSource(
 }
 
 /** Converts one AVM panorama strip and scales it while respecting vendor row/pixel strides. */
+@Suppress("LongParameterList") // Conversion geometry is explicit to avoid per-frame wrapper allocations.
 private fun yuv420ToBitmap(
     image: Image,
     outputWidth: Int,

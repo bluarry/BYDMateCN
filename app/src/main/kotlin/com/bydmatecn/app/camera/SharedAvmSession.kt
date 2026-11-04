@@ -27,6 +27,7 @@ enum class AvmConsumerPriority { BACKGROUND, INTERACTIVE }
  * that cannot attach can still consume [AvmFrameShare] without taking ownership away from others.
  */
 @Singleton
+@Suppress("TooManyFunctions") // Session ownership, arbitration and rollback form one synchronized coordinator.
 class SharedAvmSession @Inject constructor() {
     private data class Request(
         val bindings: List<AvmSurfaceBinding>,
@@ -127,6 +128,7 @@ class SharedAvmSession @Inject constructor() {
         return openRequests(requests, reason)
     }
 
+    @Suppress("ComplexCondition") // A warm update is safe only when every active producer dimension matches.
     private fun openRequests(selected: Map<String, Request>, reason: String): Boolean {
         if (probe.cameraId < 0 && !probe.discover()) return false
         val sourceConfig = resolveSourceConfig(selected)
@@ -215,6 +217,7 @@ class SharedAvmSession @Inject constructor() {
     private fun AvmSurfaceBinding.sameSurface(other: AvmSurfaceBinding): Boolean =
         index == other.index && surface === other.surface
 
+    @Suppress("ComplexCondition") // Fast structural equality guard avoids mutating an unchanged vendor session.
     private fun Request?.sameBindings(other: Request): Boolean {
         if (this == null || priority != other.priority || sourceConfig != other.sourceConfig ||
             bindings.size != other.bindings.size

@@ -142,6 +142,7 @@ private fun traceSignalHold(result: BlindSpotHoldResult, delayMs: Long) {
  * milliseconds. The two are never mixed — each hop is an explicit withContext.
  */
 @Singleton
+@Suppress("LongParameterList") // Hilt supplies the controller's independent vehicle integration ports.
 class BlindSpotController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val prefs: BlindSpotPreferences,

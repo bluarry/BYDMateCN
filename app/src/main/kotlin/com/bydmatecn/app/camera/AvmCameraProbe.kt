@@ -44,6 +44,7 @@ internal fun parseCameraTags(raw: Any?): List<String> {
  * The trace gets the camera's lifetime (open, close and why) and the vendor events in between,
  * so the time our process held the camera can be laid against what the car reported.
  */
+@Suppress("TooManyFunctions") // Vendor camera discovery and lifecycle tracing form one adapter boundary.
 class AvmCameraProbe(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Class lookup; a null loader means the app's own class path. */
@@ -188,6 +189,7 @@ class AvmCameraProbe(
      * binding set is then unknowable; keeping it marked active would hand clients a dead Surface.
      */
     @Synchronized
+    @Suppress("CyclomaticComplexMethod") // Warm vendor-surface updates require an atomic rollback state machine.
     fun updateBindings(
         added: List<AvmSurfaceBinding>,
         removed: List<AvmSurfaceBinding>,
@@ -284,6 +286,7 @@ class AvmCameraProbe(
     }
 
     @Synchronized
+    @Suppress("LongMethod", "CyclomaticComplexMethod") // Vendor constructor fallbacks and cleanup must remain in one synchronized transaction.
     private fun openBound(bindings: List<AvmSurfaceBinding>, sourceConfig: AvmSourceConfig): Boolean {
         val indexes = bindings.map { it.index }
         if (cameraId < 0) {
