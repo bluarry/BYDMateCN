@@ -340,46 +340,53 @@ class AdbRestoreManager @Inject constructor(
             transition(AdbRestoreState.Disabled, "all toggles off")
             return
         }
-        if (system.classicConnect()) {
-            if (abandoned(gen)) return
-            if (prefs.isVendorKeepEnabled() && vendorArmRequested.compareAndSet(true, false)) {
-                val armed = system.setVendorWirelessAdbEnabled(true)
-                Log.i(TAG, "firmware ADB keep initial arm result=$armed")
-                if (armed != VendorAdbRestoreResult.APPLIED) vendorArmRequested.set(true)
-                if (abandoned(gen)) return
-            }
-            // The classic port answering is the one moment a shell command can reach us: take the
-            // permission now so the next reboot can be restored without it (idempotent, see TrackingService).
-            if (!system.hasWriteSecureSettings()) {
-                val granted = system.selfGrantWriteSecureSettings()
-                Log.i(TAG, "self-grant WRITE_SECURE_SETTINGS over classic port: $granted")
-            }
-            // The grant suspended: a toggle flipped meanwhile must not be overwritten by NotNeeded.
-            if (abandoned(gen)) return
-            transition(AdbRestoreState.NotNeeded, "classic port alive")
-            ensureAccessibilityForDialog(gen)
-            return
-        }
+        if (handleClassicPort(gen)) return
         if (abandoned(gen)) return
+        if (attemptVendorRestore(gen)) return
+        attemptStandardRestore(gen, isRetry, force)
+    }
 
-        // The private firmware route belongs exclusively to the separate keep-ADB toggle.
-        if (prefs.isVendorKeepEnabled()) {
-            when (system.setVendorWirelessAdbEnabled(true)) {
-                VendorAdbRestoreResult.APPLIED -> {
-                    if (abandoned(gen)) {
-                        system.setVendorWirelessAdbEnabled(false)
-                        return
-                    }
-                    transition(AdbRestoreState.Connecting, "firmware ADB switch reasserted")
-                    if (pollClassicPort(gen, VENDOR_POLL_TIMEOUT_MS)) return
-                    Log.w(TAG, "firmware ADB switch applied but port 5555 stayed silent")
-                }
-                VendorAdbRestoreResult.DENIED -> Log.w(TAG, "firmware ADB switch write denied")
-                VendorAdbRestoreResult.UNAVAILABLE -> Unit
-            }
-            if (abandoned(gen)) return
+    private suspend fun handleClassicPort(gen: Int): Boolean {
+        if (!system.classicConnect()) return false
+        if (abandoned(gen)) return true
+        if (prefs.isVendorKeepEnabled() && vendorArmRequested.compareAndSet(true, false)) {
+            val armed = system.setVendorWirelessAdbEnabled(true)
+            Log.i(TAG, "firmware ADB keep initial arm result=$armed")
+            if (armed != VendorAdbRestoreResult.APPLIED) vendorArmRequested.set(true)
+            if (abandoned(gen)) return true
         }
+        // The classic port answering is the one moment a shell command can reach us: take the
+        // permission now so the next reboot can be restored without it (idempotent, see TrackingService).
+        if (!system.hasWriteSecureSettings()) {
+            val granted = system.selfGrantWriteSecureSettings()
+            Log.i(TAG, "self-grant WRITE_SECURE_SETTINGS over classic port: $granted")
+        }
+        // The grant suspended: a toggle flipped meanwhile must not be overwritten by NotNeeded.
+        if (abandoned(gen)) return true
+        transition(AdbRestoreState.NotNeeded, "classic port alive")
+        ensureAccessibilityForDialog(gen)
+        return true
+    }
 
+    private suspend fun attemptVendorRestore(gen: Int): Boolean {
+        if (!prefs.isVendorKeepEnabled()) return false
+        when (system.setVendorWirelessAdbEnabled(true)) {
+            VendorAdbRestoreResult.APPLIED -> {
+                if (abandoned(gen)) {
+                    system.setVendorWirelessAdbEnabled(false)
+                    return true
+                }
+                transition(AdbRestoreState.Connecting, "firmware ADB switch reasserted")
+                if (pollClassicPort(gen, VENDOR_POLL_TIMEOUT_MS)) return true
+                Log.w(TAG, "firmware ADB switch applied but port 5555 stayed silent")
+            }
+            VendorAdbRestoreResult.DENIED -> Log.w(TAG, "firmware ADB switch write denied")
+            VendorAdbRestoreResult.UNAVAILABLE -> Unit
+        }
+        return abandoned(gen)
+    }
+
+    private suspend fun attemptStandardRestore(gen: Int, isRetry: Boolean, force: Boolean) {
         // Preserve the original switch exactly: only it enables the Wi-Fi/TLS fallback.
         if (!prefs.isEnabled()) {
             transition(AdbRestoreState.Failed("firmware ADB keep failed"), "standard restore toggle off")
@@ -398,11 +405,12 @@ class AdbRestoreManager @Inject constructor(
             transition(AdbRestoreState.WaitingWifi, "no wifi")
             return
         }
-
         if (!enableWirelessDebugging(gen, network, isRetry, force)) return
-
         transition(AdbRestoreState.Connecting, "discovering tls port")
+        connectThroughTls(gen)
+    }
 
+    private suspend fun connectThroughTls(gen: Int) {
         // adbd publishes its own TLS port; when it is there, mDNS discovery (up to 45 s) is pure
         // waiting. A stale or wrong value costs one short poll and then falls through to mDNS.
         val propPort = system.tlsPortFromProperty()?.takeIf { it > 0 }
@@ -414,7 +422,6 @@ class AdbRestoreManager @Inject constructor(
                     Log.i(TAG, "prop port $propPort did not bring 5555 back, falling back to mDNS")
             }
         }
-
         val port = system.discoverTlsPort(DISCOVERY_TIMEOUT_MS)
         if (abandonedAfterEnable(gen)) return
         if (port == null) {
@@ -429,7 +436,6 @@ class AdbRestoreManager @Inject constructor(
             transition(AdbRestoreState.Failed("mDNS timeout"), "no tls service in ${DISCOVERY_TIMEOUT_MS / 1000}s")
             return
         }
-
         when (runTcpip(gen, port, TCPIP_POLL_TIMEOUT_MS)) {
             TcpipOutcome.RESTORED, TcpipOutcome.ABANDONED -> return
             TcpipOutcome.FAILED ->
