@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,11 +74,11 @@ private fun ExteriorVoiceConfiguration(
     status: LocalText,
     actions: ExteriorVoiceActions,
 ) {
-    var enabled by mutableStateOf(settings.verified)
-    var volume by mutableIntStateOf(settings.volume)
-    var microphoneGain by mutableIntStateOf(settings.microphoneGain)
-    var noiseReduction by mutableIntStateOf(settings.noiseReduction)
-    var echoProtection by mutableStateOf(settings.echoProtection)
+    var enabled by remember(settings.verified) { mutableStateOf(settings.verified) }
+    var volume by remember(settings.volume) { mutableIntStateOf(settings.volume) }
+    var microphoneGain by remember(settings.microphoneGain) { mutableIntStateOf(settings.microphoneGain) }
+    var noiseReduction by remember(settings.noiseReduction) { mutableIntStateOf(settings.noiseReduction) }
+    var echoProtection by remember(settings.echoProtection) { mutableStateOf(settings.echoProtection) }
 
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Text("车外喊话", color = Color(0xFFF2F4F6), fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -244,5 +245,3 @@ private fun VoiceSliderRow(title: String, description: String, value: Int, max: 
 private fun VoiceDivider() {
     Box(Modifier.fillMaxWidth().heightIn(min = 1.dp, max = 1.dp).background(Color(0xFF252E36)))
 }
-
-
