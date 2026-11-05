@@ -19,6 +19,7 @@
     <string name="settings_section_integrations_title">Integracje</string>
     <string name="settings_section_widget_title">Widżet</string>
     <string name="settings_section_display_title">Ekran</string>
+    <string name="settings_section_diagnostics_title">Oprogramowanie i uprawnienia</string>
     <!-- Settings: Display section (cluster projection) -->
     <string name="settings_display_state_on">Włączone</string>
     <string name="settings_display_state_off">Wyłączone</string>

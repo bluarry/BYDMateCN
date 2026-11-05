@@ -14,6 +14,7 @@
     <string name="settings_section_integrations_title">Integrações</string>
     <string name="settings_section_widget_title">Widget</string>
     <string name="settings_section_display_title">Tela</string>
+    <string name="settings_section_diagnostics_title">Firmware e permissões</string>
     <string name="settings_section_voice_agent">Agente de voz</string>
     <!-- Settings: Display section (cluster projection) -->
     <string name="cluster_a11y_description">Intercepta os botões do volante para projetar a navegação no painel de instrumentos. Ativado manualmente, funciona apenas quando o recurso está ligado.</string>

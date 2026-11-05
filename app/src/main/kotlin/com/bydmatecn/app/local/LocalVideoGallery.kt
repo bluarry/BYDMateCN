@@ -27,7 +27,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -194,8 +197,11 @@ private fun VideoThumbnailCard(
 
 @Composable
 private fun VideoThumbnail(file: File) {
-    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, file.absolutePath, file.lastModified()) {
-        value = withContext(Dispatchers.IO) {
+    var frame by remember(file.absolutePath, file.lastModified()) {
+        mutableStateOf<android.graphics.Bitmap?>(null)
+    }
+    LaunchedEffect(file.absolutePath, file.lastModified()) {
+        frame = withContext(Dispatchers.IO) {
             runCatching {
                 MediaMetadataRetriever().use { retriever ->
                     retriever.setDataSource(file.absolutePath)
@@ -204,10 +210,10 @@ private fun VideoThumbnail(file: File) {
             }.getOrNull()
         }
     }
-    val frame = bitmap
-    if (frame != null) {
+    val thumbnail = frame
+    if (thumbnail != null) {
         androidx.compose.foundation.Image(
-            bitmap = frame.asImageBitmap(),
+            bitmap = thumbnail.asImageBitmap(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),

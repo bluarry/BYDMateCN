@@ -19,6 +19,7 @@
     <string name="settings_section_integrations_title">Інтэграцыі</string>
     <string name="settings_section_widget_title">Віджэт</string>
     <string name="settings_section_display_title">Дысплей</string>
+    <string name="settings_section_diagnostics_title">Прашыўка і дазволы</string>
     <!-- Settings: Display section (cluster projection) -->
     <string name="settings_display_state_on">Уключана</string>
     <string name="settings_display_state_off">Выключана</string>

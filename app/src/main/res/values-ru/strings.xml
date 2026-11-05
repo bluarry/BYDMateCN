@@ -19,6 +19,7 @@
     <string name="settings_section_integrations_title">Интеграции</string>
     <string name="settings_section_widget_title">Виджет</string>
     <string name="settings_section_display_title">Дисплей</string>
+    <string name="settings_section_diagnostics_title">Прошивка и разрешения</string>
     <!-- Settings: Display section (cluster projection) -->
     <string name="settings_display_state_on">Включено</string>
     <string name="settings_display_state_off">Выключено</string>
