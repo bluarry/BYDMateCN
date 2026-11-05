@@ -188,7 +188,6 @@ fun BlindSpotToolScreen(onBack: () -> Unit) {
         val compact = maxWidth < 900.dp
         Column(Modifier.fillMaxSize()) {
             MirrorHeader(onBack = onBack)
-            MirrorTabs()
             if (compact) {
                 Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
@@ -236,23 +235,6 @@ private fun MirrorHeader(onBack: () -> Unit) {
             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = MirrorText)
         }
         Text("电子后视镜", color = MirrorText, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun MirrorTabs() {
-    Row(
-        Modifier.fillMaxWidth().height(52.dp).background(Color(0xFF252527)).horizontalScroll(rememberScrollState()),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Box(
-            Modifier.width(180.dp).fillMaxHeight().clickable(enabled = false) { },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("电子后视", color = MirrorText, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-            Box(Modifier.align(Alignment.BottomCenter).width(76.dp).height(3.dp).background(MirrorBlue))
-        }
-        Text("转向联动", color = MirrorMuted, fontSize = 15.sp, modifier = Modifier.padding(bottom = 16.dp, start = 12.dp))
     }
 }
 

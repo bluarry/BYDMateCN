@@ -2,6 +2,7 @@ package com.bydmatecn.app
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -48,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         private const val PERMISSION_REQUEST_CODE = 1001
         private const val BACKGROUND_LOCATION_REQUEST_CODE = 1002
         private const val DEFAULT_LANG = LocalePreferences.DEFAULT_LANGUAGE
+        const val EXTRA_START_ROUTE = "start_route"
     }
 
     override fun attachBaseContext(newBase: Context) {
@@ -123,12 +125,18 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     AppNavigation(
                         settingsRepository = settingsRepository,
-                        updateChecker = updateChecker,
+                        updateChecker = updateChecker, requestedStartRoute = intent.getStringExtra(EXTRA_START_ROUTE),
                     )
                     PostRestoreDialog(postRestoreViewModel)
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        recreate()
     }
 
     private fun requestPermissionsIfNeeded() {

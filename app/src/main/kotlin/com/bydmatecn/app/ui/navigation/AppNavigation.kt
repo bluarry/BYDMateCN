@@ -109,7 +109,8 @@ enum class Screen(val route: String, val labelRes: Int, val icon: ImageVector) {
 @Composable
 fun AppNavigation(
     settingsRepository: SettingsRepository,
-    updateChecker: UpdateChecker
+    updateChecker: UpdateChecker,
+    requestedStartRoute: String? = null,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -118,7 +119,9 @@ fun AppNavigation(
     var startDestination by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        startDestination = if (settingsRepository.isSetupCompleted()) "dashboard" else "welcome"
+        startDestination = if (settingsRepository.isSetupCompleted()) {
+            requestedStartRoute?.takeIf { route -> route in Screen.entries.map(Screen::route) } ?: "dashboard"
+        } else "welcome"
     }
 
     if (startDestination == null) return // Loading
@@ -335,7 +338,7 @@ fun AppNavigation(
             composable("blind_spot") {
                 com.bydmatecn.app.ui.settings.BlindSpotSettingsScreen(onBack = { navController.popBackStack() })
             }
-            composable("automation") { com.bydmatecn.app.ui.automation.AutomationScreen() }
+            composable("automation") { com.bydmatecn.app.ui.automation.AutomationScreen(onBack = { navController.popBackStack() }) }
             composable("tool_settings/{section}") { entry ->
                 com.bydmatecn.app.ui.settings.VehicleToolSettingsScreen(
                     section = entry.arguments?.getString("section").orEmpty(),

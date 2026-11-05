@@ -67,8 +67,8 @@ class LocalMediaActivity : ComponentActivity(), LocalComposeHost {
         ui.subtitle = "本地视频 · 应用内预览"
         ui.status = message
         ui.onBack = { finish() }
-        ui.topTabs = true
-        ui.visualStyle = LocalVisualStyle.EXTERIOR_AUDIO
+        ui.topTabs = false
+        ui.visualStyle = LocalVisualStyle.DEFAULT
         ui.section("已录视频")
         ui.controls.add {
             VideoLibraryWorkspace(

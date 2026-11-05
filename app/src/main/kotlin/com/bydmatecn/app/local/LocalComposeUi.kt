@@ -51,8 +51,7 @@ import com.bydmatecn.app.ui.theme.AccentGreen
 import com.bydmatecn.app.ui.theme.BYDMateTheme
 import com.bydmatecn.app.ui.theme.NavyDark
 import com.bydmatecn.app.ui.theme.TextPrimary
-import com.bydmatecn.app.ui.settings.SettingActionRow
-import com.bydmatecn.app.ui.settings.SettingButtonStyle
+import com.bydmatecn.app.ui.settings.SettingValueRow
 import com.bydmatecn.app.ui.settings.SettingHint
 import com.bydmatecn.app.ui.settings.SettingSliderRow
 import com.bydmatecn.app.ui.settings.SettingToggleRow
@@ -128,11 +127,10 @@ internal fun LocalUiState.label(text: String, size: Float = 16f): LocalText {
 internal fun LocalUiState.button(text: String, action: () -> Unit) {
     actionIndices.add(controls.size)
     controls.add {
-        SettingActionRow(
+        SettingValueRow(
             title = text,
-            buttonLabel = "执行",
+            value = "",
             onClick = action,
-            style = SettingButtonStyle.Secondary,
         )
     }
 }

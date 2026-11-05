@@ -57,8 +57,8 @@ internal fun LocalCameraActivity.createCameraViews() {
         ui.subtitle = if (sentry) "锁车监控 · 开门与震动事件保护 · 本地回看" else "行驶自动启停 · 循环分段 · 事件保护 · 本地回看"
         ui.status = status
         ui.onBack = { finish() }
-        ui.topTabs = true
-        ui.visualStyle = LocalVisualStyle.EXTERIOR_AUDIO
+        ui.topTabs = false
+        ui.visualStyle = LocalVisualStyle.DEFAULT
         addAutomaticRecorderControls()
         ui.section("存储与回看")
         addVideoStorageControls()

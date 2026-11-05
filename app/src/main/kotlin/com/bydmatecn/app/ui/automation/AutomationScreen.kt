@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -226,7 +227,8 @@ import java.util.Locale
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AutomationScreen(
-    viewModel: AutomationViewModel = hiltViewModel()
+    onBack: () -> Unit = {},
+    viewModel: AutomationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showPlaces by rememberSaveable { mutableStateOf(false) }
@@ -261,6 +263,9 @@ fun AutomationScreen(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterVertically)) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回", tint = TextPrimary)
+                    }
                     Text(stringResource(R.string.automation_tab_title), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
                         modifier = Modifier.align(Alignment.CenterVertically).padding(end = 12.dp))
                     // 40dp visible, the chip's own minimum interactive size makes the touch area 48dp.

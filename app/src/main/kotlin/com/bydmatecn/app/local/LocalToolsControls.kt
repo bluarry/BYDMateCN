@@ -79,8 +79,8 @@ internal fun LocalToolsActivity.fileControls() {
     }
 
 internal fun LocalToolsActivity.audioControls() {
-    ui.topTabs = true
-    ui.visualStyle = LocalVisualStyle.EXTERIOR_AUDIO
+    ui.topTabs = false
+    ui.visualStyle = LocalVisualStyle.DEFAULT
     val audioPrefs = audioPreferences()
     microphoneControls(audioPrefs)
     ui.section("本地音效")

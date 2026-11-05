@@ -2158,4 +2158,5 @@
 
 This option is independent of Restore ADB after reboot. Turning either option off does not change the other one.</string>
     <string name="settings_vendor_adb_keep_status_unsupported">Compatible DiLink ADB firmware switch was not detected</string>
+    <string name="settings_section_diagnostics_title">Firmware and permissions</string>
 </resources>

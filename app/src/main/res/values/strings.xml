@@ -2335,4 +2335,5 @@
 
 该功能与“重启后恢复 ADB”完全独立。关闭本开关不会关闭或修改原有恢复开关。若辅助进程尚未安装，请先让车机连接 Wi-Fi、确认 ADB 已恢复，再开启本功能。</string>
     <string name="settings_vendor_adb_keep_status_unsupported">未检测到兼容的 DiLink ADB 固件开关</string>
+    <string name="settings_section_diagnostics_title">固件与权限</string>
 </resources>

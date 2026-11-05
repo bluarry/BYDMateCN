@@ -50,20 +50,37 @@ internal fun LocalDashboard(ui: LocalUiState, modifier: Modifier = Modifier) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     val sections = ui.sections.toList().ifEmpty { listOf(LocalSection("功能", 0)) }
     val active = selected.coerceIn(0, sections.lastIndex)
-    if (ui.visualStyle == LocalVisualStyle.EXTERIOR_AUDIO) {
-        ExteriorAudioDashboard(ui, sections, active, { selected = it }, modifier)
-        return
+    BoxWithConstraints(modifier) {
+        val showMainRail = maxWidth >= 900.dp
+        Row(Modifier.fillMaxSize()) {
+            if (showMainRail) LocalMainNavigation(Modifier.width(152.dp).fillMaxHeight())
+            if (ui.visualStyle == LocalVisualStyle.EXTERIOR_AUDIO) {
+                ExteriorAudioDashboard(ui, sections, active, { selected = it }, Modifier.weight(1f))
+            } else {
+                DefaultLocalDashboard(ui, sections, active, { selected = it }, Modifier.weight(1f))
+            }
+        }
     }
+}
+
+@Composable
+private fun DefaultLocalDashboard(
+    ui: LocalUiState,
+    sections: List<LocalSection>,
+    active: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier,
+) {
     BoxWithConstraints(
         modifier.background(Brush.verticalGradient(listOf(Color(0xFF0B1A2B), Color(0xFF081321))))
     ) {
         val wide = maxWidth >= 760.dp
         Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ToolHeader(ui)
-            if ((!wide || ui.topTabs) && sections.size > 1) TopSectionTabs(sections, active, false, { selected = it })
+            if ((!wide || ui.topTabs) && sections.size > 1) TopSectionTabs(sections, active, false, onSelect)
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (wide && !ui.topTabs && sections.size > 1) {
-                    SectionRail(sections, active, { selected = it }, Modifier.width(260.dp).fillMaxHeight())
+                    SectionRail(sections, active, onSelect, Modifier.width(220.dp).fillMaxHeight())
                 }
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     ui.status?.let { StatusBanner(it) }

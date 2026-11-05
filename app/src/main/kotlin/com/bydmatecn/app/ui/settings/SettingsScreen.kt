@@ -194,6 +194,7 @@ internal enum class SettingsSection(@StringRes val labelRes: Int, val icon: Imag
     BATTERY(R.string.settings_section_auto_battery_title, Icons.Outlined.BatteryChargingFull),
     INTEGRATIONS(R.string.settings_section_integrations_title, Icons.Outlined.Link),
     SERVICE(R.string.settings_section_service_title, Icons.Outlined.Build),
+    DIAGNOSTICS(R.string.settings_section_diagnostics_title, Icons.Outlined.Build),
     APP(R.string.settings_section_application_title, Icons.Outlined.Settings),
     SMART_HOME(R.string.settings_smart_home_section_title, Icons.Outlined.Home),
 }
@@ -271,7 +272,12 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        val visibleSections = setOf(SettingsSection.APP)
+        val visibleSections = setOf(
+            SettingsSection.APP,
+            SettingsSection.DISPLAY,
+            SettingsSection.BATTERY,
+            SettingsSection.DIAGNOSTICS,
+        )
         var selected by rememberSaveable { mutableStateOf(SettingsSection.APP) }
         val hiddenSelected = selected == SettingsSection.SMART_HOME
         val safeSelected = if (hiddenSelected && !state.devModeUnlocked) {
@@ -291,6 +297,7 @@ fun SettingsScreen(
                 SettingsSection.DISPLAY -> DisplaySection()
                 SettingsSection.SPLIT -> SplitSection(viewModel)
                 SettingsSection.SERVICE -> ServiceSection(state, viewModel)
+                SettingsSection.DIAGNOSTICS -> DiagnosticsSection()
                 SettingsSection.APP -> AppSection(state, viewModel)
                 SettingsSection.SMART_HOME -> SmartHomeSection(state, viewModel)
             }
@@ -1530,7 +1537,6 @@ private fun DisplaySection() {
         )
     }
 
-    BlindSpotCard()
 
     // Instrument music card: mirrors Yandex music, which the stock controller leaves blank.
     // ClusterMusicBridge reads the flag on every poll, so no restart is needed.
@@ -1563,347 +1569,6 @@ private fun DisplaySection() {
  * re-reads it on every tick, so a change lands without a restart. Turning the switch on asks
  * for CAMERA — the AVM stack refuses to open the preview without it (as on the probe screen).
  */
-@Composable
-private fun BlindSpotCard() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val clusterEntryPoint = remember {
-        EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            ClusterEntryPoint::class.java,
-        )
-    }
-    val prefs = remember {
-        context.getSharedPreferences(BlindSpotPreferences.PREFS_NAME, Context.MODE_PRIVATE)
-    }
-    var enabled by remember { mutableStateOf(prefs.getBoolean(BlindSpotPreferences.KEY_ENABLED, false)) }
-    var thresholdKmh by remember {
-        mutableStateOf(prefs.getInt(
-            BlindSpotPreferences.KEY_THRESHOLD_KMH, BlindSpotPreferences.DEFAULT_THRESHOLD_KMH))
-    }
-    var pipWidthPct by remember {
-        mutableStateOf(prefs.getInt(
-            BlindSpotPreferences.KEY_PIP_WIDTH_PCT, BlindSpotPreferences.DEFAULT_PIP_WIDTH_PCT))
-    }
-    var keepWhileSignalOn by remember {
-        mutableStateOf(prefs.getBoolean(
-            BlindSpotPreferences.KEY_KEEP_WHILE_SIGNAL_ON,
-            BlindSpotPreferences.DEFAULT_KEEP_WHILE_SIGNAL_ON,
-        ))
-    }
-    var closeDelayMs by remember {
-        mutableStateOf(prefs.getInt(
-            BlindSpotPreferences.KEY_CLOSE_DELAY_MS,
-            BlindSpotPreferences.DEFAULT_CLOSE_DELAY_MS,
-        ))
-    }
-    var bsdGlow by remember { mutableStateOf(prefs.getBoolean(BlindSpotPreferences.KEY_BSD_GLOW, true)) }
-    var rotate90 by remember {
-        mutableStateOf(prefs.getBoolean(BlindSpotPreferences.KEY_PIP_ROTATE_90, false))
-    }
-    var bothOnMain by remember {
-        mutableStateOf(prefs.getBoolean(BlindSpotPreferences.KEY_BOTH_ON_MAIN, false))
-    }
-    var bothOnCluster by remember {
-        mutableStateOf(prefs.getBoolean(BlindSpotPreferences.KEY_BOTH_ON_CLUSTER, false))
-    }
-    // Same lookup the controller routes by: without a projection panel there is no cluster to offer.
-    val hasClusterDisplay = remember { blindSpotClusterDisplay(context) != null }
-
-    // Drag-to-place preview: it lives in a WindowManager overlay, so leaving the screen has to
-    // take it down explicitly. The state follows the window rather than the clicks — the overlay
-    // also goes away on its own idle timer. One window at a time, so the side being placed is
-    // the state (null = nothing on screen).
-    val placingState = remember { mutableStateOf<BlindSpotPositionOverlay.Side?>(null) }
-    var placing by placingState
-    val positionOverlay = remember {
-        BlindSpotPositionOverlay().apply { onHidden = { placingState.value = null } }
-    }
-    // MainActivity survives configuration changes, so onDispose alone never fires when the driver
-    // goes Home — an opaque touchable window would stay over whatever is on screen.
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) positionOverlay.hide()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            positionOverlay.hide()
-        }
-    }
-
-    val cameraPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* denial is answered by the pipeline itself: the camera simply never opens */ }
-
-    fun ensureOverlayPermission() {
-        val grantedBefore = AndroidSettings.canDrawOverlays(context)
-        Trace.event(
-            TraceArea.CAMERA,
-            "overlay-grant",
-            "stage" to "requested",
-            "granted" to grantedBefore,
-        )
-        scope.launch {
-            // Always call the helper even when SYSTEM_ALERT_WINDOW is already allowed: the same
-            // narrow daemon operation also grants PROJECT_MEDIA, for which Android exposes no
-            // app-side query API. Skipping on canDrawOverlays() would leave cluster projection
-            // inaccessible after a package rename or a partial manual grant.
-            val daemonReady = runCatching {
-                clusterEntryPoint.helperBootstrap().ensureRunning()
-            }.getOrDefault(false)
-            val helperGranted = daemonReady && runCatching {
-                clusterEntryPoint.helperClient().grantOverlayPermission()
-            }.getOrDefault(false)
-            val grantedAfter = AndroidSettings.canDrawOverlays(context)
-            Trace.event(
-                TraceArea.CAMERA,
-                "overlay-grant",
-                "stage" to "helper-result",
-                "daemon" to daemonReady,
-                "helper" to helperGranted,
-                "granted" to grantedAfter,
-            )
-            if (!grantedAfter) {
-                runCatching {
-                    context.startActivity(
-                        Intent(
-                            AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${context.packageName}"),
-                        ),
-                    )
-                }.onFailure {
-                    Trace.event(
-                        TraceArea.CAMERA,
-                        "overlay-grant",
-                        "stage" to "settings-failed",
-                        "error" to it.javaClass.simpleName,
-                    )
-                }
-            }
-        }
-    }
-
-    SettingCollapsibleCard(
-        title = stringResource(R.string.settings_blindspot_header),
-        subtitle = stringResource(
-            R.string.settings_display_card_blindspot_sub,
-            stringResource(
-                if (enabled) R.string.settings_display_state_on
-                else R.string.settings_display_state_off
-            ),
-        ),
-        checked = enabled,
-        onCheckedChange = {
-            enabled = it
-            BlindSpotPreferences.setEnabled(prefs, it)
-            if (it) {
-                ensureOverlayPermission()
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
-                    != PackageManager.PERMISSION_GRANTED
-                ) {
-                    cameraPermLauncher.launch(Manifest.permission.CAMERA)
-                }
-            }
-            // Switching off disables the "Готово" row too, so the overlay has to be taken
-            // down here or nothing on screen can dismiss it.
-            if (!it) positionOverlay.hide()
-        },
-    ) {
-        SettingSliderRow(
-            title = stringResource(R.string.settings_blindspot_threshold_title),
-            description = stringResource(R.string.settings_blindspot_threshold_desc),
-            value = thresholdKmh.toFloat(),
-            onValueChange = { thresholdKmh = it.roundToInt() },
-            valueRange = BlindSpotPreferences.MIN_THRESHOLD_KMH.toFloat()..
-                BlindSpotPreferences.MAX_THRESHOLD_KMH.toFloat(),
-            valueLabel = "$thresholdKmh ${stringResource(R.string.auto_unit_kmh)}",
-            steps = (BlindSpotPreferences.MAX_THRESHOLD_KMH - BlindSpotPreferences.MIN_THRESHOLD_KMH) / 5 - 1,
-            enabled = enabled,
-            onValueChangeFinished = {
-                val was = prefs.getInt(
-                    BlindSpotPreferences.KEY_THRESHOLD_KMH, BlindSpotPreferences.DEFAULT_THRESHOLD_KMH)
-                prefs.edit().putInt(BlindSpotPreferences.KEY_THRESHOLD_KMH, thresholdKmh).apply()
-                Trace.event(TraceArea.USER, "slider", "id" to "blindspot_threshold", "value" to thresholdKmh, "was" to was)
-            },
-        )
-        SettingDivider()
-        SettingToggleRow(
-            title = stringResource(R.string.settings_blindspot_keep_signal_title),
-            traceId = "blindspot_keep_signal",
-            description = stringResource(R.string.settings_blindspot_keep_signal_desc),
-            checked = keepWhileSignalOn,
-            onCheckedChange = {
-                keepWhileSignalOn = it
-                prefs.edit().putBoolean(BlindSpotPreferences.KEY_KEEP_WHILE_SIGNAL_ON, it).apply()
-            },
-            enabled = enabled,
-        )
-        SettingDivider()
-        SettingSliderRow(
-            title = stringResource(R.string.settings_blindspot_close_delay_title),
-            description = stringResource(R.string.settings_blindspot_close_delay_desc),
-            value = closeDelayMs.toFloat(),
-            onValueChange = { value ->
-                closeDelayMs = (value.roundToInt() / BlindSpotPreferences.CLOSE_DELAY_STEP_MS) *
-                    BlindSpotPreferences.CLOSE_DELAY_STEP_MS
-            },
-            valueRange = BlindSpotPreferences.MIN_CLOSE_DELAY_MS.toFloat()..
-                BlindSpotPreferences.MAX_CLOSE_DELAY_MS.toFloat(),
-            valueLabel = stringResource(
-                R.string.settings_blindspot_close_delay_value,
-                closeDelayMs / 1000f,
-            ),
-            steps = (BlindSpotPreferences.MAX_CLOSE_DELAY_MS -
-                BlindSpotPreferences.MIN_CLOSE_DELAY_MS) /
-                BlindSpotPreferences.CLOSE_DELAY_STEP_MS - 1,
-            enabled = enabled && keepWhileSignalOn,
-            onValueChangeFinished = {
-                val was = prefs.getInt(
-                    BlindSpotPreferences.KEY_CLOSE_DELAY_MS,
-                    BlindSpotPreferences.DEFAULT_CLOSE_DELAY_MS,
-                )
-                prefs.edit().putInt(BlindSpotPreferences.KEY_CLOSE_DELAY_MS, closeDelayMs).apply()
-                Trace.event(
-                    TraceArea.USER,
-                    "slider",
-                    "id" to "blindspot_close_delay",
-                    "value" to closeDelayMs,
-                    "was" to was,
-                )
-            },
-        )
-        SettingDivider()
-        SettingSliderRow(
-            title = stringResource(R.string.settings_blindspot_pip_width_title),
-            description = stringResource(R.string.settings_blindspot_pip_width_desc),
-            value = pipWidthPct.toFloat(),
-            onValueChange = { pipWidthPct = it.roundToInt() },
-            valueRange = BlindSpotPreferences.MIN_PIP_WIDTH_PCT.toFloat()..
-                BlindSpotPreferences.MAX_PIP_WIDTH_PCT.toFloat(),
-            valueLabel = "${pipWidthPct}%",
-            steps = (BlindSpotPreferences.MAX_PIP_WIDTH_PCT - BlindSpotPreferences.MIN_PIP_WIDTH_PCT) / 2 - 1,
-            enabled = enabled,
-            onValueChangeFinished = {
-                prefs.edit().putInt(BlindSpotPreferences.KEY_PIP_WIDTH_PCT, pipWidthPct).apply()
-                if (placing != null) positionOverlay.refreshSize()
-            },
-        )
-        SettingDivider()
-        SettingToggleRow(
-            title = stringResource(R.string.settings_blindspot_rotate_title),
-            traceId = "blindspot_rotate",
-            description = stringResource(R.string.settings_blindspot_rotate_desc),
-            checked = rotate90,
-            onCheckedChange = {
-                rotate90 = it
-                prefs.edit().putBoolean(BlindSpotPreferences.KEY_PIP_ROTATE_90, it).apply()
-                // Same path the width slider uses: the drag stand-in has to change shape with the
-                // camera window, and the controller re-applies the geometry on its next tick.
-                if (placing != null) positionOverlay.refreshSize()
-            },
-            enabled = enabled,
-        )
-        SettingDivider()
-        SettingActionRow(
-            title = stringResource(R.string.settings_blindspot_position_title),
-            description = stringResource(R.string.settings_blindspot_position_desc),
-            buttonLabel = stringResource(
-                if (placing == BlindSpotPositionOverlay.Side.RIGHT) R.string.settings_blindspot_position_done
-                else R.string.settings_blindspot_position_button
-            ),
-            onClick = {
-                val side = BlindSpotPositionOverlay.Side.RIGHT
-                // Read before hide(): hiding clears [placing] through onHidden, and a second
-                // tap on the same row must close the window, not reopen it.
-                val closing = placing == side
-                positionOverlay.hide()
-                if (!closing) {
-                    if (AndroidSettings.canDrawOverlays(context)) {
-                        if (positionOverlay.show(context, side)) placing = side
-                    } else {
-                        ensureOverlayPermission()
-                    }
-                }
-            },
-            enabled = enabled,
-        )
-        SettingDivider()
-        SettingToggleRow(
-            title = stringResource(R.string.settings_blindspot_both_main_title),
-            traceId = "blindspot_both_main",
-            description = stringResource(R.string.settings_blindspot_both_main_desc),
-            checked = bothOnMain,
-            onCheckedChange = {
-                bothOnMain = it
-                // The two screen opt-ins exclude each other (#240): one write, so the controller
-                // never sees both on.
-                if (it) bothOnCluster = false
-                val editor = prefs.edit().putBoolean(BlindSpotPreferences.KEY_BOTH_ON_MAIN, it)
-                if (it) editor.putBoolean(BlindSpotPreferences.KEY_BOTH_ON_CLUSTER, false)
-                editor.apply()
-                // The left window only exists on the main screen while this is on; its placement
-                // row goes away with it, and an open drag overlay would have nothing to dismiss it.
-                if (!it && placing == BlindSpotPositionOverlay.Side.LEFT) positionOverlay.hide()
-            },
-            enabled = enabled,
-        )
-        // Only when the left camera is actually shown on the main screen — there is nothing to
-        // place otherwise (it lives on the cluster panel).
-        if (bothOnMain) {
-            SettingDivider()
-            SettingActionRow(
-                title = stringResource(R.string.settings_blindspot_left_position_title),
-                description = stringResource(R.string.settings_blindspot_left_position_desc),
-                buttonLabel = stringResource(
-                    if (placing == BlindSpotPositionOverlay.Side.LEFT) R.string.settings_blindspot_position_done
-                    else R.string.settings_blindspot_position_button
-                ),
-                onClick = {
-                    val side = BlindSpotPositionOverlay.Side.LEFT
-                    val closing = placing == side
-                    positionOverlay.hide()
-                    if (!closing && positionOverlay.show(context, side)) placing = side
-                },
-                enabled = enabled,
-            )
-        }
-        if (hasClusterDisplay) {
-            SettingDivider()
-            SettingToggleRow(
-                title = stringResource(R.string.settings_blindspot_both_cluster_title),
-                traceId = "blindspot_both_cluster",
-                description = stringResource(R.string.settings_blindspot_both_cluster_desc),
-                checked = bothOnCluster,
-                onCheckedChange = {
-                    bothOnCluster = it
-                    if (it) bothOnMain = false
-                    val editor = prefs.edit().putBoolean(BlindSpotPreferences.KEY_BOTH_ON_CLUSTER, it)
-                    if (it) editor.putBoolean(BlindSpotPreferences.KEY_BOTH_ON_MAIN, false)
-                    editor.apply()
-                    // Turning the main-screen opt-in off takes the left placement row with it.
-                    if (it && placing == BlindSpotPositionOverlay.Side.LEFT) positionOverlay.hide()
-                },
-                enabled = enabled,
-            )
-        }
-        SettingDivider()
-        SettingToggleRow(
-            title = stringResource(R.string.settings_blindspot_glow_title),
-            traceId = "blindspot_glow",
-            description = stringResource(R.string.settings_blindspot_glow_desc),
-            checked = bsdGlow,
-            onCheckedChange = {
-                bsdGlow = it
-                prefs.edit().putBoolean(BlindSpotPreferences.KEY_BSD_GLOW, it).apply()
-            },
-            enabled = enabled,
-        )
-        SettingHint(text = stringResource(R.string.settings_blindspot_hint))
-    }
-}
-
 /** App label for the cluster picker row; falls back to the package name when not installed/resolvable. */
 private fun resolveAppLabel(context: Context, pkg: String): String =
     try {
@@ -4501,8 +4166,33 @@ private fun OnlineTtsVoiceRow(
 
 
 @Composable
+private fun DiagnosticsSection() {
+    val context = LocalContext.current
+    SectionHeader(text = "固件与权限")
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = CardSurfaceElevated),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            SettingValueRow(
+                title = "权限与固件适配检测",
+                description = "检查相机、麦克风、悬浮窗、使用情况访问权限及车机运行时接口。",
+                value = "打开",
+                onClick = {
+                    context.startActivity(
+                        Intent(context, com.bydmatecn.app.local.LocalToolsActivity::class.java)
+                            .putExtra("tool", "diagnostics"),
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
 private fun SmartHomeSection(state: SettingsUiState, viewModel: SettingsViewModel) {
-    SectionHeader(text = "Умный дом")
+    SectionHeader(text = "智能家居")
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = CardSurfaceElevated),
@@ -4513,27 +4203,27 @@ private fun SmartHomeSection(state: SettingsUiState, viewModel: SettingsViewMode
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SettingToggleRow(
-                title = "Polling",
+                title = "启用家庭场景轮询",
                 traceId = "alice_polling",
                 checked = state.aliceEnabled,
                 onCheckedChange = { viewModel.toggleAlice(it) },
             )
             SettingsTextField(
-                label = "Endpoint URL",
+                label = "服务地址",
                 value = state.aliceEndpoint,
                 onValueChange = { viewModel.updateAliceEndpoint(it) },
                 keyboardType = KeyboardType.Uri
             )
             SettingsTextField(
-                label = "API Key",
+                label = "API 密钥",
                 value = state.aliceApiKey,
                 onValueChange = { viewModel.updateAliceApiKey(it) },
                 keyboardType = KeyboardType.Password,
                 secret = true
             )
             SettingActionRow(
-                title = "Сохранить",
-                buttonLabel = "Сохранить",
+                title = "保存智能家居配置",
+                buttonLabel = "保存",
                 onClick = { viewModel.saveAliceSettings() },
                 style = SettingButtonStyle.Primary,
                 enabled = state.aliceEndpoint.isNotBlank() && state.aliceApiKey.isNotBlank(),
@@ -4541,7 +4231,7 @@ private fun SmartHomeSection(state: SettingsUiState, viewModel: SettingsViewMode
             state.aliceSaveStatus?.let {
                 Text(it, color = AccentGreen, fontSize = 12.sp)
             }
-            SettingHint("Polling опрашивает Worker каждую секунду\nи выполняет команды через D+ API")
+            SettingHint("连接用户自行部署的智能家居服务，定时获取场景命令，并通过车辆接口执行。该功能仅在开发者模式中显示。")
         }
     }
 }
@@ -5098,6 +4788,7 @@ fun VehicleToolSettingsScreen(
             SettingsSection.DISPLAY -> DisplaySection()
             SettingsSection.SPLIT -> SplitSection(viewModel)
             SettingsSection.SERVICE -> ServiceSection(state, viewModel)
+            SettingsSection.DIAGNOSTICS -> DiagnosticsSection()
             SettingsSection.APP -> AppSection(state, viewModel)
             SettingsSection.SMART_HOME -> SmartHomeSection(state, viewModel)
         }
